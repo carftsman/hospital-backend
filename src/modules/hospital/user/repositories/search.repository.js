@@ -1,0 +1,208 @@
+// src/modules/user/repositories/search.repository.js
+import prisma from "../../../../prisma/client.js";
+import { Prisma } from "@prisma/client";
+
+const earthRadiusKm = 6371;
+
+// NOTE: caller is responsible for passing sanitized term like `%...%`
+export const searchDoctors = async (term, lat, lng, offset, limit) => {
+  const hasCoords = typeof lat === "number" && typeof lng === "number";
+
+  return prisma.$queryRaw`
+    SELECT
+      d.id AS "doctorId",
+      d.name AS "doctorName",
+      d."imageUrl" AS "doctorImage",
+      d.experience,
+      d.specialization,
+      d.qualification,
+      d.about,
+      d.languages,
+      d."consultationFee",
+      h.id AS "hospitalId",
+      h.name AS "hospitalName",
+      h."imageUrl" AS "hospitalImage",
+      h.location AS "hospitalLocation",
+      h.place AS "hospitalPlace",
+      h.latitude,
+      h.longitude,
+      h."isOpen"
+      ${hasCoords ? Prisma.sql`, (${earthRadiusKm} * acos(
+        cos(radians(${lat})) * cos(radians(h.latitude)) *
+        cos(radians(h.longitude) - radians(${lng}))
+        + sin(radians(${lat})) * sin(radians(h.latitude))
+      )) AS distance` : Prisma.empty}
+    FROM "Doctor" d
+    JOIN "Hospital" h ON h.id = d."hospitalId"
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND (
+        d.name ILIKE ${term}
+        OR d.specialization ILIKE ${term}
+        OR d.qualification ILIKE ${term}
+      )
+    ${hasCoords ? Prisma.sql`ORDER BY distance ASC` : Prisma.sql`ORDER BY d.name ASC`}
+    LIMIT ${limit}
+    OFFSET ${offset};
+  `;
+};
+
+
+export const countDoctors = async (term) => {
+  const rows = await prisma.$queryRaw`
+    SELECT COUNT(*)::int AS count
+    FROM "Doctor" d
+    JOIN "Hospital" h ON h.id = d."hospitalId"
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND (
+        d.name ILIKE ${term}
+        OR d.specialization ILIKE ${term}
+        OR d.qualification ILIKE ${term}
+      );
+  `;
+  return rows?.[0]?.count || 0;
+};
+
+export const searchHospitals = async (term, lat, lng, offset, limit) => {
+  const hasCoords = typeof lat === "number" && typeof lng === "number";
+
+  if (hasCoords) {
+    return prisma.$queryRaw`
+      SELECT
+        h.id,
+        h.name,
+        h."imageUrl",
+        h.speciality,
+        h.location,
+        h.place,
+        h.latitude,
+        h.longitude,
+        h."isOpen",
+        (${earthRadiusKm} * acos(
+          cos(radians(${lat})) * cos(radians(h.latitude)) *
+          cos(radians(h.longitude) - radians(${lng}))
+          + sin(radians(${lat})) * sin(radians(h.latitude))
+        )) AS distance
+      FROM "Hospital" h
+      WHERE
+        h.status = 'APPROVED'
+        AND h."isListed" = true
+        AND (
+          h.name ILIKE ${term}
+          OR h.location ILIKE ${term}
+          OR h.speciality ILIKE ${term}
+        )
+      ORDER BY distance ASC
+      LIMIT ${limit} OFFSET ${offset};
+    `;
+  }
+
+  return prisma.$queryRaw`
+    SELECT
+      h.id,
+      h.name,
+      h."imageUrl",
+      h.speciality,
+      h.location,
+      h.place,
+      h.latitude,
+      h.longitude,
+      h."isOpen"
+    FROM "Hospital" h
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND (
+        h.name ILIKE ${term}
+        OR h.location ILIKE ${term}
+        OR h.speciality ILIKE ${term}
+      )
+    ORDER BY h.name ASC
+    LIMIT ${limit} OFFSET ${offset};
+  `;
+};
+
+export const countHospitals = async (term) => {
+  const rows = await prisma.$queryRaw`
+    SELECT COUNT(*)::int AS count
+    FROM "Hospital" h
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND (
+        h.name ILIKE ${term}
+        OR h.location ILIKE ${term}
+        OR h.speciality ILIKE ${term}
+      );
+  `;
+  return rows?.[0]?.count || 0;
+};
+
+export const searchHospitalsByCategory = async (term, lat, lng, offset, limit) => {
+  const hasCoords = typeof lat === "number" && typeof lng === "number";
+
+  if (hasCoords) {
+    return prisma.$queryRaw`
+      SELECT DISTINCT
+        h.id,
+        h.name,
+        h."imageUrl",
+        h.speciality,
+        h.location,
+        h.place,
+        h.latitude,
+        h.longitude,
+        h."isOpen",
+        (${earthRadiusKm} * acos(
+          cos(radians(${lat})) * cos(radians(h.latitude)) *
+          cos(radians(h.longitude) - radians(${lng}))
+          + sin(radians(${lat})) * sin(radians(h.latitude))
+        )) AS distance
+      FROM "Category" c
+      JOIN "Hospital" h ON h.id = c."hospitalId"
+      WHERE
+        h.status = 'APPROVED'
+        AND h."isListed" = true
+        AND c.name ILIKE ${term}
+      ORDER BY distance ASC
+      LIMIT ${limit} OFFSET ${offset};
+    `;
+  }
+
+  return prisma.$queryRaw`
+    SELECT DISTINCT
+      h.id,
+      h.name,
+      h."imageUrl",
+      h.speciality,
+      h.location,
+      h.place,
+      h.latitude,
+      h.longitude,
+      h."isOpen"
+    FROM "Category" c
+    JOIN "Hospital" h ON h.id = c."hospitalId"
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND c.name ILIKE ${term}
+    ORDER BY h.name ASC
+    LIMIT ${limit} OFFSET ${offset};
+  `;
+};
+
+export const countHospitalsByCategory = async (term) => {
+  const rows = await prisma.$queryRaw`
+    SELECT COUNT(DISTINCT h.id)::int AS count
+    FROM "Category" c
+    JOIN "Hospital" h ON h.id = c."hospitalId"
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+      AND c.name ILIKE ${term};
+  `;
+  return rows?.[0]?.count || 0;
+};

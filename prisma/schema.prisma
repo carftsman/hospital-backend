@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hospital {
+  id            Int     @id @default(autoincrement())
+  name          String
+  location      String
+  place         String?
+  imageUrl      String?
+  pinCode       String
+  contactName   String?
+  contactNumber String?
+
+  ownerEmail    String @unique
+  ownerPassword String
+
+  speciality       String?
+  consultationMode ConsultationMode @default(BOTH)
+
+  status    HospitalStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  latitude  Float?
+  longitude Float?
+  isOpen    Boolean        @default(true)
+  isListed  Boolean        @default(true)
+
+  categories Category[]
+  doctors    Doctor[]
+
+  notifications Notification[] // <-- REQUIRED FIX
+  
+
+
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  imageUrl    String?
+  hospitalId  Int
+  hospital    Hospital @relation(fields: [hospitalId], references: [id])
+  createdAt   DateTime @default(now())
+  doctors     Doctor[]
+  
+
+
+}
+
+model Doctor {
+  id             Int     @id @default(autoincrement())
+  name           String
+  imageUrl       String?
+  experience     Int
+  specialization String?
+  qualification  String?
+  about          String?
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+  hospitalId Int
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  // --- NEW FIELDS ---
+  languages       String[] @default([]) // Postgres text[] (empty array by default)
+  consultationFee Int      @default(0) // store in paise (or cents). 0 = free / unknown
+  // ------------------
+
+  timeSlots TimeSlot[]
+
+  @@index([hospitalId])
+  @@index([categoryId])
+  
+
+
+}
+
+enum HospitalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConsultationMode {
+  ONLINE
+  OFFLINE
+  BOTH
+}
+
+model TimeSlot {
+  id       Int    @id @default(autoincrement())
+  doctorId Int
+  doctor   Doctor @relation(fields: [doctorId], references: [id])
+
+  start            DateTime
+  end              DateTime
+  consultationMode ConsultationMode @default(BOTH)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  booking Booking? @relation("SlotBooking")
+
+  @@index([doctorId, start])
+  @@index([doctorId, isActive])
+  @@index([start])
+  @@index([doctorId, start, end])
+}
+
+model Booking {
+  id         Int      @id @default(autoincrement())
+  timeslotId Int      @unique
+  timeSlot   TimeSlot @relation("SlotBooking", fields: [timeslotId], references: [id])
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+
+  // USER SNAPSHOT
+  userName  String?
+  userEmail String?
+  userPhone String?
+
+  // DOCTOR SNAPSHOT
+  doctorId   Int?
+  doctorName String?
+
+  // HOSPITAL SNAPSHOT
+  hospitalId   Int?
+  hospitalName String?
+
+  start DateTime?
+  end   DateTime?
+
+  status    String   @default("CONFIRMED")
+  createdAt DateTime @default(now())
+
+  notification Notification? @relation("BookingNotification") // <-- FIXED
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Notification {
+  id Int @id @default(autoincrement())
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+
+  hospitalId Int
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  bookingId Int     @unique
+  booking   Booking @relation("BookingNotification", fields: [bookingId], references: [id])
+
+  doctorName   String
+  hospitalName String
+  userName     String?
+  userPhone    String?
+  slotStart    DateTime
+  slotEnd      DateTime
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+
+  @@index([hospitalId])
+  @@index([userId])
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  phone         String    @unique
+  email         String    @unique
+  password      String
+  termsAccepted Boolean   @default(false)
+  acceptedAt    DateTime?
+
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  bookings      Booking[]
+  notifications Notification[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}

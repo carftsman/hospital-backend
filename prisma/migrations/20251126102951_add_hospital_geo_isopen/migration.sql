@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Hospital" ADD COLUMN     "isListed" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "isOpen" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "latitude" DOUBLE PRECISION,
+ADD COLUMN     "longitude" DOUBLE PRECISION;
