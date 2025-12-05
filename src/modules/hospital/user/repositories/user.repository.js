@@ -21,6 +21,20 @@ export const findUserByEmail = (email) => {
 export const findUserByPhone = (phone) => {
   return prisma.user.findUnique({
     where: { phone },
-    select: { id: true }
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      password: true
+    }
+  });
+};
+
+export const updateUserPassword = (userId, hashedPassword) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword }
   });
 };

@@ -61,4 +61,7 @@ app.use("/api/hospital/user", docByHospitals);
 app.use("/api/hospital/user", timeSlots);
 app.use("/api/hospital/user", bookSlot);
 app.use("/api/hospital/user", UserbookedSlots);
+
+
+
 export default app;

@@ -25,3 +25,7 @@ export const verifyToken = (token) => {
   if (!secret) throw new Error("JWT_SECRET is not defined in .env");
   return jwt.verify(token, secret);
 };
+export const signShortToken = (payload, expiresIn = "5m") => {
+  const secret = process.env.JWT_SECRET;
+  return jwt.sign(payload, secret, { expiresIn });
+};
