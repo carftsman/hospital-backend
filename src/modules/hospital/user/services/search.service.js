@@ -1,14 +1,19 @@
 // src/modules/user/services/search.service.js
 import * as repo from "../repositories/search.repository.js";
 
-/**
- * q: raw user query (not percent-wrapped)
- * type: "doctor"|"hospital"|"category"|"all"
- * lat/lng: optional
- */
+const sanitizeForLike = (s) => s.replace(/%/g, "\\%").replace(/_/g, "\\_");
+
+const dedupeById = (arr) => {
+  const map = new Map();
+  for (const item of arr || []) {
+    if (!map.has(item.id)) map.set(item.id, item);
+  }
+  return Array.from(map.values());
+};
+
 export const searchEntities = async (q, type = "all", lat = null, lng = null, page = 1, limit = 20) => {
   const offset = (page - 1) * limit;
-  const term = `%${q.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`; // sanitize basic wildcards
+  const term = `${sanitizeForLike(q)}%`;
   const hasCoords = typeof lat === "number" && typeof lng === "number";
 
   const result = {
@@ -22,13 +27,14 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
     totalHospitals: 0
   };
 
+  // ---------------- DOCTOR SEARCH ----------------
   if (type === "doctor" || type === "all") {
-    const [doctorsRows, doctorsCount] = await Promise.all([
+    const [rows, count] = await Promise.all([
       repo.searchDoctors(term, lat, lng, offset, limit),
       repo.countDoctors(term)
     ]);
 
-    result.doctors = (doctorsRows || []).map(d => ({
+    result.doctors = rows.map(d => ({
       id: d.doctorId,
       name: d.doctorName,
       imageUrl: d.doctorImage,
@@ -51,16 +57,17 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
       distance: hasCoords ? Number(d.distance) : null
     }));
 
-    result.totalDoctors = doctorsCount || 0;
+    result.totalDoctors = count;
   }
 
+  // ---------------- HOSPITAL SEARCH ----------------
   if (type === "hospital" || type === "all") {
-    const [hRows, hCount] = await Promise.all([
+    const [rows, count] = await Promise.all([
       repo.searchHospitals(term, lat, lng, offset, limit),
       repo.countHospitals(term)
     ]);
 
-    result.hospitals = (hRows || []).map(h => ({
+    const hospitalsMapped = rows.map(h => ({
       id: h.id,
       name: h.name,
       imageUrl: h.imageUrl,
@@ -73,17 +80,18 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
       distance: hasCoords ? Number(h.distance) : null
     }));
 
-    result.totalHospitals = hCount || 0;
+    result.hospitals = dedupeById(result.hospitals.concat(hospitalsMapped));
+    result.totalHospitals = result.hospitals.length;
   }
 
+  // ---------------- CATEGORY SEARCH ----------------
   if (type === "category" || type === "all") {
-    const [catRows, catCount] = await Promise.all([
+    const [rows, count] = await Promise.all([
       repo.searchHospitalsByCategory(term, lat, lng, offset, limit),
       repo.countHospitalsByCategory(term)
     ]);
 
-    // merge into hospitals array (if type === 'all' we may append)
-    const mapped = (catRows || []).map(h => ({
+    const mapped = rows.map(h => ({
       id: h.id,
       name: h.name,
       imageUrl: h.imageUrl,
@@ -96,15 +104,8 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
       distance: hasCoords ? Number(h.distance) : null
     }));
 
-    // if searching only category, replace hospitals; if all, append (dedup not handled here)
-    if (type === "category") {
-      result.hospitals = mapped;
-      result.totalHospitals = catCount || 0;
-    } else {
-      // append and update total (basic)
-      result.hospitals = result.hospitals.concat(mapped);
-      result.totalHospitals = (result.totalHospitals || 0) + (catCount || 0);
-    }
+    result.hospitals = dedupeById(result.hospitals.concat(mapped));
+    result.totalHospitals = result.hospitals.length;
   }
 
   return result;

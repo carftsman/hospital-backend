@@ -44,21 +44,18 @@ export const registerUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
-    let { email, password } = req.body;
+    let { identifier, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+    // identifier = email OR phone
+    if (!identifier || !password) {
+      return res.status(400).json({
+        message: "Email/phone and password are required"
+      });
     }
 
-    // trim + normalize (same as admin)
-    email = email.trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    identifier = String(identifier).trim();
 
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
-    }
-
-    const result = await loginUserService({ email, password });
+    const result = await loginUserService({ identifier, password });
 
     return res.json({
       message: "Login successful",
@@ -66,6 +63,12 @@ export const loginUser = async (req, res) => {
     });
 
   } catch (err) {
+    if (err.message === "INVALID_CREDENTIALS") {
+      return res.status(401).json({
+        message: "Invalid email/phone or password"
+      });
+    }
+
     return res.status(500).json({ message: err.message });
   }
 };

@@ -50,14 +50,29 @@ export const registerUserService = async (body) => {
 };
 
 
-export const loginUserService = async ({ email, password }) => {
-  const user = await findUserByEmail(email);
+export const loginUserService = async ({ identifier, password }) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!user) throw new Error("Invalid email or password");
+  let user;
 
-  // PERFORMANCE: check password last
+  // If identifier looks like an email → search by email
+  if (emailRegex.test(identifier)) {
+    user = await findUserByEmail(identifier.toLowerCase());
+  } else {
+    // Otherwise treat as phone
+    user = await findUserByPhone(identifier);
+  }
+
+  if (!user) {
+    const err = new Error("INVALID_CREDENTIALS");
+    throw err;
+  }
+
   const isMatch = await comparePassword(password, user.password);
-  if (!isMatch) throw new Error("Invalid email or password");
+  if (!isMatch) {
+    const err = new Error("INVALID_CREDENTIALS");
+    throw err;
+  }
 
   const token = signToken({
     id: user.id,
