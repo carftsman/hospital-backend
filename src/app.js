@@ -1,6 +1,9 @@
 // src/app.js
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
+
+
 
 // admin
 import hospitalAdminRoutes from "./modules/hospital/admin/routes/hospitalRequest.routes.js";
@@ -24,13 +27,27 @@ import docByHospitals from "./modules/hospital/user/routes/hospitalDoctors.route
 import timeSlots from "./modules/hospital/user/routes/timeslot.routes.js";
 import bookSlot from "./modules/hospital/user/routes/booking.router.js";
 import UserbookedSlots from "./modules/hospital/user/routes/userBooking.routes.js";
+import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
+
 dotenv.config();
 
 const app = express();
 
-// Middlewares
-app.use(express.json()); // IMPORTANT FIX
+// 1) CORS must be registered first
+app.use(cors({
+  origin: "*",
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","Accept"],
+  credentials: false,
+}));
+
+// ❌ REMOVE — This is what causes crash
+// app.options("*", cors());
+
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // Health route
 app.get("/health", (req, res) => {
@@ -62,6 +79,8 @@ app.use("/api/hospital/user", timeSlots);
 app.use("/api/hospital/user", bookSlot);
 app.use("/api/hospital/user", UserbookedSlots);
 
+//swager
+app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
 
 
 export default app;
