@@ -264,13 +264,14 @@ export const searchSymptoms = async (term, offset, limit) => {
       c.id AS "categoryId",
       c.name AS "categoryName"
     FROM "Symptom" s
-    JOIN "Category" c ON c.id = s."categoryId"
+    LEFT JOIN "Category" c ON c.id = s."categoryId"
     WHERE s.name ILIKE ${term}
     ORDER BY s.name ASC
     LIMIT ${limit}
     OFFSET ${offset};
   `;
 };
+
 
 export const countSymptoms = async (term) => {
   const rows = await prisma.$queryRaw`

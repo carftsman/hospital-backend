@@ -6,7 +6,7 @@ import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
  * body:
  * {
  *   q: "cardio",
- *   type: "doctor" | "hospital" | "category" | "all" (default: all),
+ *   type: "doctor" | "hospital" | "category" | "symptom" | "all" (default: all),
  *   mode: "ONLINE" | "OFFLINE" | "ALL" (default: ALL),
  *   latitude?: number,
  *   longitude?: number,

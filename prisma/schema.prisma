@@ -191,7 +191,7 @@ model User {
   // OTP AUTH (NEW)
   // =====================
   otpCode       String?
-  otpExpiresAt DateTime?
+  otpExpiresAt  DateTime?
   isPhoneVerified Boolean @default(false)
 
   refreshToken  String?

@@ -5,7 +5,7 @@ import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
  * POST /api/user/search
  * body: {
  *   q: "cardio",
- *   type: "doctor" | "hospital" | "category" | "all" (default: all),
+ *   type: "doctor" | "hospital" | "category" | "symptom" | "all" (default: all),
  *   latitude?: number,
  *   longitude?: number,
  *   page?: number,
@@ -28,8 +28,8 @@ export const search = async (req, res) => {
     }
 
     const t = String(type).toLowerCase();
-    if (!["doctor", "hospital", "category", "all"].includes(t)) {
-      return res.status(400).json({ message: "type must be doctor|hospital|category|all" });
+    if (!["doctor", "hospital", "category", "symptom", "all"].includes(t)) {
+      return res.status(400).json({ message: "type must be doctor|hospital|category|symptom|all" });
     }
 
     const p = Math.max(1, parseInt(page, 10) || 1);

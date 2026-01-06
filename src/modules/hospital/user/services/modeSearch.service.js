@@ -115,9 +115,10 @@ export const modeSearchEntities = async (q, type = "all", mode = "ALL", lat = nu
 
 // ---------------- SYMPTOM SEARCH ----------------
 if (type === "symptom" || type === "all") {
+  const likeTerm = `%${term}%`;
   const [rows, count] = await Promise.all([
-    repo.searchSymptoms(term, offset, limit),
-    repo.countSymptoms(term)
+    repo.searchSymptoms(likeTerm, offset, limit),
+    repo.countSymptoms(likeTerm)
   ]);
 
   result.symptoms = rows.map(s => ({
