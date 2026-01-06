@@ -9,6 +9,8 @@ import {
   verifyForgotOtp,
   resetPassword
 } from "../controllers/forgot.controller.js";
+import { validate } from "../../../../middlewares/validate.js";
+import {registerSchema, loginSchema} from "../validations/auth.validation.js";
 const router = express.Router();
 
 // Public
@@ -55,7 +57,7 @@ const router = express.Router();
  */
 
 
-router.post("/register", registerUser);
+router.post("/register",validate(registerSchema), registerUser);
 
 /**
  * @swagger
@@ -87,7 +89,7 @@ router.post("/register", registerUser);
 
 
 
-router.post("/login", loginUser);
+router.post("/login",validate(loginSchema), loginUser);
 
 /**
  * @swagger

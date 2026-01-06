@@ -31,10 +31,10 @@ export const modeSearch = async (req, res) => {
     }
 
     const t = String(type).toLowerCase();
-    if (!["doctor", "hospital", "category", "all"].includes(t)) {
+    if (!["doctor", "hospital", "category", "symptom", "all"].includes(t)) {
 
 
-      return res.status(400).json({ message: "type must be doctor|hospital|category|all" });
+      return res.status(400).json({ message: "type must be doctor|hospital|category|symptom|all" });
     }
 
     const m = String(mode || "ALL").toUpperCase();

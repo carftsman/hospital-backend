@@ -13,19 +13,22 @@ const dedupeById = (arr) => {
 
 export const searchEntities = async (q, type = "all", lat = null, lng = null, page = 1, limit = 20) => {
   const offset = (page - 1) * limit;
-  const term = `${sanitizeForLike(q)}%`;
+  const term = `%${sanitizeForLike(q)}%`;
   const hasCoords = typeof lat === "number" && typeof lng === "number";
 
   const result = {
-    page,
-    limit,
-    query: q,
-    type,
-    doctors: [],
-    hospitals: [],
-    totalDoctors: 0,
-    totalHospitals: 0
-  };
+  page,
+  limit,
+  query: q,
+  type,
+  mode,
+  doctors: [],
+  hospitals: [],
+  symptoms: [],
+  totalDoctors: 0,
+  totalHospitals: 0,
+  totalSymptoms: 0
+};
 
   // ---------------- DOCTOR SEARCH ----------------
   if (type === "doctor" || type === "all") {
@@ -107,6 +110,24 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
     result.hospitals = dedupeById(result.hospitals.concat(mapped));
     result.totalHospitals = result.hospitals.length;
   }
+// ---------------- SYMPTOM SEARCH ----------------
+if (type === "symptom" || type === "all") {
+  const [rows, count] = await Promise.all([
+    repo.searchSymptoms(term, offset, limit),
+    repo.countSymptoms(term)
+  ]);
 
+  result.symptoms = rows.map(s => ({
+    id: s.id,
+    name: s.name,
+    imageUrl: s.imageUrl,
+    category: {
+      id: s.categoryId,
+      name: s.categoryName
+    }
+  }));
+
+  result.totalSymptoms = count;
+}
   return result;
 };

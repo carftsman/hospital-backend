@@ -29,7 +29,7 @@ const router = express.Router();
  *
  *               type:
  *                 type: string
- *                 enum: [doctor, hospital, category, all]
+ *                 enum: [doctor, hospital, category, symptom, all]
  *                 default: all
  *                 description: "Entity type to search"
  *

@@ -28,6 +28,7 @@ import timeSlots from "./modules/hospital/user/routes/timeslot.routes.js";
 import bookSlot from "./modules/hospital/user/routes/booking.router.js";
 import UserbookedSlots from "./modules/hospital/user/routes/userBooking.routes.js";
 import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
+import profileRoutes from "./modules/hospital/user/routes/profile.routes.js";
 
 dotenv.config();
 
@@ -78,6 +79,7 @@ app.use("/api/hospital/user", docByHospitals);
 app.use("/api/hospital/user", timeSlots);
 app.use("/api/hospital/user", bookSlot);
 app.use("/api/hospital/user", UserbookedSlots);
+app.use("/api/hospital/user/profile", profileRoutes);
 
 //swager
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);

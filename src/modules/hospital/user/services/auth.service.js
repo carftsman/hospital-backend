@@ -83,9 +83,6 @@ export const loginUserService = async ({ identifier, password }) => {
     token,
     user: {
       id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
       phone: user.phone
     }
   };

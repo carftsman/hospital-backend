@@ -206,3 +206,31 @@ export const countHospitalsByCategory = async (term) => {
   `;
   return rows?.[0]?.count || 0;
 };
+
+// SYMPTOM SEARCH
+
+export const searchSymptoms = async (term, offset, limit) => {
+  return prisma.$queryRaw`
+    SELECT
+      s.id,
+      s.name,
+      s."imageUrl",
+      c.id AS "categoryId",
+      c.name AS "categoryName"
+    FROM "Symptom" s
+    JOIN "Category" c ON c.id = s."categoryId"
+    WHERE s.name ILIKE ${term}
+    ORDER BY s.name ASC
+    LIMIT ${limit}
+    OFFSET ${offset};
+  `;
+};
+
+export const countSymptoms = async (term) => {
+  const rows = await prisma.$queryRaw`
+    SELECT COUNT(*)::int AS count
+    FROM "Symptom" s
+    WHERE s.name ILIKE ${term};
+  `;
+  return rows?.[0]?.count || 0;
+};

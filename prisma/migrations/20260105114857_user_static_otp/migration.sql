@@ -1,0 +1,13 @@
+-- CreateEnum
+CREATE TYPE "OnboardingStage" AS ENUM ('PHONE_VERIFICATION', 'PROFILE_SETUP', 'COMPLETED');
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "isPhoneVerified" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "onboardingStage" "OnboardingStage" NOT NULL DEFAULT 'PHONE_VERIFICATION',
+ADD COLUMN     "otpCode" TEXT,
+ADD COLUMN     "otpExpiresAt" TIMESTAMP(3),
+ADD COLUMN     "refreshToken" TEXT,
+ALTER COLUMN "firstName" DROP NOT NULL,
+ALTER COLUMN "lastName" DROP NOT NULL,
+ALTER COLUMN "email" DROP NOT NULL,
+ALTER COLUMN "password" DROP NOT NULL;
