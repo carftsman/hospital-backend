@@ -137,7 +137,17 @@ router.post("/send-otp", sendOtp);
  *                 type: string
  *     responses:
  *       200:
- *         description: OTP verified successfully
+ *         description: OTP verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 nextStep:
+ *                   type: string
+ *                   enum: [HOME, PROFILE]
  */
 
 router.post("/verify-otp", verifyOtp);
