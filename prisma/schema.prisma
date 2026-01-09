@@ -173,7 +173,8 @@ model Notification {
 // prisma/schema.prisma
 model User {
   id            Int       @id @default(autoincrement())
-
+  
+   onboardingStage OnboardingStage?
   // =====================
   // BASIC PROFILE
   // =====================
@@ -196,7 +197,8 @@ model User {
 
   refreshToken  String?
 
-  onboardingStage OnboardingStage @default(PHONE_VERIFICATION)
+  // ✅ NEW FLAG
+  isOnboardingCompleted Boolean @default(false)
 
   // =====================
   // TERMS & STATUS

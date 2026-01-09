@@ -13,7 +13,7 @@ export const completeMedicalProfileService = async (userId, body) => {
     emContactNumber
   } = body;
 
-  // ✅ Convert UI value (+ve/-ve) → DB enum
+  //  Convert UI value (+ve/-ve) → DB enum
   if (bloodGroup) {
     if (!BloodGroupValue[bloodGroup]) {
       throw new Error("INVALID_BLOOD_GROUP");
@@ -27,7 +27,8 @@ export const completeMedicalProfileService = async (userId, body) => {
     bloodGroup,
     emContactName,
     emContactNumber,
-    onboardingStage: "COMPLETED"
+    // onboardingStage: "COMPLETED"
+    isOnboardingCompleted: true
   });
 
   return {
@@ -38,7 +39,8 @@ export const completeMedicalProfileService = async (userId, body) => {
     bloodGroup: BloodGroupLabel[user.bloodGroup],
     emContactName: user.emContactName,
     emContactNumber: user.emContactNumber,
-    onboardingStage: user.onboardingStage
+    // onboardingStage: user.onboardingStage
+    isOnboardingCompleted: user.isOnboardingCompleted
   };
 };
 
@@ -49,6 +51,7 @@ export const getProfileService = async (userId) => {
     }
     return{
         ...user,
-        bloodGroup: BloodGroupLabel[user.bloodGroup]
+        bloodGroup: BloodGroupLabel[user.bloodGroup],
+        isOnboardingCompleted: user.isOnboardingCompleted
     }
 };

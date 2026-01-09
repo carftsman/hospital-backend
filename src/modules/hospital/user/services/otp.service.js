@@ -1,44 +1,78 @@
 import jwt from "jsonwebtoken";
-import {
-  findUserByPhone,
-  updateUserById
-} from "../repositories/user.repository.js";
+import prisma from "../../../../prisma/client.js";
 
 const STATIC_OTP = "007007";
 
-export const sendStaticOtpService = async (phone) => {
-  const user = await findUserByPhone(phone);
+/**
+ * SEND OTP
+ * - MUST create user if not exists
+ * - MUST NOT check "phone registered"
+ */
+export const sendOtpService = async (phone) => {
+  let user = await prisma.user.findUnique({ where: { phone } });
 
-  if (!user) throw new Error("USER_NOT_FOUND");
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        phone,
+        isPhoneVerified: false,
+        isOnboardingCompleted: false
+      }
+    });
+  }
 
-  await updateUserById(user.id, {
-    otpCode: STATIC_OTP,
-    otpExpiresAt: new Date(Date.now() + 5 * 60000)
+  const otpCode = "007007";
+  const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+  await prisma.user.update({
+    where: { phone },
+    data: {
+      otpCode,
+      otpExpiresAt
+    }
   });
 
-  return { phone, otp: STATIC_OTP };
+  // ✅ RETURN OTP ONLY IN DEV
+  if (process.env.NODE_ENV !== "production") {
+    return { otp: otpCode };
+  }
+
+  return {};
 };
 
+/**
+ * VERIFY OTP
+ */
 export const verifyStaticOtpService = async (phone, otp) => {
-  const user = await findUserByPhone(phone);
-
-  if (!user) throw new Error("USER_NOT_FOUND");
-  if (otp !== STATIC_OTP) throw new Error("INVALID_OTP");
-
-  const token = jwt.sign(
-    { id: user.id, role: "USER" },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-
-  await updateUserById(user.id, {
-    isPhoneVerified: true,
-    otpCode: null,
-    otpExpiresAt: null
+  const user = await prisma.user.findUnique({
+    where: { phone }
   });
 
-  return {
+  if (!user) {
+    throw new Error("USER_NOT_FOUND"); // should NEVER happen now
+  }
+
+  if (user.otpCode !== otp || user.otpExpiresAt < new Date()) {
+    throw new Error("INVALID_OTP");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { phone },
+    data: {
+      isPhoneVerified: true,
+      otpCode: null,
+      otpExpiresAt: null
+    }
+  });
+
+  const token = jwt.sign(
+    { id: updatedUser.id, role: "USER" },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+   );
+
+   return {
     token,
-    user
+    user: updatedUser
   };
 };
