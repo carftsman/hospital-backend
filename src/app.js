@@ -42,7 +42,7 @@ app.use(cors({
   credentials: false,
 }));
 
-// ❌ REMOVE — This is what causes crash
+// REMOVE — This is what causes crash
 // app.options("*", cors());
 
 app.use(express.json());
