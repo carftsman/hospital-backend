@@ -10,15 +10,15 @@ const router = express.Router();
  *   get:
  *     summary: List categories by consultation mode
  *     tags: [Categories]
- *     description: "Fetch categories using query parameters. Defaults to ONLINE mode."
+ *     description: "Fetch categories using query parameters. Defaults to BOTH mode."
  *     parameters:
  *       - in: query
  *         name: mode
  *         schema:
  *           type: string
- *           enum: [ONLINE, OFFLINE]
+ *           enum: [ONLINE, OFFLINE,BOTH]
  *         required: false
- *         description: "Consultation mode (default: ONLINE)"
+ *         description: "Consultation mode (default: BOTH)"
  *
  *       - in: query
  *         name: page
