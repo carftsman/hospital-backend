@@ -7,8 +7,6 @@ import {
 
 const router = express.Router();
 
-router.use(userAuth);
-
 // User order history
 /**
  * @swagger
@@ -74,7 +72,7 @@ router.use(userAuth);
  *         description: "Server Error"
  */
 
-router.get("/listbookings", listUserBookings);
+router.get("/listbookings",userAuth, listUserBookings);
 
 /**
  * @swagger
@@ -124,6 +122,6 @@ router.get("/listbookings", listUserBookings);
  */
 
 // Single booking (detailed)
-router.get("/bookings/:id", getUserBooking);
+router.get("/bookings/:id",userAuth, getUserBooking);
 
 export default router;

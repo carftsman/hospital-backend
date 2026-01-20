@@ -67,8 +67,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/hospital/admin", hospitalOpenStatusRoutes);
 app.use("/api/hospital/admin", bookedSlots)
 
-//user 
-app.use("/api/hospital/user/auth", userAuthRoutes);
+
 
 ////user routes
 app.use("/api/hospital/user", nearbyRoutes);
@@ -84,6 +83,10 @@ app.use("/api/hospital/user", bookSlot);
 app.use("/api/hospital/user", UserbookedSlots);
 app.use("/api/hospital/user/profile", profileRoutes);
 app.use("/api/hospital/user", symptomRoutes);
+
+
+//user 
+app.use("/api/hospital/user/auth", userAuthRoutes);
 
 //swager
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);

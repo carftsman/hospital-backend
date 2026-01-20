@@ -1,29 +1,3 @@
-// // import express from "express";
-// // import { getSymptoms } from "../controllers/symptom.controller.js";
-
-// // const router = express.Router();
-
-// // /**
-// //  * GET /api/hospital/user/symptoms
-// //  * Query:
-// //  *  - search (optional)
-// //  *  - page (optional)
-// //  *  - limit (optional)
-// //  */
-// // router.get("/symptoms", getSymptoms);
-
-// // export default router;
-
-// import express from "express";
-// import { getSymptoms } from "../controllers/symptom.controller.js";
-
-// const router = express.Router();
-
-// // PUBLIC
-// router.get("/symptoms", getSymptoms);
-
-// export default router;
-
 import express from "express";
 import { getSymptoms } from "../controllers/symptom.controller.js";
 
@@ -33,6 +7,7 @@ const router = express.Router();
  * @swagger
  * /api/hospital/user/symptoms:
  *   get:
+ *     security: []
  *     summary: Get all symptoms
  *     description: >
  *       Public API to fetch symptoms with optional search and pagination.
