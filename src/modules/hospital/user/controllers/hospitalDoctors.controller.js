@@ -1,4 +1,4 @@
-import { fetchHospitalDoctors } from "../services/hospitalDoctors.service.js";
+import { fetchHospitalDoctors, fetchDoctors } from "../services/hospitalDoctors.service.js";
 import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
 
 export const getHospitalDoctors = async (req, res) => {
@@ -37,5 +37,47 @@ export const getHospitalDoctors = async (req, res) => {
   } catch (err) {
     console.error("getHospitalDoctors error:", err);
     return res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+
+export const getDoctors = async (req, res) => {
+  try {
+    const {
+      lat,
+      lng,
+      distance,
+      search,
+      specialization,
+      minFee,
+      maxFee,
+      mode = "BOTH",
+      availability = "ALL",
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ message: "lat and lng are required" });
+    }
+
+    const result = await fetchDoctors({
+      lat: Number(lat),
+      lng: Number(lng),
+      distance: distance ? Number(distance) : null,
+      search,
+      specialization,
+      minFee: minFee ? Number(minFee) : null,
+      maxFee: maxFee ? Number(maxFee) : null,
+      mode,
+      availability,
+      page: Number(page),
+      limit: Number(limit)
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("getDoctors error", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };

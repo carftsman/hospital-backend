@@ -10,7 +10,7 @@ const options = {
       description: "API documentation for frontend team",
     },
 
-    // 🔥 MUST ADD THIS FOR JWT AUTH IN SWAGGER
+    // MUST ADD THIS FOR JWT AUTH IN SWAGGER
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -21,7 +21,7 @@ const options = {
       },
     },
 
-    // 🔥 <optional> If you want all endpoints secured by default:
+    //  <optional> If you want all endpoints secured by default:
     // security: [
     //   { bearerAuth: [] }
     // ],
@@ -38,7 +38,7 @@ const options = {
     ],
   },
 
-  // 🔍 Where to scan for @swagger comments
+  // Where to scan for @swagger comments
   apis: [
     "./src/modules/hospital/user/routes/*.js",
     "./src/modules/hospital/admin/routes/*.js",

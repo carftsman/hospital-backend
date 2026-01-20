@@ -1,5 +1,8 @@
 import express from "express";
-import { listHospitalsByMode, listHospitalsByCategory } from "../controllers/hospital.controller.js";
+import { listHospitalsByMode, 
+    listHospitalsByCategory,
+    listHospitalsByModeGet,
+    listHospitalsByCategoryGet } from "../controllers/hospital.controller.js";
 import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
@@ -178,5 +181,103 @@ router.post("/hospitals-by-mode", nearbyLimiter, listHospitalsByMode);
  */
 
 router.post("/hospitals-by-category", nearbyLimiter, listHospitalsByCategory);
+
+/**
+ * @swagger
+ * /api/hospital/user/hospitals/nearby:
+ *   get:
+ *     summary: Get nearby hospitals by consultation mode
+ *     tags: [Hospitals]
+ *     description: Returns nearby hospitals sorted by distance using user location.
+ *     parameters:
+ *       - in: query
+ *         name: mode
+ *         schema:
+ *           type: string
+ *           enum: [ONLINE, OFFLINE, BOTH]
+ *           default: ONLINE
+ *       - in: query
+ *         name: latitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           example: 17.385044
+ *       - in: query
+ *         name: longitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           example: 78.486671
+ *       - in: query
+ *         name: maxDistanceKm
+ *         schema:
+ *           type: number
+ *           example: 5
+ *           description: Maximum distance in kilometers
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Nearby hospitals fetched successfully
+ *       400:
+ *         description: Invalid query params
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/hospitals/nearby", nearbyLimiter, listHospitalsByModeGet);
+
+/**
+ * @swagger
+ * /api/hospital/user/hospitals/by-category:
+ *   get:
+ *     summary: Get nearby hospitals by category
+ *     tags: [Hospitals]
+ *     parameters:
+ *       - in: query
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: mode
+ *         schema:
+ *           type: string
+ *           enum: [ONLINE, OFFLINE]
+ *       - in: query
+ *         name: latitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: longitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: maxDistanceKm
+ *         schema:
+ *           type: number
+ *           example: 10
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Hospitals fetched successfully
+ */
+router.get("/hospitals/by-category", nearbyLimiter, listHospitalsByCategoryGet);
 
 export default router;

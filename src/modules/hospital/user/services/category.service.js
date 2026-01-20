@@ -1,54 +1,147 @@
+// import prisma from "../../../../prisma/client.js";
+// import { Prisma } from "@prisma/client";
+
+// export const getCategoriesByMode = async (
+//   mode = "BOTH",
+//   page = 1,
+//   limit = 20
+// ) => {
+//   const offset = (page - 1) * limit;
+ 
+//   const modeCondition =
+//     mode === "BOTH"
+//       ? Prisma.sql``   // NO FILTER
+//       : Prisma.sql`
+//           AND (
+//             h."consultationMode" = ${mode}::"ConsultationMode"
+//             OR h."consultationMode" = 'BOTH'::"ConsultationMode"
+//           )
+//         `;
+//   const hospitalModeCondition =
+//     mode === "BOTH"
+//       ? Prisma.sql`h."consultationMode" = 'BOTH'::"ConsultationMode"`
+//       : Prisma.sql`(
+//           h."consultationMode" = ${mode}::"ConsultationMode"
+//           OR h."consultationMode" = 'BOTH'::"ConsultationMode"
+//         )`;
+
+//   const timeslotModeCondition =
+//     mode === "BOTH"
+//       ? Prisma.sql`t."consultationMode" = 'BOTH'::"ConsultationMode"`
+//       : Prisma.sql`(
+//           t."consultationMode" = ${mode}::"ConsultationMode"
+//           OR t."consultationMode" = 'BOTH'::"ConsultationMode"
+//         )`;
+
+//   const rows = await prisma.$queryRaw`
+//   SELECT DISTINCT
+//     c.id,
+//     c.name,
+//     c."imageUrl",
+//     c.description
+//   FROM "Category" c
+//   JOIN "Hospital" h ON h.id = c."hospitalId"
+//   LEFT JOIN "Doctor" d ON d."categoryId" = c.id
+//   LEFT JOIN "TimeSlot" t ON t."doctorId" = d.id
+//   WHERE
+//     h.status = 'APPROVED'
+//     AND h."isListed" = true
+//     AND ${hospitalModeCondition}
+//     AND (
+//       d.id IS NULL
+//       OR (
+//         t.id IS NULL
+//         OR (
+//           t."isActive" = true
+//           AND ${timeslotModeCondition}
+//         )
+//       )
+//     )
+//   ORDER BY c.name ASC
+// `;
+
+
+//   const countRows = await prisma.$queryRaw`
+//   SELECT COUNT(DISTINCT c.id)::int AS count
+//   FROM "Category" c
+//   JOIN "Hospital" h ON h.id = c."hospitalId"
+//   LEFT JOIN "Doctor" d ON d."categoryId" = c.id
+//   LEFT JOIN "TimeSlot" t ON t."doctorId" = d.id
+//   WHERE
+//     h.status = 'APPROVED'
+//     AND h."isListed" = true
+//     AND ${hospitalModeCondition}
+//     AND (
+//       d.id IS NULL
+//       OR (
+//         t.id IS NULL
+//         OR (
+//           t."isActive" = true
+//           AND ${timeslotModeCondition}
+//         )
+//       )
+//     );
+// `;
+
+// return {
+//     categories: rows,
+//     total: countRows?.[0]?.count || 0
+//   };
+// };
+
 import prisma from "../../../../prisma/client.js";
 import { Prisma } from "@prisma/client";
 
-export const getCategoriesByMode = async (mode = "ONLINE", page = 1, limit = 20) => {
+export const getCategoriesByMode = async (
+  mode = "BOTH",
+  page = 1,
+  limit = 20
+) => {
   const offset = (page - 1) * limit;
 
-  const timeslotModeCondition =
-    mode === "ONLINE"
-      ? Prisma.sql`(t."consultationMode" = 'ONLINE' OR t."consultationMode" = 'BOTH')`
-      : Prisma.sql`(t."consultationMode" = 'OFFLINE' OR t."consultationMode" = 'BOTH')`;
+  // Base filter (always applied)
+  const baseWhere = Prisma.sql`
+    FROM "Category" c
+    JOIN "Hospital" h ON h.id = c."hospitalId"
+    WHERE
+      h.status = 'APPROVED'
+      AND h."isListed" = true
+  `;
 
-  const hospitalModeCondition =
-    mode === "ONLINE"
-      ? Prisma.sql`(h."consultationMode" = 'ONLINE' OR h."consultationMode" = 'BOTH')`
-      : Prisma.sql`(h."consultationMode" = 'OFFLINE' OR h."consultationMode" = 'BOTH')`;
+  //  Mode filter (ONLY for ONLINE / OFFLINE)
+  const modeFilter =
+    mode === "BOTH"
+      ? Prisma.sql`` //  NO FILTER
+      : Prisma.sql`
+          AND (
+            h."consultationMode" = ${mode}::"ConsultationMode"
+            OR h."consultationMode" = 'BOTH'::"ConsultationMode"
+          )
+        `;
 
+  //  DATA QUERY
   const rows = await prisma.$queryRaw`
-    SELECT DISTINCT
+    SELECT
       c.id,
       c.name,
       c."imageUrl",
       c.description
-    FROM "Category" c
-    JOIN "Hospital" h ON h.id = c."hospitalId"
-    JOIN "Doctor" d ON d."categoryId" = c.id
-    JOIN "TimeSlot" t ON t."doctorId" = d.id
-    WHERE 
-      h.status = 'APPROVED'
-      AND h."isListed" = true
-      AND ${hospitalModeCondition}
-      AND ${timeslotModeCondition}
-      AND t."isActive" = true
+    ${baseWhere}
+    ${modeFilter}
     ORDER BY c.name ASC
     LIMIT ${limit}
     OFFSET ${offset};
   `;
 
+  //  COUNT QUERY (IDENTICAL FILTERS)
   const countRows = await prisma.$queryRaw`
-    SELECT COUNT(DISTINCT c.id)::int AS count
-    FROM "Category" c
-    JOIN "Hospital" h ON h.id = c."hospitalId"
-    JOIN "Doctor" d ON d."categoryId" = c.id
-    JOIN "TimeSlot" t ON t."doctorId" = d.id
-    WHERE 
-      h.status = 'APPROVED'
-      AND h."isListed" = true
-      AND ${hospitalModeCondition}
-      AND ${timeslotModeCondition}
-      AND t."isActive" = true;
+    SELECT COUNT(c.id)::int AS count
+    ${baseWhere}
+    ${modeFilter};
   `;
 
-  const total = countRows?.[0]?.count || 0;
-  return { categories: rows, total };
+  return {
+    categories: rows,
+    total: countRows?.[0]?.count || 0
+  };
 };

@@ -1,5 +1,5 @@
 import express from "express";
-import { getHospitalDoctors } from "../controllers/hospitalDoctors.controller.js";
+import { getHospitalDoctors, getDoctors } from "../controllers/hospitalDoctors.controller.js";
 import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
@@ -100,4 +100,6 @@ const router = express.Router();
 
 router.get("/hospital/:hospitalId/doctors", nearbyLimiter, getHospitalDoctors);
 
+
+router.get("/doctors", nearbyLimiter, getDoctors);
 export default router;

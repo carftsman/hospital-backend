@@ -48,3 +48,37 @@ export const fetchHospitalDoctors = async (
     doctors
   };
 };
+
+
+export const fetchDoctors = async (filters) => {
+  const offset = (filters.page - 1) * filters.limit;
+
+  const [rows, total] = await Promise.all([
+    repo.getDoctors(filters, offset),
+    repo.countDoctors(filters)
+  ]);
+
+  return {
+    page: filters.page,
+    limit: filters.limit,
+    total,
+    count: rows.length,
+    doctors: rows.map(r => ({
+      id: r.doctorId,
+      name: r.doctorName,
+      imageUrl: r.imageUrl,
+      specialization: r.specialization,
+      experience: r.experience,
+      consultationFee: Number(r.consultationFee),
+      languages: r.languages || [],
+      distance: r.distance ? Number(r.distance.toFixed(2)) : null,
+      hospital: {
+        id: r.hospitalId,
+        name: r.hospitalName,
+        place: r.place,
+        isOpen: r.isOpen,
+        consultationMode: r.consultationMode
+      }
+    }))
+  };
+};
