@@ -30,16 +30,13 @@ import hospitalDoctorsRoutes from "./modules/hospital/user/routes/hospitalDoctor
 import bookingRoutes from "./modules/hospital/user/routes/booking.router.js";
 import userBookingRoutes from "./modules/hospital/user/routes/userBooking.routes.js";
 import profileRoutes from "./modules/hospital/user/routes/profile.routes.js";
-<<<<<<< Updated upstream
 import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
-=======
-import appointmentRoutes from
-"./modules/hospital/user/routes/appointments.routes.js";
+import appointmentRoutes from "./modules/hospital/user/routes/appointments.routes.js";
 // =======================
 // Swagger
 // =======================
 import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
->>>>>>> Stashed changes
+
 
 // =======================
 // App Init
@@ -80,37 +77,8 @@ app.use("/api/hospital/admin/doctors", doctorAdminRoutes);
 app.use("/api/hospital/admin", hospitalOpenStatusRoutes);
 app.use("/api/hospital/admin", bookedSlotsRoutes);
 app.use("/api/upload", uploadRoutes);
-
-<<<<<<< Updated upstream
-
-
-////user routes
-app.use("/api/hospital/user", nearbyRoutes);
-app.use("/api/hospital/user", onlineCategories);
-app.use("/api/hospital/user", hospitalBymode);
-app.use("/api/hospital/user",hospitalHomeSearch);
-app.use("/api/hospital/user", hospitalHomeSugg);
-app.use("/api/hospital/user", searchbymode);
-app.use("/api/hospital/user", modeBySuggestions);
-app.use("/api/hospital/user", docByHospitals);
-app.use("/api/hospital/user", timeSlots);
-app.use("/api/hospital/user", bookSlot);
-app.use("/api/hospital/user", UserbookedSlots);
-app.use("/api/hospital/user/profile", profileRoutes);
-app.use("/api/hospital/user", symptomRoutes);
-
-
-//user 
-app.use("/api/hospital/user/auth", userAuthRoutes);
-=======
-// =======================
-// User APIs
-// =======================
-// =======================
-// User APIs
-// =======================
-app.use("/api/hospital/user/auth", userAuthRoutes);
-app.use("/api/hospital/user/profile", profileRoutes);
+ 
+//user routes
 app.use("/api/hospital/user", nearbyRoutes);
 app.use("/api/hospital/user", onlineCategoriesRoutes);
 app.use("/api/hospital/user", hospitalByModeRoutes);
@@ -121,17 +89,18 @@ app.use("/api/hospital/user", modeSuggestionRoutes);
 app.use("/api/hospital/user", hospitalDoctorsRoutes);
 app.use("/api/hospital/user", bookingRoutes);
 app.use("/api/hospital/user", userBookingRoutes);
->>>>>>> Stashed changes
+app.use("/api/hospital/user/profile", profileRoutes);
+app.use("/api/hospital/user", symptomRoutes);
 
-// ✅ THIS IS THE CORRECT ONE
+
+//user 
+app.use("/api/hospital/user/auth", userAuthRoutes);
+
+//  THIS IS THE CORRECT ONE
 app.use("/api/appointments", appointmentRoutes);
 
-// =======================
-// Swagger Docs
-// =======================
+
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
 
-// =======================
-// Export App
-// =======================
+
 export default app;

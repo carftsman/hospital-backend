@@ -11,7 +11,6 @@ const options = {
       description: "API documentation for frontend team",
     },
 
-<<<<<<< Updated upstream
     // MUST ADD THIS FOR JWT AUTH IN SWAGGER
     components: {
       securitySchemes: {
@@ -28,8 +27,6 @@ const options = {
     //   { bearerAuth: [] }
     // ],
 
-=======
->>>>>>> Stashed changes
     servers: [
       {
         url: "http://localhost:5000",
@@ -122,10 +119,7 @@ const options = {
     },
   },
 
-<<<<<<< Updated upstream
   // Where to scan for @swagger comments
-=======
->>>>>>> Stashed changes
   apis: [
     "./src/modules/hospital/user/routes/*.js",
     "./src/modules/hospital/admin/routes/*.js",
