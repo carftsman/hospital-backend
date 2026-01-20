@@ -1,5 +1,6 @@
 import express from "express";
-import { searchSuggestions } from "../controllers/suggestions.controller.js";
+import { hospitalHomeSuggestions } from "../controllers/suggestions.controller.js";
+import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
 /**
@@ -61,6 +62,9 @@ const router = express.Router();
  *         description: "Internal server error"
  */
 
-router.post("/HospitalHomesuggestions", searchSuggestions);
+
+
+router.post("/HospitalHomesuggestions", nearbyLimiter, hospitalHomeSuggestions);
+
 
 export default router;

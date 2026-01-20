@@ -1,15 +1,18 @@
-import { getModeSuggestions } from "../services/modeSuggestion.service.js";
+import { modeSuggestionEntities } from "../services/modeSuggestion.service.js";
 
 export const modeSuggestions = async (req, res) => {
   try {
+    // ✅ Works for both GET & POST
+    const source = req.method === "GET" ? req.query : req.body;
+
     const {
-      query,
+      q,
       mode = "BOTH",
       limit = 10
-    } = req.body;
+    } = source;
 
-    if (!query || typeof query !== "string") {
-      return res.status(400).json({ message: "query must be a string" });
+    if (!q || typeof q !== "string" || !q.trim()) {
+      return res.status(400).json({ message: "query 'q' is required" });
     }
 
     const m = String(mode).toUpperCase();
@@ -17,14 +20,10 @@ export const modeSuggestions = async (req, res) => {
       return res.status(400).json({ message: "mode must be ONLINE|OFFLINE|BOTH" });
     }
 
-    const suggestions = await getModeSuggestions(query.trim(), Number(limit), m);
+    const l = Math.min(20, Math.max(1, parseInt(limit, 10) || 10));
 
-    return res.json({
-      query,
-      mode: m,
-      limit,
-      suggestions
-    });
+    const result = await modeSuggestionEntities(q.trim(), m, l);
+    return res.json(result);
 
   } catch (err) {
     console.error("modeSuggestions error:", err);

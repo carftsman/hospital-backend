@@ -3,70 +3,85 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 
-
-
-// admin
+// =======================
+// Admin Routes
+// =======================
 import hospitalAdminRoutes from "./modules/hospital/admin/routes/hospitalRequest.routes.js";
 import hospitalStatusRoutes from "./modules/hospital/admin/routes/hospitalStatus.routes.js";
 import hospitalAuthRoutes from "./modules/hospital/admin/routes/auth.routes.js";
 import categoryAdminRoutes from "./modules/hospital/admin/routes/category.routes.js";
 import doctorAdminRoutes from "./modules/hospital/admin/routes/doctor.routes.js";
-import timeslotAdminRoutes from "./modules/hospital/admin/routes/timeslot.routes.js";
 import uploadRoutes from "./modules/hospital/admin/routes/upload.routes.js";
-import bookedSlots from "./modules/hospital/admin/routes/notification.routes.js";
-import userAuthRoutes from "./modules/hospital/user/routes/auth.routes.js";
+import bookedSlotsRoutes from "./modules/hospital/admin/routes/notification.routes.js";
 import hospitalOpenStatusRoutes from "./modules/hospital/admin/routes/openStatus.routes.js";
+
+// =======================
+// User Routes
+// =======================
+import userAuthRoutes from "./modules/hospital/user/routes/auth.routes.js";
 import nearbyRoutes from "./modules/hospital/user/routes/nearby.routes.js";
-import onlineCategories from "./modules/hospital/user/routes/category.routes.js";
-import hospitalBymode from "./modules/hospital/user/routes/hospital.routes.js";
-import hospitalHomeSearch from "./modules/hospital/user/routes/search.routes.js";
-import hospitalHomeSugg from "./modules/hospital/user/routes/suggestions.routes.js"
-import searchbymode from "./modules/hospital/user/routes/modeSearch.router.js";
-import modeBySuggestions from "./modules/hospital/user/routes/modeSuggestion.routes.js";
-import docByHospitals from "./modules/hospital/user/routes/hospitalDoctors.routes.js";
-import timeSlots from "./modules/hospital/user/routes/timeslot.routes.js";
-import bookSlot from "./modules/hospital/user/routes/booking.router.js";
-import UserbookedSlots from "./modules/hospital/user/routes/userBooking.routes.js";
-import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
+import onlineCategoriesRoutes from "./modules/hospital/user/routes/category.routes.js";
+import hospitalByModeRoutes from "./modules/hospital/user/routes/hospital.routes.js";
+import hospitalHomeSearchRoutes from "./modules/hospital/user/routes/search.routes.js";
+import hospitalHomeSuggestionsRoutes from "./modules/hospital/user/routes/suggestions.routes.js";
+import searchByModeRoutes from "./modules/hospital/user/routes/modeSearch.router.js";
+import modeSuggestionRoutes from "./modules/hospital/user/routes/modeSuggestion.routes.js";
+import hospitalDoctorsRoutes from "./modules/hospital/user/routes/hospitalDoctors.routes.js";
+import bookingRoutes from "./modules/hospital/user/routes/booking.router.js";
+import userBookingRoutes from "./modules/hospital/user/routes/userBooking.routes.js";
 import profileRoutes from "./modules/hospital/user/routes/profile.routes.js";
+<<<<<<< Updated upstream
 import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
+=======
+import appointmentRoutes from
+"./modules/hospital/user/routes/appointments.routes.js";
+// =======================
+// Swagger
+// =======================
+import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
+>>>>>>> Stashed changes
 
+// =======================
+// App Init
+// =======================
 dotenv.config();
-
 const app = express();
 
-// 1) CORS must be registered first
-app.use(cors({
-  origin: "*",
-  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization","Accept"],
-  credentials: false,
-}));
-
-// REMOVE — This is what causes crash
-// app.options("*", cors());
+// =======================
+// Middleware
+// =======================
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    credentials: false,
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-
-// Health route
+// =======================
+// Health Check
+// =======================
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "server running" });
 });
 
-// All routes
+// =======================
+// Admin APIs
+// =======================
 app.use("/api/hospital/admin", hospitalAdminRoutes);
 app.use("/api/hospital/admin/hospitals", hospitalStatusRoutes);
 app.use("/api/hospital/admin/auth", hospitalAuthRoutes);
 app.use("/api/hospital/admin/categories", categoryAdminRoutes);
 app.use("/api/hospital/admin/doctors", doctorAdminRoutes);
-app.use("/api/hospital/admin/timeslots", timeslotAdminRoutes);
-app.use("/api/upload", uploadRoutes);
 app.use("/api/hospital/admin", hospitalOpenStatusRoutes);
-app.use("/api/hospital/admin", bookedSlots)
+app.use("/api/hospital/admin", bookedSlotsRoutes);
+app.use("/api/upload", uploadRoutes);
 
+<<<<<<< Updated upstream
 
 
 ////user routes
@@ -87,9 +102,36 @@ app.use("/api/hospital/user", symptomRoutes);
 
 //user 
 app.use("/api/hospital/user/auth", userAuthRoutes);
+=======
+// =======================
+// User APIs
+// =======================
+// =======================
+// User APIs
+// =======================
+app.use("/api/hospital/user/auth", userAuthRoutes);
+app.use("/api/hospital/user/profile", profileRoutes);
+app.use("/api/hospital/user", nearbyRoutes);
+app.use("/api/hospital/user", onlineCategoriesRoutes);
+app.use("/api/hospital/user", hospitalByModeRoutes);
+app.use("/api/hospital/user", hospitalHomeSearchRoutes);
+app.use("/api/hospital/user", hospitalHomeSuggestionsRoutes);
+app.use("/api/hospital/user", searchByModeRoutes);
+app.use("/api/hospital/user", modeSuggestionRoutes);
+app.use("/api/hospital/user", hospitalDoctorsRoutes);
+app.use("/api/hospital/user", bookingRoutes);
+app.use("/api/hospital/user", userBookingRoutes);
+>>>>>>> Stashed changes
 
-//swager
+// ✅ THIS IS THE CORRECT ONE
+app.use("/api/appointments", appointmentRoutes);
+
+// =======================
+// Swagger Docs
+// =======================
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
 
-
+// =======================
+// Export App
+// =======================
 export default app;

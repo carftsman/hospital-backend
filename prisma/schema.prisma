@@ -7,79 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Hospital {
-  id            Int     @id @default(autoincrement())
-  name          String
-  location      String
-  place         String?
-  imageUrl      String?
-  pinCode       String
-  contactName   String?
-  contactNumber String?
-
-  ownerEmail    String @unique
-  ownerPassword String
-
-  speciality       String?
-  consultationMode ConsultationMode @default(BOTH)
-
-  status    HospitalStatus @default(PENDING)
-  createdAt DateTime       @default(now())
-  latitude  Float?
-  longitude Float?
-  isOpen    Boolean        @default(true)
-  isListed  Boolean        @default(true)
-
-  categories Category[]
-  doctors    Doctor[]
-
-  notifications Notification[] // <-- REQUIRED FIX
-
-}
-
-model Category {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  imageUrl    String?
-  hospitalId  Int
-  hospital    Hospital @relation(fields: [hospitalId], references: [id])
-  createdAt   DateTime @default(now())
-  doctors     Doctor[]
-
-  Symptom Symptom[]
-}
-
-model Doctor {
-  id             Int     @id @default(autoincrement())
-  name           String
-  imageUrl       String?
-  experience     Int
-  specialization String?
-  qualification  String?
-  about          String?
-
-  categoryId Int
-  category   Category @relation(fields: [categoryId], references: [id])
-  hospitalId Int
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  // --- NEW FIELDS ---
-  languages       String[] @default([]) // Postgres text[] (empty array by default)
-  consultationFee Int      @default(0) // store in paise (or cents). 0 = free / unknown
-  // ------------------
-
-  timeSlots TimeSlot[]
-
-  @@index([hospitalId])
-  @@index([categoryId])
-
-
-
-}
-
 enum HospitalStatus {
   PENDING
   APPROVED
@@ -92,145 +19,18 @@ enum ConsultationMode {
   BOTH
 }
 
-model TimeSlot {
-  id       Int    @id @default(autoincrement())
-  doctorId Int
-  doctor   Doctor @relation(fields: [doctorId], references: [id])
-
-  start            DateTime
-  end              DateTime
-  consultationMode ConsultationMode @default(BOTH)
-
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  booking Booking? @relation("SlotBooking")
-
-  @@index([doctorId, start])
-  @@index([doctorId, isActive])
-  @@index([start])
-  @@index([doctorId, start, end])
+enum BookingStatus {
+  HOLD
+  CONFIRMED
+  CANCELLED
+  EXPIRED
 }
-
-model Booking {
-  id         Int      @id @default(autoincrement())
-  timeslotId Int      @unique
-  timeSlot   TimeSlot @relation("SlotBooking", fields: [timeslotId], references: [id])
-
-  userId Int?
-  user   User? @relation(fields: [userId], references: [id])
-
-  // USER SNAPSHOT
-  userName  String?
-  userEmail String?
-  userPhone String?
-
-  // DOCTOR SNAPSHOT
-  doctorId   Int?
-  doctorName String?
-
-  // HOSPITAL SNAPSHOT
-  hospitalId   Int?
-  hospitalName String?
-
-  start DateTime?
-  end   DateTime?
-
-  status    String   @default("CONFIRMED")
-  createdAt DateTime @default(now())
-
-  notification Notification? @relation("BookingNotification") // <-- FIXED
-
-  @@index([userId])
-  @@index([status])
-}
-
-model Notification {
-  id Int @id @default(autoincrement())
-
-  userId Int?
-  user   User? @relation(fields: [userId], references: [id])
-
-  hospitalId Int
-  hospital   Hospital @relation(fields: [hospitalId], references: [id])
-
-  bookingId Int     @unique
-  booking   Booking @relation("BookingNotification", fields: [bookingId], references: [id])
-
-  doctorName   String
-  hospitalName String
-  userName     String?
-  userPhone    String?
-  slotStart    DateTime
-  slotEnd      DateTime
-  createdAt    DateTime @default(now())
-  read         Boolean  @default(false)
-
-  @@index([hospitalId])
-  @@index([userId])
-}
-
-// prisma/schema.prisma
-model User {
-  id            Int       @id @default(autoincrement())
-  
-   onboardingStage OnboardingStage?
-  // =====================
-  // BASIC PROFILE
-  // =====================
-  fullName      String?
-
-  phone         String    @unique
-  email         String?   @unique
-  password      String?   // nullable for OTP-only users
-
-  bloodGroup      BloodGroup?
-  emContactName   String?
-  emContactNumber String?
-
-  // =====================
-  // OTP AUTH (NEW)
-  // =====================
-  otpCode       String?
-  otpExpiresAt  DateTime?
-  isPhoneVerified Boolean @default(false)
-
-  refreshToken  String?
-
-  // ✅ NEW FLAG
-  isOnboardingCompleted Boolean @default(false)
-
-  // =====================
-  // TERMS & STATUS
-  // =====================
-  termsAccepted Boolean   @default(false)
-  acceptedAt    DateTime?
-
-  status        UserStatus @default(ACTIVE)
-
-  // =====================
-  // TIMESTAMPS
-  // =====================
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  // =====================
-  // RELATIONS
-  // =====================
-  bookings      Booking[]
-  notifications Notification[]
-
-  @@index([email])
-  @@index([phone])
-}
-
 
 enum OnboardingStage {
   PHONE_VERIFICATION
   PROFILE_SETUP
   COMPLETED
 }
-
 
 enum UserStatus {
   ACTIVE
@@ -249,14 +49,175 @@ enum BloodGroup {
   O_NEG
 }
 
+model Hospital {
+  id               Int              @id @default(autoincrement())
+  name             String
+  location         String
+  place            String?
+  imageUrl         String?
+  pinCode          String
+  contactName      String?
+  contactNumber    String?
+  ownerEmail       String           @unique
+  ownerPassword    String
+  speciality       String?
+  consultationMode ConsultationMode @default(BOTH)
+  status           HospitalStatus   @default(PENDING)
+  createdAt        DateTime         @default(now())
+  isListed         Boolean          @default(true)
+  isOpen           Boolean          @default(true)
+  latitude         Float?
+  longitude        Float?
+
+  categories    Category[]
+  doctors       Doctor[]
+  notifications Notification[]
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  imageUrl    String?
+  hospitalId  Int
+  createdAt   DateTime @default(now())
+
+  hospital Hospital  @relation(fields: [hospitalId], references: [id])
+  doctors  Doctor[]
+  symptoms Symptom[]
+}
+
+model Doctor {
+  id              Int      @id @default(autoincrement())
+  name            String
+  imageUrl        String?
+  experience      Int
+  specialization  String?
+  qualification   String?
+  about           String?
+  categoryId      Int
+  hospitalId      Int
+  createdAt       DateTime @default(now())
+  consultationFee Int      @default(0)
+  languages       String[] @default([])
+
+  category  Category   @relation(fields: [categoryId], references: [id])
+  hospital  Hospital   @relation(fields: [hospitalId], references: [id])
+  timeSlots TimeSlot[]
+}
+
+model User {
+  id                    Int              @id @default(autoincrement())
+  phone                 String           @unique
+  email                 String?          @unique
+  password              String?
+  termsAccepted         Boolean          @default(false)
+  acceptedAt            DateTime?
+  status                UserStatus       @default(ACTIVE)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  isPhoneVerified       Boolean          @default(false)
+  onboardingStage       OnboardingStage?
+  otpCode               String?
+  otpExpiresAt          DateTime?
+  refreshToken          String?
+  bloodGroup            BloodGroup?
+  emContactName         String?
+  emContactNumber       String?
+  fullName              String?
+  isOnboardingCompleted Boolean          @default(false)
+
+  bookings        Booking[]
+  notifications   Notification[]
+  patientProfiles PatientProfile[]
+}
+
+model PatientProfile {
+  id     Int @id @default(autoincrement())
+  userId Int
+
+  fullName String
+  phone    String?
+  age      Int?
+  gender   String?
+  isSelf   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  bookings Booking[]
+
+  @@index([userId])
+}
+
+model TimeSlot {
+  id               Int              @id @default(autoincrement())
+  doctorId         Int
+  start            DateTime
+  end              DateTime
+  consultationMode ConsultationMode @default(BOTH)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+
+  doctor  Doctor   @relation(fields: [doctorId], references: [id])
+  booking Booking? @relation("SlotBooking")
+
+  @@index([doctorId, start])
+}
+
+model Booking {
+  id               Int @id @default(autoincrement())
+  timeslotId       Int @unique
+  userId           Int
+  doctorId         Int
+  patientProfileId Int
+
+  start     DateTime
+  end       DateTime
+  status    BookingStatus @default(HOLD)
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  // 🔹 relations
+  user           User           @relation(fields: [userId], references: [id])
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id])
+  timeSlot       TimeSlot       @relation("SlotBooking", fields: [timeslotId], references: [id])
+
+  notification Notification? @relation("BookingNotification")
+}
+
+model Notification {
+  id         Int  @id @default(autoincrement())
+  userId     Int?
+  hospitalId Int
+  bookingId  Int  @unique
+
+  doctorName   String
+  hospitalName String
+  userName     String?
+  userPhone    String?
+  slotStart    DateTime
+  slotEnd      DateTime
+
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+
+  booking  Booking  @relation("BookingNotification", fields: [bookingId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([hospitalId])
+  @@index([userId])
+}
+
 model Symptom {
   id         Int      @id @default(autoincrement())
   name       String
   imageUrl   String?
   categoryId Int
-  category   Category @relation(fields: [categoryId], references: [id])
   createdAt  DateTime @default(now())
 
-  @@index([name])
-  @@index([categoryId])
+  category Category @relation(fields: [categoryId], references: [id])
 }

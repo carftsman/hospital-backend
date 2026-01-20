@@ -5,6 +5,9 @@ import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
 
+/**
+ * POST /api/hospital/user/bookings
+ */
 // now protected by userAuth
 /**
  * @swagger
@@ -95,6 +98,16 @@ const router = express.Router();
  *                   example: Internal server error
  */
 
-router.post("/bookings", userAuth, nearbyLimiter, createBooking);
+
+
+
+// src/modules/hospital/user/routes/booking.router.js
+
+router.post(
+  "/bookings",
+  userAuth,
+  nearbyLimiter,
+  createBooking
+);
 
 export default router;

@@ -1,5 +1,6 @@
 import express from "express";
 import { modeSuggestions } from "../controllers/modeSuggestion.controller.js";
+import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
 

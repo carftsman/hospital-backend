@@ -4,69 +4,31 @@ import { nearbyLimiter } from "../../../../middlewares/rateLimiters.js";
 
 const router = express.Router();
 
-// POST because we accept location and complex payload
+/**
+ * @swagger
+ * tags:
+ *   name: Search
+ *   description: Search doctors, hospitals, categories and symptoms
+ */
+
 /**
  * @swagger
  * /api/hospital/user/modeSearch:
  *   post:
  *     summary: Search doctors, hospitals, or categories by mode and text query
  *     tags: [Search]
- *     description: "Performs a multi-entity search based on query, type, mode, and optional geolocation."
+ *     description: Performs a multi-entity search using filters like type, mode and location
  *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - q
- *             properties:
- *               q:
- *                 type: string
- *                 description: "Search keyword"
- *                 example: "cardio"
- *
- *               type:
- *                 type: string
- *                 enum: [doctor, hospital, category, symptom, all]
- *                 default: all
- *                 description: "Entity type to search"
- *
- *               mode:
- *                 type: string
- *                 enum: [ONLINE, OFFLINE, BOTH]
- *                 default: BOTH
- *                 description: "Consultation mode filter"
- *
- *               latitude:
- *                 type: number
- *                 nullable: true
- *                 description: "User latitude for distance-based filtering"
- *                 example: 17.385044
- *
- *               longitude:
- *                 type: number
- *                 nullable: true
- *                 description: "User longitude for distance-based filtering"
- *                 example: 78.486671
- *
- *               page:
- *                 type: integer
- *                 minimum: 1
- *                 default: 1
- *                 description: "Pagination page number"
- *
- *               limit:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 100
- *                 default: 20
- *                 description: "Items per page"
+ *             $ref: '#/components/schemas/ModeSearchRequest'
  *
  *     responses:
  *       200:
- *         description: "Search results retrieved successfully"
+ *         description: Search results retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -99,12 +61,63 @@ const router = express.Router();
  *                       distance: 3.5
  *
  *       400:
- *         description: "Bad request. Missing or invalid parameters such as q, mode, or type"
- *
+ *         description: Bad request (missing or invalid parameters)
  *       500:
- *         description: "Internal server error"
+ *         description: Internal server error
  */
-
 router.post("/modeSearch", nearbyLimiter, modeSearch);
+
+/**
+ * @swagger
+ * /api/hospital/user/modeSearch:
+ *   get:
+ *     summary: Search doctors, hospitals, or categories (GET)
+ *     tags: [Search]
+ *
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: cardio
+ *
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           $ref: '#/components/schemas/SearchTypeEnum'
+ *
+ *       - in: query
+ *         name: mode
+ *         schema:
+ *           $ref: '#/components/schemas/ConsultationModeEnum'
+ *
+ *       - in: query
+ *         name: latitude
+ *         schema:
+ *           type: number
+ *
+ *       - in: query
+ *         name: longitude
+ *         schema:
+ *           type: number
+ *
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *
+ *     responses:
+ *       200:
+ *         description: Search results retrieved successfully
+ */
+router.get("/modeSearch", nearbyLimiter, modeSearch);
 
 export default router;

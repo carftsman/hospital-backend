@@ -21,7 +21,7 @@ export const searchEntities = async (q, type = "all", lat = null, lng = null, pa
   limit,
   query: q,
   type,
-  mode,
+  
   doctors: [],
   hospitals: [],
   symptoms: [],
