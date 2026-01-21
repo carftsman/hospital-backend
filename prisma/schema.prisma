@@ -27,14 +27,11 @@ model Hospital {
   latitude         Float?
   longitude        Float?
 
-  establishedYear Int?              // ✅ ADD THIS LINE
-
-  establishedYear  Int?
-  categories       Category[]
-  doctors          Doctor[]
-  notifications    Notification[]
+  establishedYear Int?
+  categories      Category[]
+  doctors         Doctor[]
+  notifications   Notification[]
 }
-
 
 model Category {
   id          Int       @id @default(autoincrement())
@@ -159,15 +156,14 @@ model Notification {
   user         User?    @relation(fields: [userId], references: [id])
 }
 
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model Symptom {
   id         Int      @id @default(autoincrement())
   name       String
   imageUrl   String?
   categoryId Int
   createdAt  DateTime @default(now())
+  Category   Category @relation(fields: [categoryId], references: [id])
 }
-
 
 enum HospitalStatus {
   PENDING
