@@ -15,6 +15,10 @@ const options = {
         url: "http://localhost:5000",
         description: "Local Development Server",
       },
+      {
+        url: "https://hospital-backend-1-9jq0.onrender.com",
+        description: "Render Production Server",
+      },
     ],
 
     components: {
