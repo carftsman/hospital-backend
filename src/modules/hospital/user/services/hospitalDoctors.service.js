@@ -7,78 +7,82 @@ export const fetchHospitalDoctors = async (
   page = 1,
   limit = 50
 ) => {
-  const offset = (page - 1) * limit;
+  const p = page > 0 ? page : 1;
+  const l = limit > 0 ? limit : 50;
+  const offset = (p - 1) * l;
 
   const [rows, total] = await Promise.all([
-    repo.getDoctorsByHospital(hospitalId, mode, offset, limit),
+    repo.getDoctorsByHospital(hospitalId, mode, offset, l),
     repo.countDoctorsByHospital(hospitalId, mode)
   ]);
-
-  const doctors = rows.map(r => ({
-    id: r.doctorId,
-    name: r.doctorName,
-    imageUrl: r.doctorImage,
-    experience: r.experience,
-    specialization: r.specialization,
-    qualification: r.qualification,
-    about: r.about,
-    languages: r.languages || [],
-    consultationFee: Number(r.consultationFee || 0),
-    createdAt: r.createdAt,
-    hospital: {
-      id: r.hospitalId,
-      name: r.hospitalName,
-      imageUrl: r.hospitalImage,
-      location: r.hospitalLocation,
-      place: r.hospitalPlace,
-      latitude: r.latitude ? Number(r.latitude) : null,
-      longitude: r.longitude ? Number(r.longitude) : null,
-      isOpen: Boolean(r.isOpen),
-      consultationMode: r.hospitalMode
-    }
-  }));
 
   return {
     hospitalId,
     hospitalDistance: hospitalDistance ? Number(hospitalDistance) : null,
-    page,
-    limit,
+    page: p,
+    limit: l,
     total,
-    count: doctors.length,
-    doctors
+    count: rows.length,
+    doctors: rows
   };
 };
 
-
-export const fetchDoctors = async (filters) => {
-  const offset = (filters.page - 1) * filters.limit;
+export const fetchDoctors = async (filters, page = 1, limit = 20) => {
+  const p = page > 0 ? page : 1;
+  const l = limit > 0 ? limit : 20;
+  const offset = (p - 1) * l;
 
   const [rows, total] = await Promise.all([
-    repo.getDoctors(filters, offset),
+    repo.getDoctors(filters, offset, l),
     repo.countDoctors(filters)
   ]);
 
+  return { rows, total, page: p, limit: l };
+};
+
+export const fetchDoctorInfo = async (doctorId) => {
+  const row = await repo.getDoctorById(doctorId);
+
+  if (!row) return null;
+
   return {
-    page: filters.page,
-    limit: filters.limit,
-    total,
-    count: rows.length,
-    doctors: rows.map(r => ({
-      id: r.doctorId,
-      name: r.doctorName,
-      imageUrl: r.imageUrl,
-      specialization: r.specialization,
-      experience: r.experience,
-      consultationFee: Number(r.consultationFee),
-      languages: r.languages || [],
-      distance: r.distance ? Number(r.distance.toFixed(2)) : null,
-      hospital: {
-        id: r.hospitalId,
-        name: r.hospitalName,
-        place: r.place,
-        isOpen: r.isOpen,
-        consultationMode: r.consultationMode
-      }
+    id: row.doctorId,
+    name: row.doctorName,
+    imageUrl: row.imageUrl,
+    specialization: row.specialization,
+    qualification: row.qualification,
+    experience: row.experience,
+    about: row.about,
+    languages: row.languages || [],
+    consultationFee: Number(row.consultationFee || 0),
+    createdAt: row.createdAt,
+    hospital: {
+      id: row.hospitalId,
+      name: row.hospitalName,
+      imageUrl: row.hospitalImage,
+      location: row.location,
+      place: row.place,
+      latitude: row.latitude ? Number(row.latitude) : null,
+      longitude: row.longitude ? Number(row.longitude) : null,
+      consultationMode: row.consultationMode,
+      isOpen: Boolean(row.isOpen)
+    }
+  };
+};
+
+export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
+  const slots = await repo.getDoctorAvailabilityByDate(doctorId, date);
+
+  return {
+    doctorId,
+    date,
+    totalSlots: slots.length,
+    availableSlots: slots.filter(s => !s.isBooked).length,
+    slots: slots.map(s => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      isBooked: s.isBooked
     }))
   };
 };

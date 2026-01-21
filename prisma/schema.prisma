@@ -26,6 +26,7 @@ model Hospital {
   isOpen           Boolean          @default(true)
   latitude         Float?
   longitude        Float?
+  establishedYear  Int?
   categories       Category[]
   doctors          Doctor[]
   notifications    Notification[]
@@ -44,21 +45,22 @@ model Category {
 }
 
 model Doctor {
-  id              Int        @id @default(autoincrement())
-  name            String
-  imageUrl        String?
-  experience      Int
-  specialization  String?
-  qualification   String?
-  about           String?
-  categoryId      Int
-  hospitalId      Int
-  createdAt       DateTime   @default(now())
-  consultationFee Int        @default(0)
-  languages       String[]   @default([])
-  category        Category   @relation(fields: [categoryId], references: [id])
-  hospital        Hospital   @relation(fields: [hospitalId], references: [id])
-  timeSlots       TimeSlot[]
+  id                 Int                  @id @default(autoincrement())
+  name               String
+  imageUrl           String?
+  experience         Int
+  specialization     String?
+  qualification      String?
+  about              String?
+  categoryId         Int
+  hospitalId         Int
+  createdAt          DateTime             @default(now())
+  consultationFee    Int                  @default(0)
+  languages          String[]             @default([])
+  category           Category             @relation(fields: [categoryId], references: [id])
+  hospital           Hospital             @relation(fields: [hospitalId], references: [id])
+  timeSlots          TimeSlot[]
+  DoctorAvailability DoctorAvailability[]
 }
 
 model User {
@@ -95,7 +97,7 @@ model PatientProfile {
   gender    String?
   isSelf    Boolean   @default(false)
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  updatedAt DateTime  @default(now()) @updatedAt
   bookings  Booking[]
   user      User      @relation(fields: [userId], references: [id])
 
@@ -203,4 +205,17 @@ enum BloodGroup {
   AB_NEG
   O_POS
   O_NEG
+}
+
+model DoctorAvailability {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  date      DateTime
+  startTime String
+  endTime   String
+  isBooked  Boolean  @default(false)
+
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, date])
 }
