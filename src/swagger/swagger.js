@@ -16,7 +16,7 @@ const options = {
         description: "Local Development Server",
       },
       {
-        url: "https://hospital-backend-1-9jq0.onrender.com/api-docs/",
+        url: "https://hospital-backend-1-9jq0.onrender.com",
         description: "Render Production Server",
       },
     ],
