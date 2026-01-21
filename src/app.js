@@ -32,6 +32,8 @@ import userBookingRoutes from "./modules/hospital/user/routes/userBooking.routes
 import profileRoutes from "./modules/hospital/user/routes/profile.routes.js";
 import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
 import appointmentRoutes from "./modules/hospital/user/routes/appointments.routes.js";
+import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.routes.js";
+
 // =======================
 // Swagger
 // =======================
@@ -102,5 +104,6 @@ app.use("/api/appointments", appointmentRoutes);
 
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
 
+app.use("/api/hospital/user", hospitalInfoRoutes);
 
 export default app;

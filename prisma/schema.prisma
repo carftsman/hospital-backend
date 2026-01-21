@@ -26,10 +26,14 @@ model Hospital {
   isOpen           Boolean          @default(true)
   latitude         Float?
   longitude        Float?
+
+  establishedYear Int?              // ✅ ADD THIS LINE
+
   categories       Category[]
   doctors          Doctor[]
   notifications    Notification[]
 }
+
 
 model Category {
   id          Int       @id @default(autoincrement())
@@ -160,8 +164,8 @@ model Symptom {
   imageUrl   String?
   categoryId Int
   createdAt  DateTime @default(now())
-  category   Category @relation(fields: [categoryId], references: [id])
 }
+
 
 enum HospitalStatus {
   PENDING
