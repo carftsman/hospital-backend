@@ -1,88 +1,131 @@
-import * as repo from "../repositories/hospitalDoctors.repository.js";
+import prisma from "../../../../prisma/client.js";
 
-export const fetchHospitalDoctors = async (
-  hospitalId,
-  mode = "BOTH",
-  hospitalDistance = null,
-  page = 1,
-  limit = 50
-) => {
-  const p = page > 0 ? page : 1;
-  const l = limit > 0 ? limit : 50;
-  const offset = (p - 1) * l;
+/* ---------------- FETCH DOCTORS (GLOBAL LIST) ---------------- */
+export const fetchDoctors = async (filters, page, limit) => {
+  const skip = (page - 1) * limit;
 
-  const [rows, total] = await Promise.all([
-    repo.getDoctorsByHospital(hospitalId, mode, offset, l),
-    repo.countDoctorsByHospital(hospitalId, mode)
-  ]);
+  const where = {};
+  if (filters.specialization) {
+    where.specialization = filters.specialization;
+  }
+
+  const rows = await prisma.doctor.findMany({
+    skip,
+    take: limit,
+    where,
+    orderBy: {
+      rating: "desc", // ⭐ Top rated first
+    },
+    select: {
+      id: true,
+      name: true,
+      specialization: true,
+      experience: true,
+      consultationFee: true,
+      languages: true,
+      rating: true, // ⭐
+      hospital: {
+        select: {
+          id: true,
+          name: true,
+          place: true,
+          isOpen: true,
+        },
+      },
+    },
+  });
+
+  const total = await prisma.doctor.count({ where });
+
+  return { rows, total };
+};
+
+/* ---------------- HOSPITAL DOCTORS ---------------- */
+export const fetchHospitalDoctors = async (hospitalId, mode, distance, page, limit) => {
+  const skip = (page - 1) * limit;
+
+  const doctors = await prisma.doctor.findMany({
+    where: { hospitalId },
+    skip,
+    take: limit,
+    orderBy: { rating: "desc" }, // ⭐
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+      specialization: true,
+      experience: true,
+      consultationFee: true,
+      rating: true, // ⭐
+    },
+  });
+
+  const total = await prisma.doctor.count({ where: { hospitalId } });
 
   return {
-    hospitalId,
-    hospitalDistance: hospitalDistance ? Number(hospitalDistance) : null,
-    page: p,
-    limit: l,
     total,
-    count: rows.length,
-    doctors: rows
+    count: doctors.length,
+    page,
+    limit,
+    data: doctors,
   };
 };
 
-export const fetchDoctors = async (filters, page = 1, limit = 20) => {
-  const p = page > 0 ? page : 1;
-  const l = limit > 0 ? limit : 20;
-  const offset = (p - 1) * l;
-
-  const [rows, total] = await Promise.all([
-    repo.getDoctors(filters, offset, l),
-    repo.countDoctors(filters)
-  ]);
-
-  return { rows, total, page: p, limit: l };
-};
-
+/* ---------------- DOCTOR PROFILE ---------------- */
 export const fetchDoctorInfo = async (doctorId) => {
-  const row = await repo.getDoctorById(doctorId);
-
-  if (!row) return null;
-
-  return {
-    id: row.doctorId,
-    name: row.doctorName,
-    imageUrl: row.imageUrl,
-    specialization: row.specialization,
-    qualification: row.qualification,
-    experience: row.experience,
-    about: row.about,
-    languages: row.languages || [],
-    consultationFee: Number(row.consultationFee || 0),
-    createdAt: row.createdAt,
-    hospital: {
-      id: row.hospitalId,
-      name: row.hospitalName,
-      imageUrl: row.hospitalImage,
-      location: row.location,
-      place: row.place,
-      latitude: row.latitude ? Number(row.latitude) : null,
-      longitude: row.longitude ? Number(row.longitude) : null,
-      consultationMode: row.consultationMode,
-      isOpen: Boolean(row.isOpen)
-    }
-  };
+  return prisma.doctor.findUnique({
+    where: { id: doctorId },
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+      specialization: true,
+      qualification: true,
+      experience: true,
+      about: true,
+      languages: true,
+      consultationFee: true,
+      rating: true, // ⭐
+      createdAt: true,
+      hospital: {
+        select: {
+          id: true,
+          name: true,
+          imageUrl: true,
+          location: true,
+          place: true,
+          latitude: true,
+          longitude: true,
+          isOpen: true,
+        },
+      },
+    },
+  });
 };
 
+/* ---------------- DOCTOR AVAILABILITY ---------------- */
 export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
-  const slots = await repo.getDoctorAvailabilityByDate(doctorId, date);
+  const start = new Date(`${date}T00:00:00`);
+  const end = new Date(`${date}T23:59:59`);
+
+  const slots = await prisma.timeSlot.findMany({
+    where: {
+      doctorId,
+      start: { gte: start, lte: end },
+    },
+    orderBy: { start: "asc" },
+  });
 
   return {
     doctorId,
     date,
     totalSlots: slots.length,
-    availableSlots: slots.filter(s => !s.isBooked).length,
+    availableSlots: slots.filter(s => s.isActive).length,
     slots: slots.map(s => ({
       id: s.id,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      isBooked: s.isBooked
-    }))
+      startTime: s.start.toISOString().substring(11, 16),
+      endTime: s.end.toISOString().substring(11, 16),
+      isBooked: !s.isActive,
+    })),
   };
 };

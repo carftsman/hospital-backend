@@ -1,109 +1,94 @@
-import { fetchHospitalDoctors, fetchDoctors, fetchDoctorInfo, fetchDoctorAvailabilityByDate } from "../services/hospitalDoctors.service.js";
-import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
+import {
+  fetchHospitalDoctors,
+  fetchDoctors,
+  fetchDoctorInfo,
+  fetchDoctorAvailabilityByDate,
+} from "../services/hospitalDoctors.service.js";
 
 /* ---------------- HOSPITAL DOCTORS ---------------- */
-
 export const getHospitalDoctors = async (req, res) => {
   try {
-    const { hospitalId } = req.params;
-    const { mode = "BOTH", distance = null, page = 1, limit = 50 } = req.query;
+    const hospitalId = Number(req.params.hospitalId);
+    const { page = 1, limit = 50 } = req.query;
 
-    const hid = Number(hospitalId);
-    if (!hid) {
+    if (!hospitalId) {
       return res.status(400).json({ message: "Invalid hospitalId" });
     }
 
-    const p = Math.max(1, parseInt(page) || 1);
-    const l = Math.min(200, Math.max(1, parseInt(limit) || 50));
-
-    const cacheKey = `HOSPITAL_DOCS:${hid}:${mode}:p${p}:l${l}`;
-    const cached = getFromCache(cacheKey);
-    if (cached) return res.json({ cached: true, ...cached });
-
-    const result = await fetchHospitalDoctors(hid, mode, distance, p, l);
-    setToCache(cacheKey, result, 10);
+    const result = await fetchHospitalDoctors(
+      hospitalId,
+      null,
+      null,
+      Number(page),
+      Number(limit)
+    );
 
     return res.json(result);
   } catch (err) {
-    console.error("getHospitalDoctors error:", err);
+    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
 /* ---------------- GLOBAL DOCTORS ---------------- */
-
 export const getDoctors = async (req, res) => {
   try {
-    const { lat, lng, distance, specialization, page = 1, limit = 20 } = req.query;
+    const { specialization, page = 1, limit = 20 } = req.query;
 
-    const p = Math.max(1, parseInt(page) || 1);
-    const l = Math.min(100, Math.max(1, parseInt(limit) || 20));
-
-    const filters = {
-      lat: lat !== undefined ? Number(lat) : null,
-      lng: lng !== undefined ? Number(lng) : null,
-      distance: distance !== undefined ? Number(distance) : null,
-      specialization
-    };
-
-    const { rows, total } = await fetchDoctors(filters, p, l);
+    const { rows, total } = await fetchDoctors(
+      { specialization },
+      Number(page),
+      Number(limit)
+    );
 
     return res.json({
-      page: p,
-      limit: l,
+      page: Number(page),
+      limit: Number(limit),
       total,
       count: rows.length,
-      doctors: rows
+      doctors: rows,
     });
   } catch (err) {
-    console.error("getDoctors error:", err);
+    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+/* ---------------- DOCTOR PROFILE ---------------- */
 export const getDoctorInfo = async (req, res) => {
   try {
-    const { doctorId } = req.params;
+    const doctorId = Number(req.params.doctorId);
 
-    const did = Number(doctorId);
-    if (!did || did <= 0) {
+    if (!doctorId) {
       return res.status(400).json({ message: "Invalid doctorId" });
     }
 
-    const doctor = await fetchDoctorInfo(did);
-
+    const doctor = await fetchDoctorInfo(doctorId);
     if (!doctor) {
       return res.status(404).json({ message: "Doctor not found" });
     }
 
     return res.json(doctor);
   } catch (err) {
-    console.error("getDoctorInfo error:", err);
+    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+/* ---------------- DOCTOR AVAILABILITY ---------------- */
 export const getDoctorAvailability = async (req, res) => {
   try {
-    const { doctorId } = req.params;
+    const doctorId = Number(req.params.doctorId);
     const { date } = req.query;
 
-    const did = Number(doctorId);
-    if (!did || did <= 0) {
-      return res.status(400).json({ message: "Invalid doctorId" });
+    if (!doctorId || !date) {
+      return res.status(400).json({ message: "Invalid input" });
     }
 
-    if (!date) {
-      return res
-        .status(400)
-        .json({ message: "date query param is required (YYYY-MM-DD)" });
-    }
-
-    const availability = await fetchDoctorAvailabilityByDate(did, date);
-
+    const availability = await fetchDoctorAvailabilityByDate(doctorId, date);
     return res.json(availability);
   } catch (err) {
-    console.error("getDoctorAvailability error:", err);
+    console.error(err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
