@@ -6,29 +6,30 @@ export const fetchDoctors = async (filters, page, limit) => {
 
   const where = {};
   if (filters.specialization) {
-    where.specialization = filters.specialization;
+    where.specialization = {
+      contains: filters.specialization,
+      mode: "insensitive",
+    };
   }
 
   const rows = await prisma.doctor.findMany({
     skip,
     take: limit,
     where,
-    orderBy: {
-      rating: "desc", // ⭐ Top rated first
-    },
-    select: {
-      id: true,
-      name: true,
-      specialization: true,
-      experience: true,
-      consultationFee: true,
-      languages: true,
-      rating: true, // ⭐
+    orderBy: { rating: "desc" },
+
+    include: {
+      category: true,
       hospital: {
         select: {
           id: true,
           name: true,
+          imageUrl: true,
+          location: true,
           place: true,
+          latitude: true,
+          longitude: true,
+          consultationMode: true,
           isOpen: true,
         },
       },
@@ -40,23 +41,19 @@ export const fetchDoctors = async (filters, page, limit) => {
   return { rows, total };
 };
 
+
 /* ---------------- HOSPITAL DOCTORS ---------------- */
-export const fetchHospitalDoctors = async (hospitalId, mode, distance, page, limit) => {
+export const fetchHospitalDoctors = async (hospitalId, page, limit) => {
   const skip = (page - 1) * limit;
 
   const doctors = await prisma.doctor.findMany({
     where: { hospitalId },
     skip,
     take: limit,
-    orderBy: { rating: "desc" }, // ⭐
-    select: {
-      id: true,
-      name: true,
-      imageUrl: true,
-      specialization: true,
-      experience: true,
-      consultationFee: true,
-      rating: true, // ⭐
+    orderBy: { rating: "desc" },
+
+    include: {
+      category: true,
     },
   });
 
@@ -71,22 +68,15 @@ export const fetchHospitalDoctors = async (hospitalId, mode, distance, page, lim
   };
 };
 
+
 /* ---------------- DOCTOR PROFILE ---------------- */
 export const fetchDoctorInfo = async (doctorId) => {
   return prisma.doctor.findUnique({
     where: { id: doctorId },
-    select: {
-      id: true,
-      name: true,
-      imageUrl: true,
-      specialization: true,
-      qualification: true,
-      experience: true,
-      about: true,
-      languages: true,
-      consultationFee: true,
-      rating: true, // ⭐
-      createdAt: true,
+
+    include: {
+      category: true,
+
       hospital: {
         select: {
           id: true,
@@ -96,12 +86,17 @@ export const fetchDoctorInfo = async (doctorId) => {
           place: true,
           latitude: true,
           longitude: true,
+          consultationMode: true,
           isOpen: true,
         },
       },
+
+      timeSlots: true,
+      DoctorAvailability: true,
     },
   });
 };
+
 
 /* ---------------- DOCTOR AVAILABILITY ---------------- */
 export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
@@ -121,11 +116,6 @@ export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
     date,
     totalSlots: slots.length,
     availableSlots: slots.filter(s => s.isActive).length,
-    slots: slots.map(s => ({
-      id: s.id,
-      startTime: s.start.toISOString().substring(11, 16),
-      endTime: s.end.toISOString().substring(11, 16),
-      isBooked: !s.isActive,
-    })),
+    slots,
   };
 };

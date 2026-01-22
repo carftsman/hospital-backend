@@ -62,7 +62,7 @@ model Doctor {
   hospital           Hospital             @relation(fields: [hospitalId], references: [id])
   timeSlots          TimeSlot[]
   DoctorAvailability DoctorAvailability[]
-  rating             Float                @default(0)
+  rating             Float?               @default(0)
 }
 
 model User {

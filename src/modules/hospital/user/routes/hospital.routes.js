@@ -1,112 +1,10 @@
 import express from "express";
 import {
-  getHospitalDoctors,
-  getDoctors,
-  getDoctorInfo,
-  getDoctorAvailability,
-} from "../controllers/hospitalDoctors.controller.js";
-import {
   listNearbyHospitals
 } from "../controllers/hospital.controller.js";
 
 
 const router = express.Router();
-
-/**
- * @swagger
- * tags:
- *   name: Doctors
- *   description: Doctor listing, profile, and availability APIs
- */
-
-/**
- * @swagger
- * /api/hospital/user/hospital/{hospitalId}/doctors:
- *   get:
- *     summary: Get doctors for a specific hospital
- *     tags: [Doctors]
- *     description: Returns doctors available in a hospital sorted by rating
- *     parameters:
- *       - in: path
- *         name: hospitalId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *     responses:
- *       200:
- *         description: Doctors retrieved successfully
- *       400:
- *         description: Invalid hospitalId
- *       500:
- *         description: Internal server error
- */
-router.get("/hospital/:hospitalId/doctors", getHospitalDoctors);
-
-/**
- * @swagger
- * /api/hospital/user/doctors:
- *   get:
- *     summary: Get doctors (global list)
- *     tags: [Doctors]
- *     description: Returns doctors filtered by specialization and sorted by rating
- *     parameters:
- *       - in: query
- *         name: specialization
- *         schema:
- *           type: string
- *           example: Cardiology
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: Doctors fetched successfully
- *       500:
- *         description: Internal server error
- */
-router.get("/doctors", getDoctors);
-
-/**
- * @swagger
- * /api/hospital/user/doctors/{doctorId}:
- *   get:
- *     summary: Get doctor profile
- *     tags: [Doctors]
- *     parameters:
- *       - in: path
- *         name: doctorId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 12
- *     responses:
- *       200:
- *         description: Doctor profile retrieved
- *       404:
- *         description: Doctor not found
- *       500:
- *         description: Internal server error
- */
-router.get("/doctors/:doctorId", getDoctorInfo);
-
 
 
 /**
@@ -220,38 +118,5 @@ router.get("/doctors/:doctorId", getDoctorInfo);
  */
 
 router.get("/hospitals/nearby/filter", listNearbyHospitals);
-
-
-
-
-/**
- * @swagger
- * /api/hospital/user/doctors/{doctorId}/availability:
- *   get:
- *     summary: Get doctor availability by date
- *     tags: [Doctors]
- *     parameters:
- *       - in: path
- *         name: doctorId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 12
- *       - in: query
- *         name: date
- *         required: true
- *         schema:
- *           type: string
- *           format: date
- *           example: 2026-02-01
- *     responses:
- *       200:
- *         description: Availability retrieved
- *       400:
- *         description: Invalid input
- *       500:
- *         description: Internal server error
- */
-router.get("/doctors/:doctorId/availability", getDoctorAvailability);
 
 export default router;
