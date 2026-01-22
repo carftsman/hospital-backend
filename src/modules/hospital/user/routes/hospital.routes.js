@@ -5,8 +5,70 @@ import {
   getDoctorInfo,
   getDoctorAvailability,
 } from "../controllers/hospitalDoctors.controller.js";
+import {
+  listNearbyHospitals
+} from "../controllers/hospital.controller.js";
+
+
+import {
+  listNearbyHospitalsByCategoryAndMode
+} from "../controllers/hospital.controller.js";
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * /api/hospital/user/hospitals/nearby/filter:
+ *   get:
+ *     summary: Get nearby hospitals by category and mode
+ *     tags: [Hospitals]
+ *     parameters:
+ *       - in: query
+ *         name: latitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: longitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: categoryId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: mode
+ *         schema:
+ *           type: string
+ *           enum: [ONLINE, OFFLINE, BOTH]
+ *           default: BOTH
+ *       - in: query
+ *         name: radius
+ *         schema:
+ *           type: number
+ *           default: 10
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Nearby hospitals fetched successfully
+ */
+router.get(
+  "/hospitals/nearby/filter",
+  listNearbyHospitalsByCategoryAndMode
+);
+
+
 
 /**
  * @swagger
@@ -102,6 +164,51 @@ router.get("/doctors", getDoctors);
  *         description: Internal server error
  */
 router.get("/doctors/:doctorId", getDoctorInfo);
+
+
+
+/**
+ * @swagger
+ * /api/hospital/user/hospitals/nearby:
+ *   get:
+ *     summary: Get nearby hospitals
+ *     tags: [Hospitals]
+ *     parameters:
+ *       - in: query
+ *         name: latitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           example: 17.3850
+ *       - in: query
+ *         name: longitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           example: 78.4867
+ *       - in: query
+ *         name: radius
+ *         schema:
+ *           type: number
+ *           default: 10
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Nearby hospitals fetched successfully
+ */
+router.get("/hospitals/nearby", listNearbyHospitals);
+
+
+
 
 /**
  * @swagger

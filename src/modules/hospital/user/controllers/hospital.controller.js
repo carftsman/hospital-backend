@@ -1,9 +1,111 @@
-import { 
-  getHospitalsByMode,
-  getHospitalsByCategory 
-} from "../services/hospital.service.js";
 
 import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
+import {
+  getHospitalsByMode,
+  getHospitalsByCategory,
+  getNearbyHospitals
+} from "../services/hospital.service.js";
+
+
+import {
+  getNearbyHospitalsByCategoryAndMode
+} from "../services/hospital.service.js";
+
+
+/**
+ * GET Nearby Hospitals by Category + Mode
+ * /api/hospital/user/hospitals/nearby/filter
+ */
+export const listNearbyHospitalsByCategoryAndMode = async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      categoryId,
+      mode = "BOTH",
+      radius = 10,
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const catId = Number(categoryId);
+    const r = Number(radius);
+    const m = String(mode).toUpperCase();
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return res.status(400).json({
+        message: "latitude and longitude are required numbers"
+      });
+    }
+
+    if (!catId) {
+      return res.status(400).json({
+        message: "categoryId is required and must be a number"
+      });
+    }
+
+    if (!["ONLINE", "OFFLINE", "BOTH"].includes(m)) {
+      return res.status(400).json({
+        message: "mode must be ONLINE, OFFLINE or BOTH"
+      });
+    }
+
+    const p = Math.max(1, parseInt(page));
+    const l = Math.min(100, Math.max(1, parseInt(limit)));
+
+    const cacheKey =
+      `nearbyHospCatMode:${catId}:${m}:${lat.toFixed(5)}:${lng.toFixed(5)}:r${r}:p${p}:l${l}`;
+
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      return res.json({ cached: true, ...cached });
+    }
+
+    const { hospitals, total } =
+      await getNearbyHospitalsByCategoryAndMode(
+        lat,
+        lng,
+        catId,
+        m,
+        r,
+        p,
+        l
+      );
+
+    const payload = {
+      categoryId: catId,
+      mode: m,
+      latitude: lat,
+      longitude: lng,
+      radiusKm: r,
+      page: p,
+      limit: l,
+      total,
+      count: hospitals.length,
+      data: hospitals.map(h => ({
+        id: h.id,
+        name: h.name,
+        imageUrl: h.imageUrl,
+        speciality: h.speciality,
+        location: h.location,
+        place: h.place,
+        latitude: Number(h.latitude),
+        longitude: Number(h.longitude),
+        distance: Number(h.distance),
+        isOpen: h.isOpen
+      }))
+    };
+
+    setToCache(cacheKey, payload, 10);
+    return res.json(payload);
+
+  } catch (err) {
+    console.error("listNearbyHospitalsByCategoryAndMode error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 export const listHospitalsByCategory = async (req, res) => {
   try {
@@ -76,6 +178,77 @@ export const listHospitalsByCategory = async (req, res) => {
     return res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
+
+export const listNearbyHospitals = async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      radius = 10,
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const r = Number(radius);
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return res.status(400).json({
+        message: "latitude and longitude are required numbers"
+      });
+    }
+
+    const p = Math.max(1, parseInt(page));
+    const l = Math.min(100, Math.max(1, parseInt(limit)));
+
+    const cacheKey =
+      `nearbyHosp:${lat.toFixed(5)}:${lng.toFixed(5)}:r${r}:p${p}:l${l}`;
+
+    const cached = getFromCache(cacheKey);
+    if (cached) {
+      return res.json({ cached: true, ...cached });
+    }
+
+    const { hospitals, total } = await getNearbyHospitals(
+      lat,
+      lng,
+      r,
+      p,
+      l
+    );
+
+    const payload = {
+      latitude: lat,
+      longitude: lng,
+      radiusKm: r,
+      page: p,
+      limit: l,
+      total,
+      count: hospitals.length,
+      data: hospitals.map(h => ({
+        id: h.id,
+        name: h.name,
+        imageUrl: h.imageUrl,
+        speciality: h.speciality,
+        location: h.location,
+        place: h.place,
+        latitude: Number(h.latitude),
+        longitude: Number(h.longitude),
+        distance: Number(h.distance),
+        isOpen: h.isOpen
+      }))
+    };
+
+    setToCache(cacheKey, payload, 10);
+    return res.json(payload);
+
+  } catch (err) {
+    console.error("listNearbyHospitals error:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 
 export const listHospitalsByMode = async (req, res) => {
   try {
