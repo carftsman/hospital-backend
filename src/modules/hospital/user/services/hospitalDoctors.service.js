@@ -43,27 +43,78 @@ export const fetchDoctors = async (filters, page, limit) => {
 
 
 /* ---------------- HOSPITAL DOCTORS ---------------- */
-export const fetchHospitalDoctors = async (hospitalId, page, limit) => {
-  const skip = (page - 1) * limit;
+// export const fetchHospitalDoctors = async (hospitalId, page = 1, limit = 10) => {
+//   const safePage = Math.max(1, Number(page) || 1);
+//   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+//   const skip = (safePage - 1) * safeLimit;
+
+//   const doctors = await prisma.doctor.findMany({
+//     where: { hospitalId },
+//     skip,
+//     take: safeLimit,
+//     orderBy: { rating: "desc" },
+//     include: {
+//       category: true,
+//     },
+//   });
+
+//   const total = await prisma.doctor.count({
+//     where: { hospitalId },
+//   });
+
+//   return {
+//     total,
+//     count: doctors.length,
+//     page: safePage,
+//     limit: safeLimit,
+//     data: doctors,
+//   };
+// };
+export const fetchHospitalDoctors = async (
+  hospitalId,
+  page = 1,
+  limit = 10,
+  mode = null
+) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+  const skip = (safePage - 1) * safeLimit;
+
+  let modeFilter = {};
+
+  if (mode === "ONLINE") {
+    modeFilter = { in: ["ONLINE", "BOTH"] };
+  } else if (mode === "OFFLINE") {
+    modeFilter = { in: ["OFFLINE", "BOTH"] };
+  } else if (mode === "BOTH") {
+    modeFilter = { equals: "BOTH" };
+  }
 
   const doctors = await prisma.doctor.findMany({
-    where: { hospitalId },
+    where: {
+      hospitalId,
+      ...(mode ? { consultationMode: modeFilter } : {}),
+    },
     skip,
-    take: limit,
+    take: safeLimit,
     orderBy: { rating: "desc" },
-
     include: {
       category: true,
     },
   });
 
-  const total = await prisma.doctor.count({ where: { hospitalId } });
+  const total = await prisma.doctor.count({
+    where: {
+      hospitalId,
+      ...(mode ? { consultationMode: modeFilter } : {}),
+    },
+  });
 
   return {
     total,
     count: doctors.length,
-    page,
-    limit,
+    page: safePage,
+    limit: safeLimit,
     data: doctors,
   };
 };

@@ -26,11 +26,15 @@ model Hospital {
   isOpen           Boolean          @default(true)
   latitude         Float?
   longitude        Float?
-
-  establishedYear Int?
-  categories      Category[]
-  doctors         Doctor[]
-  notifications   Notification[]
+  establishedYear  Int?
+  state            String?
+  city             String?
+  open24x7         Boolean?         @default(false)
+  rating           Float?           @default(0)
+  popularity       Int?             @default(0)
+  categories       Category[]
+  doctors          Doctor[]
+  notifications    Notification[]
 }
 
 model Category {
@@ -58,11 +62,13 @@ model Doctor {
   createdAt          DateTime             @default(now())
   consultationFee    Int                  @default(0)
   languages          String[]             @default([])
+  rating             Decimal?             @default(0) @db.Decimal(2, 1)
+  isfavorite         Boolean?             @default(false)
+  consultationMode   ConsultationMode     @default(BOTH)
   category           Category             @relation(fields: [categoryId], references: [id])
   hospital           Hospital             @relation(fields: [hospitalId], references: [id])
-  timeSlots          TimeSlot[]
   DoctorAvailability DoctorAvailability[]
-  rating             Float?               @default(0)
+  timeSlots          TimeSlot[]
 }
 
 model User {
@@ -166,6 +172,18 @@ model Symptom {
   Category   Category @relation(fields: [categoryId], references: [id])
 }
 
+model DoctorAvailability {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  date      DateTime
+  startTime String
+  endTime   String
+  isBooked  Boolean  @default(false)
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, date])
+}
+
 enum HospitalStatus {
   PENDING
   APPROVED
@@ -206,17 +224,4 @@ enum BloodGroup {
   AB_NEG
   O_POS
   O_NEG
-}
-
-model DoctorAvailability {
-  id        Int      @id @default(autoincrement())
-  doctorId  Int
-  date      DateTime
-  startTime String
-  endTime   String
-  isBooked  Boolean  @default(false)
-
-  doctor Doctor @relation(fields: [doctorId], references: [id])
-
-  @@index([doctorId, date])
 }

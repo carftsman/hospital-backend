@@ -23,8 +23,8 @@ const modeFilterSql = (mode) => {
 /* ---------------- DOCTORS BY HOSPITAL ---------------- */
 
 export const getDoctorsByHospital = async (hospitalId, mode, offset, limit) => {
-  const safeOffset = Math.max(0, offset);
-  const safeLimit = Math.max(1, limit);
+  const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const modeSql = modeFilterSql(mode);
 
   return prisma.$queryRaw`
@@ -61,6 +61,7 @@ export const getDoctorsByHospital = async (hospitalId, mode, offset, limit) => {
   `;
 };
 
+
 export const countDoctorsByHospital = async (hospitalId, mode) => {
   const modeSql = modeFilterSql(mode);
 
@@ -77,6 +78,7 @@ export const countDoctorsByHospital = async (hospitalId, mode) => {
 
   return rows?.[0]?.count ?? 0;
 };
+
 
 /* ---------------- GLOBAL DOCTORS ---------------- */
 

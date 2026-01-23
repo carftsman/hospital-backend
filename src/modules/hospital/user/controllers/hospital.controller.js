@@ -4,15 +4,94 @@ import {
 } from "../services/hospital.service.js";
 import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
 
+// export const listNearbyHospitals = async (req, res) => {
+//   try {
+//     const {
+//       latitude,
+//       longitude,
+//       radius = 10,
+//       categoryIds,
+//       mode = "BOTH",
+//       openNow,
+//       page = 1,
+//       limit = 20
+//     } = req.query;
+
+//     const lat = Number(latitude);
+//     const lng = Number(longitude);
+//     const r = Number(radius);
+//     const m = String(mode).toUpperCase();
+
+//     if (Number.isNaN(lat) || Number.isNaN(lng)) {
+//       return res.status(400).json({ message: "latitude & longitude required" });
+//     }
+
+//     if (!["ONLINE", "OFFLINE", "BOTH"].includes(m)) {
+//       return res.status(400).json({ message: "Invalid mode" });
+//     }
+
+//     const categories = categoryIds
+//       ? categoryIds.split(",").map(Number).filter(Boolean)
+//       : [];
+
+//     const p = Math.max(1, parseInt(page));
+//     const l = Math.min(100, Math.max(1, parseInt(limit)));
+
+//     const cacheKey = `nearby:${lat}:${lng}:${r}:${categories.join("-")}:${m}:${openNow}:p${p}:l${l}`;
+
+//     const cached = getFromCache(cacheKey);
+//     if (cached) return res.json({ cached: true, ...cached });
+
+//     const { hospitals, total } =
+//       await getNearbyHospitalsWithFilters(
+//         lat,
+//         lng,
+//         r,
+//         categories,
+//         m,
+//         openNow === "true",
+//         p,
+//         l
+//       );
+
+//     const payload = {
+//       latitude: lat,
+//       longitude: lng,
+//       radiusKm: r,
+//       page: p,
+//       limit: l,
+//       total,
+//       count: hospitals.length,
+//       data: hospitals
+//     };
+
+//     setToCache(cacheKey, payload, 10);
+//     return res.json(payload);
+
+//   } catch (err) {
+//     console.error("listNearbyHospitals error:", err);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 export const listNearbyHospitals = async (req, res) => {
   try {
     const {
       latitude,
       longitude,
       radius = 10,
+
+      // filters
       categoryIds,
       mode = "BOTH",
       openNow,
+      open24x7,
+      state,
+      city,
+
+      // sorting
+      sort = "distance", // distance | rating | popularity
+
+      // pagination
       page = 1,
       limit = 20
     } = req.query;
@@ -30,34 +109,59 @@ export const listNearbyHospitals = async (req, res) => {
       return res.status(400).json({ message: "Invalid mode" });
     }
 
+    if (!["distance", "rating", "popularity"].includes(sort)) {
+      return res.status(400).json({ message: "Invalid sort option" });
+    }
+
     const categories = categoryIds
       ? categoryIds.split(",").map(Number).filter(Boolean)
       : [];
 
-    const p = Math.max(1, parseInt(page));
-    const l = Math.min(100, Math.max(1, parseInt(limit)));
+    const p = Math.max(1, parseInt(page, 10));
+    const l = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    
 
-    const cacheKey = `nearby:${lat}:${lng}:${r}:${categories.join("-")}:${m}:${openNow}:p${p}:l${l}`;
+
+    const cacheKey = [
+      "nearby",
+      lat,
+      lng,
+      r,
+      categories.join("-"),
+      m,
+      sort,
+      state || "any",
+      city || "any",
+      openNow,
+      open24x7,
+      `p${p}`,
+      `l${l}`
+    ].join(":");
 
     const cached = getFromCache(cacheKey);
     if (cached) return res.json({ cached: true, ...cached });
 
     const { hospitals, total } =
-      await getNearbyHospitalsWithFilters(
+      await getNearbyHospitalsWithFilters({
         lat,
         lng,
-        r,
+        radius: r,
         categories,
-        m,
-        openNow === "true",
-        p,
-        l
-      );
+        mode: m,
+        sort,
+        state,
+        city,
+        openNow: openNow === "true",
+        open24x7: open24x7 === "true",
+        page: p,
+        limit: l
+      });
 
     const payload = {
       latitude: lat,
       longitude: lng,
       radiusKm: r,
+      sort,
       page: p,
       limit: l,
       total,

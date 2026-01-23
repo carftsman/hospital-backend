@@ -9,23 +9,27 @@ import {
 export const getHospitalDoctors = async (req, res) => {
   try {
     const hospitalId = Number(req.params.hospitalId);
-    const { page = 1, limit = 50 } = req.query;
 
     if (!hospitalId) {
       return res.status(400).json({ message: "Invalid hospitalId" });
     }
 
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+    const mode = req.query.mode || null;
+
+
     const result = await fetchHospitalDoctors(
       hospitalId,
-      null,
-      null,
-      Number(page),
-      Number(limit)
+      page,
+      limit,
+      mode
     );
 
     return res.json(result);
+
   } catch (err) {
-    console.error(err);
+    console.error("getHospitalDoctors error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
