@@ -8,6 +8,52 @@ const prisma = new PrismaClient();
 /**
  * 1️⃣ Doctor availability for next 12 days (UI date tabs)
  */
+// export const getDoctorAvailability = async (req, res) => {
+//   const { doctorId } = req.query;
+//   if (!doctorId) {
+//     return res.status(400).json({ message: "doctorId required" });
+//   }
+
+//   const today = new Date();
+//   const days = [];
+
+//   for (let i = 0; i < 12; i++) {
+//     const date = new Date(today);
+//     date.setDate(today.getDate() + i);
+
+//     const start = new Date(date);
+//     start.setHours(0, 0, 0, 0);
+
+//     const end = new Date(date);
+//     end.setHours(23, 59, 59, 999);
+
+//     const slotsCount = await prisma.timeSlot.count({
+//       where: {
+//         doctorId: Number(doctorId),
+//         start: { gte: start, lte: end },
+//         isActive: true,
+//         booking: null,
+//       },
+//     });
+
+//     days.push({
+//       date: start.toISOString().slice(0, 10),
+//       label:
+//         i === 0
+//           ? "Today"
+//           : i === 1
+//           ? "Tomorrow"
+//           : start.toLocaleDateString("en-IN", {
+//               weekday: "short",
+//               month: "short",
+//               day: "numeric",
+//             }),
+//       slotsAvailable: slotsCount,
+//     });
+//   }
+
+//   res.json({ doctorId: Number(doctorId), days });
+// };
 export const getDoctorAvailability = async (req, res) => {
   const { doctorId } = req.query;
   if (!doctorId) {
@@ -18,32 +64,28 @@ export const getDoctorAvailability = async (req, res) => {
   const days = [];
 
   for (let i = 0; i < 12; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
 
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
+    const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
 
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    const slotsCount = await prisma.doctorAvailability.count({
+  where: {
+    doctorId: Number(doctorId),
+    date: new Date(`${dateStr}T00:00:00.000Z`),
+    isBooked: false,
+  },
+});
 
-    const slotsCount = await prisma.timeSlot.count({
-      where: {
-        doctorId: Number(doctorId),
-        start: { gte: start, lte: end },
-        isActive: true,
-        booking: null,
-      },
-    });
 
     days.push({
-      date: start.toISOString().slice(0, 10),
+      date: dateStr,
       label:
         i === 0
           ? "Today"
           : i === 1
           ? "Tomorrow"
-          : start.toLocaleDateString("en-IN", {
+          : d.toLocaleDateString("en-IN", {
               weekday: "short",
               month: "short",
               day: "numeric",
@@ -58,40 +100,68 @@ export const getDoctorAvailability = async (req, res) => {
 /**
  * 2️⃣ Get slots for selected date
  */
+// export const getAvailableSlots = async (req, res) => {
+//   const { doctorId, date } = req.query;
+//   if (!doctorId || !date) {
+//     return res.status(400).json({ message: "doctorId and date required" });
+//   }
+
+//   const start = new Date(date);
+//   start.setHours(0, 0, 0, 0);
+
+//   const end = new Date(date);
+//   end.setHours(23, 59, 59, 999);
+
+//   const slots = await prisma.timeSlot.findMany({
+//     where: {
+//       doctorId: Number(doctorId),
+//       start: { gte: start, lte: end },
+//       isActive: true,
+//       booking: null,
+//     },
+//     orderBy: { start: "asc" },
+//   });
+
+//   res.json({
+//     date,
+//     slots: slots.map(s => ({
+//       slotId: s.id,
+//       time: s.start.toLocaleTimeString("en-IN", {
+//         hour: "2-digit",
+//         minute: "2-digit",
+//       }),
+//       mode: s.consultationMode,
+//     })),
+//   });
+// };
 export const getAvailableSlots = async (req, res) => {
   const { doctorId, date } = req.query;
+
   if (!doctorId || !date) {
     return res.status(400).json({ message: "doctorId and date required" });
   }
 
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
+  const dateObj = new Date(`${date}T00:00:00.000Z`);
 
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
-
-  const slots = await prisma.timeSlot.findMany({
+  const slots = await prisma.doctorAvailability.findMany({
     where: {
       doctorId: Number(doctorId),
-      start: { gte: start, lte: end },
-      isActive: true,
-      booking: null,
+      date: dateObj, // ✅ Date object
+      isBooked: false,
     },
-    orderBy: { start: "asc" },
+    orderBy: { startTime: "asc" },
   });
 
   res.json({
+    doctorId: Number(doctorId),
     date,
     slots: slots.map(s => ({
-      slotId: s.id,
-      time: s.start.toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      mode: s.consultationMode,
+      availabilityId: s.id,
+      time: `${s.startTime} - ${s.endTime}`,
     })),
   });
 };
+
 
 /**
  * 3️⃣ Hold appointment (SELF / OTHER)
