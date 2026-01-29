@@ -145,7 +145,7 @@ export const getAvailableSlots = async (req, res) => {
       });
     }
 
-    // ✅ Generate slots if not present
+    // Generate slots if not present
     await generateSlotsIfMissing(Number(doctorId), date);
 
     const startOfDay = new Date(date);
@@ -422,46 +422,132 @@ export const holdAppointment = async (req, res) => {
 /**
  * 4️⃣ Booking summary (Payment screen)
  */
+// export const getBookingSummary = async (req, res) => {
+//   const bookingId = Number(req.params.bookingId);
+//   const userId = req.user.id;
+
+//   const booking = await prisma.booking.findFirst({
+//     where: { id: bookingId, userId },
+//     include: {
+//       patientProfile: true,
+//       timeSlot: {
+//         include: {
+//           doctor: { include: { hospital: true } },
+//         },
+//       },
+//     },
+//   });
+
+//   if (!booking) {
+//     return res.status(404).json({ message: "Booking not found" });
+//   }
+
+//   const fee = booking.timeSlot.doctor.consultationFee;
+//   const gst = Math.round(fee * 0.18);
+
+//   res.json({
+//     bookingId,
+//     doctor: booking.timeSlot.doctor.fullName,
+//     hospital: booking.timeSlot.doctor.hospital.name,
+//     patient: booking.patientProfile.fullName,
+//     date: booking.start.toDateString(),
+//     time: booking.start.toLocaleTimeString("en-IN", {
+//       hour: "2-digit",
+//       minute: "2-digit",
+//     }),
+//     consultationFee: fee,
+//     serviceFee: 0,
+//     gst,
+//     total: fee + gst,
+//     status: booking.status,
+//   });
+// };
 export const getBookingSummary = async (req, res) => {
-  const bookingId = Number(req.params.bookingId);
-  const userId = req.user.id;
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const userId = req.user.id;
 
-  const booking = await prisma.booking.findFirst({
-    where: { id: bookingId, userId },
-    include: {
-      patientProfile: true,
-      timeSlot: {
-        include: {
-          doctor: { include: { hospital: true } },
-        },
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, userId },
+      include: {
+        patientProfile: true,
+        timeSlot: {
+          include: {
+            doctor: {
+              include: {
+                hospital: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!booking || !booking.timeSlot || !booking.timeSlot.doctor) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const doctor = booking.timeSlot.doctor;
+
+    const fee = doctor.consultationFee ?? 0;
+    const gst = Math.round(fee * 0.18);
+    const serviceFee = 0;
+    const totalPayable = fee + gst + serviceFee;
+
+    const formatTime = (date) =>
+      date
+        .toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        })
+        .toUpperCase();
+
+    // Normalize booking status for UI
+    const status =
+      booking.status === "EXPIRED" ? "UNAVAILABLE" : booking.status;
+
+    return res.json({
+      bookingId: booking.id,
+
+      doctor: {
+        name: doctor.name,
+        specialization: doctor.specialization,
+        experience: doctor.experience,
+        rating: Number(doctor.rating ?? 0),
+        reviews: doctor.reviewsCount ?? 0,
+        hospital: doctor.hospital.name
       },
-    },
-  });
 
-  if (!booking) {
-    return res.status(404).json({ message: "Booking not found" });
+      patient: booking.patientProfile?.fullName ?? "Self",
+
+      slot: {
+  date: booking.timeSlot.start.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short"
+  }),
+  time: `${formatTime(booking.timeSlot.start)} - ${formatTime(booking.timeSlot.end)}`
+},
+
+      reason: booking.reason || "Not specified",
+
+      payment: {
+        consultationFee: fee,
+        serviceFee,
+        gst,
+        totalPayable
+      },
+
+      status
+    });
+
+  } catch (error) {
+    console.error("getBookingSummary error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-
-  const fee = booking.timeSlot.doctor.consultationFee;
-  const gst = Math.round(fee * 0.18);
-
-  res.json({
-    bookingId,
-    doctor: booking.timeSlot.doctor.fullName,
-    hospital: booking.timeSlot.doctor.hospital.name,
-    patient: booking.patientProfile.fullName,
-    date: booking.start.toDateString(),
-    time: booking.start.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    consultationFee: fee,
-    serviceFee: 0,
-    gst,
-    total: fee + gst,
-    status: booking.status,
-  });
 };
+
 
 /**
  * 5️⃣ Create Razorpay order
@@ -572,4 +658,97 @@ export const getDoctorBookedSlots = async (req, res) => {
       status: b.status,
     }))
   );
+};
+
+// 8️⃣ Payment success details
+export const getPaymentSuccessDetails = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const userId = req.user.id;
+
+    const booking = await prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        userId,
+        status: "CONFIRMED"
+      },
+      include: {
+        timeSlot: {
+          include: {
+            doctor: {
+              include: {
+                hospital: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found or not confirmed"
+      });
+    }
+
+    const doctor = booking.timeSlot.doctor;
+    const hospital = doctor.hospital;
+
+    const fee = doctor.consultationFee ?? 0;
+    const gst = Math.round(fee * 0.18);
+    const totalPaid = fee + gst;
+
+    const formatTime = (date) =>
+      date
+        .toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        })
+        .toUpperCase();
+
+    const baseUrl =
+      process.env.APP_URL ||
+      `${req.protocol}://${req.get("host")}`;
+
+    return res.json({
+      bookingId: booking.id,
+
+      payment: {
+        status: "SUCCESS",
+        amountPaid: totalPaid,
+        hospital: hospital.name
+      },
+
+      doctor: {
+        name: doctor.name,
+        image: doctor.imageUrl ?? null,
+        specialization: doctor.specialization,
+        experience: doctor.experience,
+        rating: Number(doctor.rating ?? 0),
+        reviews: doctor.reviewsCount ?? 0
+      },
+
+      appointment: {
+  date: booking.timeSlot.start.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short"
+  }),
+  time: `${formatTime(booking.timeSlot.start)} - ${formatTime(booking.timeSlot.end)}`
+},
+
+      hospital: {
+        name: hospital.name,
+        latitude: hospital.latitude,
+        longitude: hospital.longitude
+      },
+
+      shareLink: `${baseUrl}/appointments/${booking.id}`
+    });
+
+  } catch (error) {
+    console.error("getPaymentSuccessDetails error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };

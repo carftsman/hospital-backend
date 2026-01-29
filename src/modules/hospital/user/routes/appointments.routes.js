@@ -270,5 +270,106 @@ router.get(
   controller.getDoctorBookedSlots
 );
 
+/**
+ * @swagger
+ * /api/appointments/{bookingId}/success:
+ *   get:
+ *     summary: Get payment success details for an appointment
+ *     description: >
+ *       Returns payment success details after appointment confirmation,
+ *       including doctor, hospital, appointment time, and share link.
+ *     tags:
+ *       - Appointments
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Booking ID of the confirmed appointment
+ *     responses:
+ *       200:
+ *         description: Payment success details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 bookingId:
+ *                   type: integer
+ *                   example: 7
+ *                 payment:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                       example: SUCCESS
+ *                     amountPaid:
+ *                       type: integer
+ *                       example: 944
+ *                     hospital:
+ *                       type: string
+ *                       example: Apollo Hospitals
+ *                 doctor:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: Dr. Rajesh Kumar
+ *                     image:
+ *                       type: string
+ *                       example: https://res.cloudinary.com/demo/image/upload/doctor.jpg
+ *                     specialization:
+ *                       type: string
+ *                       example: Cardiology
+ *                     experience:
+ *                       type: integer
+ *                       example: 12
+ *                     rating:
+ *                       type: number
+ *                       example: 4.8
+ *                     reviews:
+ *                       type: integer
+ *                       example: 0
+ *                 appointment:
+ *                   type: object
+ *                   properties:
+ *                     date:
+ *                       type: string
+ *                       example: Tue, 27 Jan
+ *                     time:
+ *                       type: string
+ *                       example: 02:30 PM - 03:00 PM
+ *                 hospital:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: Apollo Hospitals
+ *                     latitude:
+ *                       type: number
+ *                       example: 17.4474
+ *                     longitude:
+ *                       type: number
+ *                       example: 78.3762
+ *                 shareLink:
+ *                   type: string
+ *                   example: http://localhost:5000/appointments/7
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Booking not found or not confirmed
+ *       500:
+ *         description: Internal server error
+ */
+
+router.get(
+  "/:bookingId/success",
+  auth,
+  controller.getPaymentSuccessDetails
+);
+
 export default router;
  
