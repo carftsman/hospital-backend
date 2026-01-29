@@ -277,7 +277,7 @@ export const holdAppointment = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
-    if (!slot.isActive || slot.booking.length > 0) {
+    if (!slot.isActive || slot.booking) {
       return res.status(409).json({ message: "Slot not available" });
     }
 
@@ -324,8 +324,19 @@ export const holdAppointment = async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     const booking = await prisma.$transaction(async (tx) => {
-      const createdBooking = await tx.booking.create({
-        data: {
+       //  UPSERT instead of CREATE
+      const upsertedBooking = await tx.booking.upsert({
+        where: {
+          timeslotId: slot.id // unique constraint
+        },
+        update: {
+          userId,
+          doctorId: slot.doctorId,
+          patientProfileId: patientProfile.id,
+          status: "HOLD",
+          expiresAt
+        },
+        create: {
           timeslotId: slot.id,
           userId,
           doctorId: slot.doctorId,
@@ -342,7 +353,7 @@ export const holdAppointment = async (req, res) => {
         data: { isActive: false }
       });
 
-      return createdBooking;
+      return upsertedBooking;
     });
 
     return res.status(201).json({
@@ -356,7 +367,6 @@ export const holdAppointment = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 /**
  * 4️⃣ Booking summary (Payment screen)
