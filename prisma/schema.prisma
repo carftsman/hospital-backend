@@ -120,7 +120,7 @@ model TimeSlot {
   consultationMode ConsultationMode @default(BOTH)
   isActive         Boolean          @default(true)
   createdAt        DateTime         @default(now())
-  booking          Booking?         @relation("SlotBooking")
+  booking          Booking[]
   doctor           Doctor           @relation(fields: [doctorId], references: [id])
 
   @@index([doctorId, start])
@@ -128,7 +128,7 @@ model TimeSlot {
 
 model Booking {
   id               Int             @id @default(autoincrement())
-  timeslotId       Int             @unique
+  timeslotId       Int
   createdAt        DateTime        @default(now())
   doctorId         Int
   end              DateTime
@@ -136,13 +136,14 @@ model Booking {
   userId           Int
   patientProfileId Int?
   status           BookingStatus   @default(CONFIRMED)
-  expiresAt        DateTime?       @db.Timestamp(6)
+  expiresAt        DateTime?
   patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  timeSlot         TimeSlot        @relation("SlotBooking", fields: [timeslotId], references: [id])
+  timeSlot         TimeSlot        @relation(fields: [timeslotId], references: [id])
   user             User            @relation(fields: [userId], references: [id])
   notification     Notification?   @relation("BookingNotification")
 
   @@index([userId])
+  @@index([timeslotId])
 }
 
 model Notification {

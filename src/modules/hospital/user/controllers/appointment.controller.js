@@ -87,8 +87,8 @@ export const getDoctorAvailability = async (req, res) => {
           ? "Tomorrow"
           : d.toLocaleDateString("en-IN", {
               weekday: "short",
-              month: "short",
-              day: "numeric",
+              // month: "short",
+              // day: "numeric",
             }),
       slotsAvailable: slotsCount,
     });
@@ -166,87 +166,197 @@ export const getAvailableSlots = async (req, res) => {
 /**
  * 3️⃣ Hold appointment (SELF / OTHER)
  */
+// export const holdAppointment = async (req, res) => {
+//   const userId = req.user.id;
+//   const { slotId, bookingFor, patient } = req.body;
+
+//   if (!slotId) {
+//     return res.status(400).json({ message: "slotId required" });
+//   }
+
+//   const slot = await prisma.timeSlot.findUnique({
+//     where: { id: Number(slotId) },
+//     include: { booking: true },
+//   });
+
+//   if (!slot || !slot.isActive || slot.booking) {
+//     return res.status(409).json({ message: "Slot not available" });
+//   }
+
+//   let patientProfile;
+
+//   if (bookingFor === "SELF") {
+//     patientProfile = await prisma.patientProfile.findFirst({
+//       where: { userId, isSelf: true },
+//     });
+
+//     if (!patientProfile) {
+//       const user = await prisma.user.findUnique({ where: { id: userId } });
+//       patientProfile = await prisma.patientProfile.create({
+//         data: {
+//           userId,
+//           fullName: user.fullName ?? "Self",
+//           phone: user.phone,
+//           isSelf: true,
+//         },
+//       });
+//     }
+//   } else {
+//     if (!patient?.fullName || !patient?.phone) {
+//       return res.status(400).json({ message: "Patient details required" });
+//     }
+
+//     patientProfile = await prisma.patientProfile.create({
+//       data: {
+//         userId,
+//         fullName: patient.fullName,
+//         phone: patient.phone,
+//         age: patient.age,
+//         gender: patient.gender,
+//         isSelf: false,
+//       },
+//     });
+//   }
+
+//   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+//   const booking = await prisma.$transaction(async tx => {
+//     const b = await tx.booking.create({
+//       data: {
+//         timeslotId: slot.id,
+//         userId,
+//         doctorId: slot.doctorId,
+//         patientProfileId: patientProfile.id,
+//         start: slot.start,
+//         end: slot.end,
+//         status: "HOLD",
+//         expiresAt,
+//       },
+//     });
+
+//     await tx.timeSlot.update({
+//       where: { id: slot.id },
+//       data: { isActive: false },
+//     });
+
+//     return b;
+//   });
+
+//   res.status(201).json({
+//     bookingId: booking.id,
+//     expiresAt: booking.expiresAt,
+//   });
+// };
 export const holdAppointment = async (req, res) => {
-  const userId = req.user.id;
-  const { slotId, bookingFor, patient } = req.body;
+  try {
+    const userId = req.user.id;
+    const { slotId, bookingFor, patient } = req.body;
 
-  if (!slotId) {
-    return res.status(400).json({ message: "slotId required" });
-  }
+    if (!slotId) {
+      return res.status(400).json({ message: "slotId required" });
+    }
 
-  const slot = await prisma.timeSlot.findUnique({
-    where: { id: Number(slotId) },
-    include: { booking: true },
-  });
+    const now = new Date();
 
-  if (!slot || !slot.isActive || slot.booking) {
-    return res.status(409).json({ message: "Slot not available" });
-  }
-
-  let patientProfile;
-
-  if (bookingFor === "SELF") {
-    patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId, isSelf: true },
+    /* ---------------- FETCH SLOT ---------------- */
+    const slot = await prisma.timeSlot.findUnique({
+      where: { id: Number(slotId) },
+      include: {
+        booking: {
+          where: {
+            OR: [
+              { status: "CONFIRMED" },
+              { status: "HOLD", expiresAt: { gt: now } }
+            ]
+          }
+        }
+      }
     });
 
-    if (!patientProfile) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!slot) {
+      return res.status(404).json({ message: "Slot not found" });
+    }
+
+    if (!slot.isActive || slot.booking.length > 0) {
+      return res.status(409).json({ message: "Slot not available" });
+    }
+
+    /* ---------------- PATIENT PROFILE ---------------- */
+    let patientProfile;
+
+    if (bookingFor === "SELF") {
+      patientProfile = await prisma.patientProfile.findFirst({
+        where: { userId, isSelf: true }
+      });
+
+      if (!patientProfile) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId }
+        });
+
+        patientProfile = await prisma.patientProfile.create({
+          data: {
+            userId,
+            fullName: user.fullName ?? "Self",
+            phone: user.phone,
+            isSelf: true
+          }
+        });
+      }
+    } else {
+      if (!patient?.fullName || !patient?.phone) {
+        return res.status(400).json({ message: "Patient details required" });
+      }
+
       patientProfile = await prisma.patientProfile.create({
         data: {
           userId,
-          fullName: user.fullName ?? "Self",
-          phone: user.phone,
-          isSelf: true,
-        },
+          fullName: patient.fullName,
+          phone: patient.phone,
+          age: patient.age,
+          gender: patient.gender,
+          isSelf: false
+        }
       });
     }
-  } else {
-    if (!patient?.fullName || !patient?.phone) {
-      return res.status(400).json({ message: "Patient details required" });
-    }
 
-    patientProfile = await prisma.patientProfile.create({
-      data: {
-        userId,
-        fullName: patient.fullName,
-        phone: patient.phone,
-        age: patient.age,
-        gender: patient.gender,
-        isSelf: false,
-      },
+    /* ---------------- HOLD TRANSACTION ---------------- */
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    const booking = await prisma.$transaction(async (tx) => {
+      const createdBooking = await tx.booking.create({
+        data: {
+          timeslotId: slot.id,
+          userId,
+          doctorId: slot.doctorId,
+          patientProfileId: patientProfile.id,
+          start: slot.start,
+          end: slot.end,
+          status: "HOLD",
+          expiresAt
+        }
+      });
+
+      await tx.timeSlot.update({
+        where: { id: slot.id },
+        data: { isActive: false }
+      });
+
+      return createdBooking;
     });
+
+    return res.status(201).json({
+      message: "Appointment slot held successfully",
+      bookingId: booking.id,
+      expiresAt: booking.expiresAt
+    });
+
+  } catch (error) {
+    console.error("holdAppointment error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
-
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-  const booking = await prisma.$transaction(async tx => {
-    const b = await tx.booking.create({
-      data: {
-        timeslotId: slot.id,
-        userId,
-        doctorId: slot.doctorId,
-        patientProfileId: patientProfile.id,
-        start: slot.start,
-        end: slot.end,
-        status: "HOLD",
-        expiresAt,
-      },
-    });
-
-    await tx.timeSlot.update({
-      where: { id: slot.id },
-      data: { isActive: false },
-    });
-
-    return b;
-  });
-
-  res.status(201).json({
-    bookingId: booking.id,
-    expiresAt: booking.expiresAt,
-  });
 };
+
 
 /**
  * 4️⃣ Booking summary (Payment screen)
