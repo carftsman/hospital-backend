@@ -2,6 +2,7 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 //import razorpay from "../../../../config/razorpay.js";
+import { generateSlotsIfMissing } from "../services/slotGenerator.service.js";
 
 const prisma = new PrismaClient();
 
@@ -135,32 +136,82 @@ export const getDoctorAvailability = async (req, res) => {
 //   });
 // };
 export const getAvailableSlots = async (req, res) => {
-  const { doctorId, date } = req.query;
+  try {
+    const { doctorId, date } = req.query;
 
-  if (!doctorId || !date) {
-    return res.status(400).json({ message: "doctorId and date required" });
-  }
+    if (!doctorId || !date) {
+      return res.status(400).json({
+        message: "doctorId and date required"
+      });
+    }
 
-  const dateObj = new Date(`${date}T00:00:00.000Z`);
+    // ✅ Generate slots if not present
+    await generateSlotsIfMissing(Number(doctorId), date);
 
-  const slots = await prisma.doctorAvailability.findMany({
-    where: {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const now = new Date();
+
+    const slots = await prisma.timeSlot.findMany({
+      where: {
+        doctorId: Number(doctorId),
+        start: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      },
+      select: {
+        id: true,
+        start: true,
+        end: true,
+        isActive: true,
+        booking: {
+          select: {
+            status: true,
+            expiresAt: true
+          }
+        }
+      },
+      orderBy: { start: "asc" }
+    });
+
+    const responseSlots = slots.map(slot => {
+      const blocked =
+        slot.booking &&
+        (
+          slot.booking.status === "CONFIRMED" ||
+          (slot.booking.status === "HOLD" && slot.booking.expiresAt > now)
+        );
+
+      return {
+        slotId: slot.id,
+        time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`,
+        isAvailable: slot.isActive && !blocked
+      };
+    });
+
+    return res.json({
       doctorId: Number(doctorId),
-      date: dateObj, // ✅ Date object
-      isBooked: false,
-    },
-    orderBy: { startTime: "asc" },
-  });
+      date,
+      slots: responseSlots
+    });
 
-  res.json({
-    doctorId: Number(doctorId),
-    date,
-    slots: slots.map(s => ({
-      availabilityId: s.id,
-      time: `${s.startTime} - ${s.endTime}`,
-    })),
-  });
+  } catch (error) {
+    console.error("getAvailableSlots error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
+
+const formatTime = (date) =>
+  date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
 
 
 /**
