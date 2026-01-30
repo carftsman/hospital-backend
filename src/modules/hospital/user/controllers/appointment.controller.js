@@ -301,7 +301,7 @@ const formatTime = (date) =>
 export const holdAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { slotId, bookingFor, patient } = req.body;
+    const { slotId, bookingFor, patient, reason } = req.body;
 
     if (!slotId) {
       return res.status(400).json({ message: "slotId required" });
@@ -311,24 +311,10 @@ export const holdAppointment = async (req, res) => {
 
     /* ---------------- FETCH SLOT ---------------- */
     const slot = await prisma.timeSlot.findUnique({
-      where: { id: Number(slotId) },
-      include: {
-        booking: {
-          where: {
-            OR: [
-              { status: "CONFIRMED" },
-              { status: "HOLD", expiresAt: { gt: now } }
-            ]
-          }
-        }
-      }
+      where: { id: Number(slotId) }
     });
 
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
-    }
-
-    if (!slot.isActive || slot.booking) {
+    if (!slot || !slot.isActive) {
       return res.status(409).json({ message: "Slot not available" });
     }
 
@@ -350,13 +336,21 @@ export const holdAppointment = async (req, res) => {
             userId,
             fullName: user.fullName ?? "Self",
             phone: user.phone,
+            email: user.email ?? null,
             isSelf: true
           }
         });
       }
     } else {
-      if (!patient?.fullName || !patient?.phone) {
-        return res.status(400).json({ message: "Patient details required" });
+      if (
+        !patient?.fullName ||
+        !patient?.phone ||
+        !patient?.email ||
+        !patient?.dob
+      ) {
+        return res.status(400).json({
+          message: "Patient name, phone, email and date of birth are required"
+        });
       }
 
       patientProfile = await prisma.patientProfile.create({
@@ -364,8 +358,10 @@ export const holdAppointment = async (req, res) => {
           userId,
           fullName: patient.fullName,
           phone: patient.phone,
-          age: patient.age,
-          gender: patient.gender,
+          email: patient.email,
+          dob: new Date(patient.dob),
+          age: patient.age ?? null,
+          gender: patient.gender ?? null,
           isSelf: false
         }
       });
@@ -375,19 +371,48 @@ export const holdAppointment = async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     const booking = await prisma.$transaction(async (tx) => {
-       //  UPSERT instead of CREATE
-      const upsertedBooking = await tx.booking.upsert({
-        where: {
-          timeslotId: slot.id // unique constraint
-        },
-        update: {
-          userId,
-          doctorId: slot.doctorId,
-          patientProfileId: patientProfile.id,
-          status: "HOLD",
-          expiresAt
-        },
-        create: {
+      const existing = await tx.booking.findUnique({
+        where: { timeslotId: slot.id }
+      });
+
+      //  BLOCK active bookings
+      if (
+        existing &&
+        (
+          existing.status === "CONFIRMED" ||
+          (existing.status === "HOLD" && existing.expiresAt > now)
+        )
+      ) {
+        throw new Error("Slot already booked");
+      }
+
+      //  REUSE expired booking
+      if (existing) {
+        const updated = await tx.booking.update({
+          where: { id: existing.id },
+          data: {
+            userId,
+            doctorId: slot.doctorId,
+            patientProfileId: patientProfile.id,
+            start: slot.start,
+            end: slot.end,
+            status: "HOLD",
+            expiresAt,
+            reason: reason ?? null
+          }
+        });
+
+        await tx.timeSlot.update({
+          where: { id: slot.id },
+          data: { isActive: false }
+        });
+
+        return updated;
+      }
+
+      //  FIRST booking for slot
+      const created = await tx.booking.create({
+        data: {
           timeslotId: slot.id,
           userId,
           doctorId: slot.doctorId,
@@ -395,7 +420,8 @@ export const holdAppointment = async (req, res) => {
           start: slot.start,
           end: slot.end,
           status: "HOLD",
-          expiresAt
+          expiresAt,
+          reason: reason ?? null
         }
       });
 
@@ -404,7 +430,7 @@ export const holdAppointment = async (req, res) => {
         data: { isActive: false }
       });
 
-      return upsertedBooking;
+      return created;
     });
 
     return res.status(201).json({
@@ -415,9 +441,13 @@ export const holdAppointment = async (req, res) => {
 
   } catch (error) {
     console.error("holdAppointment error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(409).json({
+      message: error.message || "Internal server error"
+    });
   }
 };
+
+
 
 /**
  * 4️⃣ Booking summary (Payment screen)

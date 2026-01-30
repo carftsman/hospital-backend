@@ -103,13 +103,14 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *                 bookingFor: SELF
  *             OTHER:
  *               value:
- *                 slotId: 101
+ *                 slotId: 791
  *                 bookingFor: OTHER
+ *                 reason: "Fever and cough"
  *                 patient:
- *                   fullName: "Suresh Kumar"
+ *                   fullName: "Riya Sharma"
  *                   phone: "9876543210"
- *                   age: 45
- *                   gender: MALE
+ *                   email: "riya@gmail.com"
+ *                   dob: "1998-06-12"
  *     responses:
  *       201:
  *         description: Slot held successfully
@@ -120,6 +121,7 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *               expiresAt: "2026-01-26T10:40:00Z"
  */
 router.post("/hold", auth, role("USER"), controller.holdAppointment);
+
 
 /**
  * @swagger

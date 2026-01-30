@@ -106,6 +106,8 @@ model PatientProfile {
   isSelf    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
+  email     String?
+  dob       DateTime? @db.Timestamp(6)
   bookings  Booking[]
   user      User      @relation(fields: [userId], references: [id])
 
@@ -137,6 +139,7 @@ model Booking {
   patientProfileId Int?
   status           BookingStatus   @default(CONFIRMED)
   expiresAt        DateTime?       @db.Timestamp(6)
+  reason           String?
   patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
   timeSlot         TimeSlot        @relation(fields: [timeslotId], references: [id], onUpdate: NoAction)
   user             User            @relation(fields: [userId], references: [id])
