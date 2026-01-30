@@ -542,6 +542,7 @@ export const getBookingSummary = async (req, res) => {
 
       doctor: {
         name: doctor.name,
+        image: doctor.imageUrl ?? null,
         specialization: doctor.specialization,
         experience: doctor.experience,
         rating: Number(doctor.rating ?? 0),
