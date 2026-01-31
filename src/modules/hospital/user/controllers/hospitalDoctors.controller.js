@@ -17,13 +17,17 @@ export const getHospitalDoctors = async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
     const mode = req.query.mode || null;
+    const specialization = req.query.specialization || null; 
+    const search = req.query.search || null;
 
 
     const result = await fetchHospitalDoctors(
       hospitalId,
       page,
       limit,
-      mode
+      mode,
+      specialization,
+      search
     );
 
     return res.json(result);

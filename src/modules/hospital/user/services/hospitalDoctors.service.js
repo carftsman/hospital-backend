@@ -74,7 +74,9 @@ export const fetchHospitalDoctors = async (
   hospitalId,
   page = 1,
   limit = 10,
-  mode = null
+  mode = null,
+  specialization = null,   // NEW
+  search = null         // NEW
 ) => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
@@ -90,24 +92,61 @@ export const fetchHospitalDoctors = async (
     modeFilter = { equals: "BOTH" };
   }
 
+  /* ---------------- WHERE CONDITION ---------------- */
+  const where = {
+    hospitalId,
+    ...(mode ? { consultationMode: modeFilter } : {}),
+    ...(specialization
+      ? {
+          specialization: {
+            equals: specialization,
+            mode: "insensitive" // ✅ case-insensitive
+          }
+        }
+      : {}),
+      ...(search
+    ? {
+        name: {
+          contains: search,
+          mode: "insensitive" // doctor name search
+        }
+      }
+    : {})
+  };
+
+ /* ---------------- MAIN QUERY ---------------- */
   const doctors = await prisma.doctor.findMany({
-    where: {
-      hospitalId,
-      ...(mode ? { consultationMode: modeFilter } : {}),
-    },
+    where,
     skip,
     take: safeLimit,
     orderBy: { rating: "desc" },
     include: {
-      category: true,
-    },
+      category: {
+        select: {
+          id: true,
+          name: true
+        }
+      },
+      hospital: {
+        select: {
+          id: true,
+          name: true,
+          location: true,
+          place: true, latitude: true,
+          longitude: true,
+          consultationMode: true,
+          city: true,
+          contactName: true,
+          contactNumber: true,
+          imageUrl: true,
+          rating: true
+        }
+      }
+    }
   });
 
   const total = await prisma.doctor.count({
-    where: {
-      hospitalId,
-      ...(mode ? { consultationMode: modeFilter } : {}),
-    },
+    where
   });
 
   return {
@@ -115,9 +154,10 @@ export const fetchHospitalDoctors = async (
     count: doctors.length,
     page: safePage,
     limit: safeLimit,
-    data: doctors,
+    data: doctors
   };
 };
+
 
 
 /* ---------------- DOCTOR PROFILE ---------------- */

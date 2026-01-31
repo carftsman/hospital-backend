@@ -9,7 +9,10 @@ const router = express.Router();
  *   get:
  *     summary: Get doctors for a specific hospital
  *     tags: [Doctors]
- *     description: "Returns doctors available in a specific hospital filtered by consultation mode."
+ *     description: >
+ *       Returns doctors available in a specific hospital.
+ *       Supports filtering by consultation mode, specialization,
+ *       and doctor name search with pagination.
  *
  *     parameters:
  *       - in: path
@@ -17,7 +20,8 @@ const router = express.Router();
  *         required: true
  *         schema:
  *           type: integer
- *         description: "ID of the hospital"
+ *           example: 1
+ *         description: Unique hospital ID
  *
  *       - in: query
  *         name: mode
@@ -25,16 +29,23 @@ const router = express.Router();
  *         schema:
  *           type: string
  *           enum: [ONLINE, OFFLINE, BOTH]
- *           default: BOTH
- *         description: "Consultation mode filter"
+ *         description: Consultation mode filter
  *
  *       - in: query
- *         name: distance
+ *         name: specialization
  *         required: false
  *         schema:
- *           type: number
- *           nullable: true
- *         description: "Maximum distance filter in kilometers"
+ *           type: string
+ *           example: Cardiology
+ *         description: Filter doctors by specialization (case-insensitive)
+ *
+ *       - in: query
+ *         name: search
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: Rajesh
+ *         description: Search doctors by name (case-insensitive)
  *
  *       - in: query
  *         name: page
@@ -43,7 +54,7 @@ const router = express.Router();
  *           type: integer
  *           minimum: 1
  *           default: 1
- *         description: "Page number for pagination"
+ *         description: Page number for pagination
  *
  *       - in: query
  *         name: limit
@@ -51,54 +62,51 @@ const router = express.Router();
  *         schema:
  *           type: integer
  *           minimum: 1
- *           maximum: 200
- *           default: 50
- *         description: "Maximum number of doctors per page"
+ *           maximum: 50
+ *           default: 10
+ *         description: Number of doctors per page
  *
  *     responses:
  *       200:
- *         description: "Doctors retrieved successfully"
+ *         description: Doctors retrieved successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 cached:
- *                   type: boolean
- *                   example: false
- *                 total:
- *                   type: integer
- *                   example: 40
- *                 count:
- *                   type: integer
- *                   example: 10
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 50
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     example:
- *                       id: 12
- *                       name: "Dr. Rakesh Sharma"
- *                       speciality: "Cardiology"
- *                       experience: "10 years"
- *                       imageUrl: "https://example.com/doc.jpg"
- *                       rating: 4.8
- *                       mode: "ONLINE"
+ *             example:
+ *               total: 1
+ *               count: 1
+ *               page: 1
+ *               limit: 10
+ *               data:
+ *                 - id: 1
+ *                   name: "Dr. Rajesh Kumar"
+ *                   imageUrl: "https://example.com/doctor.jpg"
+ *                   experience: 12
+ *                   specialization: "Cardiology"
+ *                   consultationMode: "BOTH"
+ *                   rating: 4.8
+ *                   category:
+ *                     id: 1
+ *                     name: "Cardiology"
+ *                   hospital:
+ *                     id: 1
+ *                     name: "Apollo Hospitals"
+ *                     city: "Hyderabad"
+ *                     state: "Telangana"
+ *                     imageUrl: "https://example.com/hospital.jpg"
+ *                     rating: 4.7
  *
  *       400:
- *         description: "Invalid input such as hospitalId or mode"
+ *         description: Invalid hospitalId or query parameters
  *
  *       500:
- *         description: "Internal server error"
+ *         description: Internal server error
  */
+router.get(
+  "/hospital/:hospitalId/doctors",
+  nearbyLimiter,
+  getHospitalDoctors
+);
 
-router.get("/hospital/:hospitalId/doctors", nearbyLimiter, getHospitalDoctors);
 
 /**
  * @swagger
