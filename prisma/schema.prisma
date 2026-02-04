@@ -73,7 +73,7 @@ model Doctor {
 
 model User {
   id                    Int              @id @default(autoincrement())
-  phone                 String           @unique
+  phone                 String?          @unique
   email                 String?          @unique
   password              String?
   termsAccepted         Boolean          @default(false)

@@ -1,22 +1,35 @@
- 
- import {
+
+import {
   sendOtpService,
   verifyStaticOtpService
 } from "../services/otp.service.js";
 
+/**
+ * SEND OTP
+ * Supports: phone OR email
+ */
 export const sendOtp = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, email } = req.body;
 
-    if (!phone) {
-      return res.status(400).json({ message: "Phone is required" });
+    // 🔴 Validation
+    if (!phone && !email) {
+      return res.status(400).json({
+        message: "Phone or Email is required"
+      });
     }
 
-    const data = await sendOtpService(phone);
+    if (phone && email) {
+      return res.status(400).json({
+        message: "Use either phone or email, not both"
+      });
+    }
+
+    const data = await sendOtpService({ phone, email });
 
     return res.json({
       message: "OTP sent successfully",
-      ...data // otp appears only in dev
+      ...data // static OTP (dev + prod as per your current setup)
     });
 
   } catch (err) {
@@ -25,16 +38,28 @@ export const sendOtp = async (req, res) => {
 };
 
 
-
+/**
+ * VERIFY OTP
+ * Supports: phone OR email
+ */
 export const verifyOtp = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone, email, otp } = req.body;
 
-    if (!phone || !otp) {
-      return res.status(400).json({ message: "Phone & OTP required" });
+    //  Validation
+    if ((!phone && !email) || !otp) {
+      return res.status(400).json({
+        message: "Phone or Email and OTP required"
+      });
     }
 
-    const result = await verifyStaticOtpService(phone, otp);
+    if (phone && email) {
+      return res.status(400).json({
+        message: "Use either phone or email, not both"
+      });
+    }
+
+    const result = await verifyStaticOtpService({ phone, email, otp });
 
     return res.json({
       message: "Login successful",
@@ -42,7 +67,8 @@ export const verifyOtp = async (req, res) => {
       isOnboardingCompleted: result.user.isOnboardingCompleted,
       user: {
         id: result.user.id,
-        phone: result.user.phone
+        phone: result.user.phone || null,
+        email: result.user.email || null
       }
     });
 

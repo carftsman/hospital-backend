@@ -6,48 +6,27 @@ import prisma from "../../../../prisma/client.js";
  * - MUST create user if not exists
  * - MUST NOT check "phone registered"
  */
-// export const sendOtpService = async (phone) => {
-//   let user = await prisma.user.findUnique({ where: { phone } });
+export const sendOtpService = async ({ phone, email }) => {
+  if (!phone && !email) {
+    throw new Error("PHONE_OR_EMAIL_REQUIRED");
+  }
 
-//   if (!user) {
-//     user = await prisma.user.create({
-//       data: {
-//         phone,
-//         isPhoneVerified: false,
-//         isOnboardingCompleted: false
-//       }
-//     });
-//   }
-
-//   const otpCode = "007007";
-//   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-//   await prisma.user.update({
-//     where: { phone },
-//     data: {
-//       otpCode,
-//       otpExpiresAt
-//     }
-//   });
-
-//   // ✅ RETURN OTP ONLY IN DEV
-//   if (process.env.NODE_ENV !== "production") {
-//     return { otp: otpCode };
-//   }
-
-//   return {};
-// };
-
-export const sendOtpService = async (phone) => {
-  let user = await prisma.user.findUnique({
-    where: { phone }
+  //  Find user by phone OR email
+  let user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        phone ? { phone } : undefined,
+        email ? { email } : undefined
+      ].filter(Boolean)
+    }
   });
 
-  // Create user if not exists
+  //  Create user if not exists
   if (!user) {
     user = await prisma.user.create({
       data: {
-        phone,
+        phone: phone || null,
+        email: email || null,
         isPhoneVerified: false,
         isOnboardingCompleted: false
       }
@@ -57,29 +36,45 @@ export const sendOtpService = async (phone) => {
   const otpCode = "007007";
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
+  // Save OTP
   await prisma.user.update({
-    where: { phone },
+    where: { id: user.id },
     data: {
       otpCode,
       otpExpiresAt
     }
   });
 
-  // ✅ ALWAYS RETURN OTP (DEV + PROD)
+  //  Email OTP (optional)
+  if (email) {
+    console.log(`OTP ${otpCode} sent to email ${email}`);
+  }
+
+  //  SMS OTP (optional)
+  if (phone) {
+    console.log(`OTP ${otpCode} sent to phone ${phone}`);
+  }
+
+  //  Always return OTP (as per your requirement)
   return { otp: otpCode };
 };
 
+export const verifyStaticOtpService = async ({ phone, email, otp }) => {
+  if ((!phone && !email) || !otp) {
+    throw new Error("INVALID_INPUT");
+  }
 
-/**
- * VERIFY OTP
- */
-export const verifyStaticOtpService = async (phone, otp) => {
-  const user = await prisma.user.findUnique({
-    where: { phone }
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        phone ? { phone } : undefined,
+        email ? { email } : undefined
+      ].filter(Boolean)
+    }
   });
 
   if (!user) {
-    throw new Error("USER_NOT_FOUND"); // should NEVER happen now
+    throw new Error("USER_NOT_FOUND");
   }
 
   if (user.otpCode !== otp || user.otpExpiresAt < new Date()) {
@@ -87,7 +82,7 @@ export const verifyStaticOtpService = async (phone, otp) => {
   }
 
   const updatedUser = await prisma.user.update({
-    where: { phone },
+    where: { id: user.id },
     data: {
       isPhoneVerified: true,
       otpCode: null,
@@ -99,9 +94,9 @@ export const verifyStaticOtpService = async (phone, otp) => {
     { id: updatedUser.id, role: "USER" },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
-   );
+  );
 
-   return {
+  return {
     token,
     user: updatedUser
   };
