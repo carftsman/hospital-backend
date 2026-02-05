@@ -94,6 +94,7 @@ model User {
   bookings              Booking[]
   notifications         Notification[]
   patientProfiles       PatientProfile[]
+  labBookings           LabBooking[]
 }
 
 model PatientProfile {
@@ -227,4 +228,84 @@ enum BloodGroup {
   AB_NEG
   O_POS
   O_NEG
+}
+
+//Lab
+
+model Lab {
+  id          Int      @id @default(autoincrement())
+  name        String
+  imageUrl    String?
+  description String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  latitude    Float?
+  longitude   Float?
+  isOpen      Boolean  @default(true)
+  rating      Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  categories LabCategory[]
+  tests      LabTest[]
+  bookings   LabBooking[]
+}
+
+model LabCategory {
+  id    Int    @id @default(autoincrement())
+  name  String
+  labId Int
+
+  lab   Lab       @relation(fields: [labId], references: [id])
+  tests LabTest[]
+
+  createdAt DateTime @default(now())
+}
+
+model LabTest {
+  id          Int      @id @default(autoincrement())
+  labId       Int
+  categoryId  Int
+  name        String
+  description String?
+  price       Int
+  reportTime  String
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  lab      Lab          @relation(fields: [labId], references: [id])
+  category LabCategory  @relation(fields: [categoryId], references: [id])
+  bookings LabBooking[]
+}
+
+model LabBooking {
+  id         Int              @id @default(autoincrement())
+  userId     Int
+  labId      Int
+  labTestId  Int
+  status     LabBookingStatus @default(PENDING)
+  sampleDate DateTime
+  createdAt  DateTime         @default(now())
+
+  user    User       @relation(fields: [userId], references: [id])
+  lab     Lab        @relation(fields: [labId], references: [id])
+  labTest LabTest    @relation(fields: [labTestId], references: [id])
+  report  LabReport?
+}
+
+model LabReport {
+  id           Int      @id @default(autoincrement())
+  labBookingId Int      @unique
+  reportUrl    String
+  createdAt    DateTime @default(now())
+
+  labBooking LabBooking @relation(fields: [labBookingId], references: [id])
+}
+
+enum LabBookingStatus {
+  PENDING
+  SAMPLE_COLLECTED
+  COMPLETED
+  CANCELLED
 }

@@ -32,9 +32,9 @@ const options = {
     },
   },
 
-  apis: [
-    "./src/modules/hospital/user/routes/*.js",
-    "./src/modules/hospital/admin/routes/*.js",
+   apis: [
+    "./src/modules/**/*.routes.js",  
+    "./src/routes/**/*.js",
   ],
 };
 

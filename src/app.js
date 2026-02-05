@@ -34,11 +34,16 @@ import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
 import appointmentRoutes from "./modules/hospital/user/routes/appointments.routes.js";
 import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.routes.js";
 
+
+//lab
+import labRoutes from "./modules/lab/user/routes/lab.routes.js";
+import labReportRoutes from "./modules/lab/user/routes/labReport.routes.js";
+import labAdminReportRoutes from "./modules/lab/admin/routes/labAdminReport.routes.js";
+
 // =======================
 // Swagger
 // =======================
 import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
-
 
 // =======================
 // App Init
@@ -105,5 +110,16 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
 
 app.use("/api/hospital/user", hospitalInfoRoutes);
+
+
+//Lab
+
+
+
+
+app.use("/api/labs", labRoutes);
+app.use("/api/labs", labReportRoutes);
+app.use("/api/lab-admin", labAdminReportRoutes);
+
 
 export default app;
