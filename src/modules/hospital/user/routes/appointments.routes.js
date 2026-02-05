@@ -122,6 +122,53 @@ router.get("/slots", auth, controller.getAvailableSlots);
  */
 router.post("/hold", auth, role("USER"), controller.holdAppointment);
 
+/**
+ * @swagger
+ * /api/appointments/my:
+ *   get:
+ *     summary: Get past & upcoming appointments of a user
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 2
+ *     responses:
+ *       200:
+ *         description: Past and upcoming appointments
+ *         content:
+ *           application/json:
+ *             example:
+ *               pastAppointments:
+ *                 - bookingId: 12
+ *                   status: CONFIRMED
+ *                   doctor:
+ *                     name: Dr. Manoj Iyer
+ *                     specialization: Urology
+ *                     hospital: Apollo Hospitals
+ *                   patient: John Doe
+ *                   appointment:
+ *                     date: Mon, 20 Jan
+ *                     time: 10:00 AM - 10:30 AM
+ *               upcomingAppointments:
+ *                 - bookingId: 15
+ *                   status: HOLD
+ *                   doctor:
+ *                     name: Dr. Rajesh Kumar
+ *                     specialization: Cardiology
+ *                     hospital: Apollo Hospitals
+ *                   patient: Self
+ *                   appointment:
+ *                     date: Fri, 07 Feb
+ *                     time: 11:30 AM - 12:00 PM
+ *       400:
+ *         description: userId missing
+ *       500:
+ *         description: Internal server error
+ */
+router.get("/my", controller.getMyAppointments);
 
 /**
  * @swagger
@@ -239,6 +286,8 @@ router.post(
   role("USER"),
   controller.verifyPaymentAndConfirm
 );
+
+
 
 /**
  * @swagger

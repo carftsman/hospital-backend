@@ -691,6 +691,98 @@ export const getDoctorBookedSlots = async (req, res) => {
   );
 };
 
+/**
+ * 9️⃣ Get all bookings of logged-in user (Past + Upcoming)
+ */
+/**
+ * 9️⃣ Get all bookings of logged-in user
+ * Returns pastAppointments & upcomingAppointments separately
+ */
+export const getMyAppointments = async (req, res) => {
+  try {
+    // ⚠️ TEMP: userId taken from query since auth removed
+    const userId = Number(req.query.userId);
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    const now = new Date();
+
+    const bookings = await prisma.booking.findMany({
+      where: { userId },
+      orderBy: {
+        timeSlot: {
+          start: "desc"
+        }
+      },
+      include: {
+        timeSlot: {
+          include: {
+            doctor: {
+              include: {
+                hospital: true
+              }
+            }
+          }
+        },
+        patientProfile: true
+      }
+    });
+
+    const formatTime = (date) =>
+      date.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+
+    const pastAppointments = [];
+    const upcomingAppointments = [];
+
+    bookings.forEach(b => {
+      const appointmentData = {
+        bookingId: b.id,
+        status: b.status,
+
+        doctor: {
+          name: b.timeSlot.doctor.name,
+          specialization: b.timeSlot.doctor.specialization,
+          hospital: b.timeSlot.doctor.hospital.name
+        },
+
+        patient: b.patientProfile?.fullName ?? "Self",
+
+        appointment: {
+          date: b.timeSlot.start.toLocaleDateString("en-IN", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short"
+          }),
+          time: `${formatTime(b.timeSlot.start)} - ${formatTime(b.timeSlot.end)}`
+        }
+      };
+
+      if (b.timeSlot.end < now) {
+        pastAppointments.push(appointmentData);
+      } else {
+        upcomingAppointments.push(appointmentData);
+      }
+    });
+
+    return res.json({
+      pastAppointments,
+      upcomingAppointments
+    });
+
+  } catch (error) {
+    console.error("getMyAppointments error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+
 // 8️⃣ Payment success details
 export const getPaymentSuccessDetails = async (req, res) => {
   try {
