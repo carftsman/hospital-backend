@@ -37,7 +37,6 @@ import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.rout
 
 //lab
 import labRoutes from "./modules/lab/user/routes/lab.routes.js";
-import labReportRoutes from "./modules/lab/user/routes/labReport.routes.js";
 import labAdminReportRoutes from "./modules/lab/admin/routes/labAdminReport.routes.js";
 
 // =======================
@@ -118,7 +117,6 @@ app.use("/api/hospital/user", hospitalInfoRoutes);
 
 
 app.use("/api/labs", labRoutes);
-app.use("/api/labs", labReportRoutes);
 app.use("/api/lab-admin", labAdminReportRoutes);
 
 

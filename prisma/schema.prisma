@@ -211,10 +211,13 @@ model Lab {
   isOpen      Boolean       @default(true)
   rating      Float         @default(0)
   createdAt   DateTime      @default(now())
-  bookings    LabBooking[]
-  categories  LabCategory[]
-  tests       LabTest[]
+
+  bookings   LabBooking[]
+  categories LabCategory[]
+  tests      LabTest[]
+  slots      LabSlot[]      // ✅ ADD THIS
 }
+
 
 model LabCategory {
   id        Int       @id @default(autoincrement())
@@ -260,6 +263,19 @@ model LabReport {
   reportUrl    String
   createdAt    DateTime   @default(now())
   labBooking   LabBooking @relation(fields: [labBookingId], references: [id])
+}
+model LabSlot {
+  id        Int      @id @default(autoincrement())
+  labId     Int
+  date      DateTime
+  startTime String
+  endTime   String
+  isBooked  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  lab Lab @relation(fields: [labId], references: [id])
+
+  @@index([labId, date])
 }
 
 model DoctorSymptom {
