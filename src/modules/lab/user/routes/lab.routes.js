@@ -1,15 +1,15 @@
 import { Router } from "express";
 import * as controller from "../controllers/lab.controller.js";
-
+ 
 const router = Router();
-
+ 
 /**
  * @swagger
  * tags:
  *   name: Labs
  *   description: Diagnostic labs – screen-wise APIs (Search, Slots, Booking, Reports)
  */
-
+ 
 /**
  * @swagger
  * /api/labs/nearby:
@@ -39,7 +39,7 @@ const router = Router();
  *         description: Nearby labs list
  */
 router.get("/nearby", controller.getNearbyLabs);
-
+ 
 /**
  * @swagger
  * /api/labs/search:
@@ -58,7 +58,7 @@ router.get("/nearby", controller.getNearbyLabs);
  *         description: Matching labs
  */
 router.get("/search", controller.searchLabs);
-
+ 
 /**
  * @swagger
  * /api/labs/categories/all:
@@ -70,10 +70,10 @@ router.get("/search", controller.searchLabs);
  *         description: List of lab categories
  */
 router.get("/categories/all", controller.getLabCategories);
-
-
-
-
+ 
+ 
+ 
+ 
 /**
  * @swagger
  * /api/labs/reports:
@@ -136,7 +136,7 @@ router.get("/categories/all", controller.getLabCategories);
  *         description: Internal server error
  */
 router.get("/reports", controller.getUserLabReports);
-
+ 
 /**
  * @swagger
  * /api/labs/reports/{bookingId}:
@@ -177,7 +177,7 @@ router.get("/reports/:bookingId", controller.getLabReportByBooking);
  *         description: userId is required
  */
 router.get("/reports", controller.getMyLabReports);
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}/categories:
@@ -196,8 +196,8 @@ router.get("/reports", controller.getMyLabReports);
  *         description: Categories for a lab
  */
 router.get("/:labId/categories", controller.getCategoriesByLab);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/{labId}/tests/search:
@@ -221,7 +221,7 @@ router.get("/:labId/categories", controller.getCategoriesByLab);
  *         description: Matching lab tests
  */
 router.get("/:labId/tests/search", controller.searchLabTests);
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}/tests:
@@ -245,7 +245,7 @@ router.get("/:labId/tests/search", controller.searchLabTests);
  *         description: Lab tests list
  */
 router.get("/:labId/tests", controller.getLabTests);
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}/slots:
@@ -270,7 +270,7 @@ router.get("/:labId/tests", controller.getLabTests);
  *         description: Available lab slots
  */
 router.get("/:labId/slots", controller.getLabSlots);
-
+ 
 /**
  * @swagger
  * /api/labs/tests/{labTestId}:
@@ -291,7 +291,7 @@ router.get("/:labId/slots", controller.getLabSlots);
  *         description: Test not found
  */
 router.get("/tests/:labTestId", controller.getLabTestById);
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}:
@@ -312,8 +312,8 @@ router.get("/tests/:labTestId", controller.getLabTestById);
  *         description: Lab not found
  */
 router.get("/:labId", controller.getLabById);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/book:
@@ -349,8 +349,8 @@ router.get("/:labId", controller.getLabById);
  *         description: Lab booking created
  */
 router.post("/book", controller.bookLabTest);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/bookings/{bookingId}/cancel:
@@ -375,7 +375,7 @@ router.post("/book", controller.bookLabTest);
  *         description: Booking cancelled
  */
 router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
-
+ 
 /**
  * @swagger
  * /api/labs/bookings:
@@ -394,5 +394,5 @@ router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
  *         description: List of lab bookings
  */
 router.get("/bookings", controller.getUserLabBookings);
-
+ 
 export default router;

@@ -1,15 +1,15 @@
 import { Router } from "express";
 import * as controller from "../controllers/labAdminReport.controller.js";
-
+ 
 const router = Router();
-
+ 
 /**
  * @swagger
  * tags:
  *   name: Lab Admin
  *   description: Lab admin report upload APIs
  */
-
+ 
 /**
  * @swagger
  * /api/lab-admin/reports/upload:
@@ -41,5 +41,5 @@ const router = Router();
  *         description: Report already exists
  */
 router.post("/reports/upload", controller.uploadLabReport);
-
+ 
 export default router;
