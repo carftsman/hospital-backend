@@ -108,7 +108,7 @@ router.get(
  *     summary: Get doctors based on location and filters
  *     description: >
  *       Public API to fetch doctors based on user location with optional filters
- *       like distance, specialization, consultation fee, availability, and search.
+ *       like distance, specialization, availability, and women-specific doctors.
  *       No authentication token is required.
  *     tags:
  *       - Doctors
@@ -121,6 +121,7 @@ router.get(
  *         required: true
  *         description: User latitude
  *         example: 17.385044
+ *
  *       - in: query
  *         name: lng
  *         schema:
@@ -129,6 +130,7 @@ router.get(
  *         required: true
  *         description: User longitude
  *         example: 78.486671
+ *
  *       - in: query
  *         name: distance
  *         schema:
@@ -137,13 +139,15 @@ router.get(
  *         required: false
  *         description: Maximum distance in kilometers
  *         example: 5
+ *
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
  *         required: false
- *         description: Search by doctor name or hospital name
+ *         description: Search by doctor name
  *         example: rakesh
+ *
  *       - in: query
  *         name: specialization
  *         schema:
@@ -151,20 +155,18 @@ router.get(
  *         required: false
  *         description: Filter by doctor specialization
  *         example: Cardiology
+ *
  *       - in: query
- *         name: minFee
+ *         name: women
  *         schema:
- *           type: integer
+ *           type: boolean
+ *           default: false
  *         required: false
- *         description: Minimum consultation fee
- *         example: 300
- *       - in: query
- *         name: maxFee
- *         schema:
- *           type: integer
- *         required: false
- *         description: Maximum consultation fee
- *         example: 1000
+ *         description: >
+ *           If true, returns only doctors belonging to women-specific categories
+ *           (e.g., Gynecology, Dermatology, Psychiatry, etc.)
+ *         example: true
+ *
  *       - in: query
  *         name: mode
  *         schema:
@@ -173,6 +175,7 @@ router.get(
  *           default: BOTH
  *         required: false
  *         description: Consultation mode filter
+ *
  *       - in: query
  *         name: availability
  *         schema:
@@ -181,6 +184,7 @@ router.get(
  *           default: ALL
  *         required: false
  *         description: Filter doctors based on availability
+ *
  *       - in: query
  *         name: page
  *         schema:
@@ -189,6 +193,7 @@ router.get(
  *           default: 1
  *         required: false
  *         description: Page number
+ *
  *       - in: query
  *         name: limit
  *         schema:
@@ -198,6 +203,7 @@ router.get(
  *           default: 20
  *         required: false
  *         description: Number of doctors per page
+ *
  *     responses:
  *       200:
  *         description: Doctors fetched successfully
@@ -228,24 +234,21 @@ router.get(
  *                         example: 12
  *                       name:
  *                         type: string
- *                         example: Dr. Rakesh Sharma
+ *                         example: Dr. Kavya Rao
  *                       specialization:
  *                         type: string
- *                         example: Cardiology
+ *                         example: Gynecology
  *                       experience:
  *                         type: integer
- *                         example: 12
+ *                         example: 10
  *                       consultationFee:
  *                         type: integer
- *                         example: 600
+ *                         example: 650
  *                       languages:
  *                         type: array
  *                         items:
  *                           type: string
- *                         example: ["English", "Hindi"]
- *                       distance:
- *                         type: number
- *                         example: 2.4
+ *                         example: ["English", "Telugu"]
  *                       hospital:
  *                         type: object
  *                         properties:
@@ -254,19 +257,20 @@ router.get(
  *                             example: 1
  *                           name:
  *                             type: string
- *                             example: Demo Hospital
+ *                             example: Apollo Hospital
  *                           place:
  *                             type: string
  *                             example: Hyderabad
  *                           isOpen:
  *                             type: boolean
  *                             example: true
+ *
  *       400:
  *         description: Invalid request parameters
+ *
  *       500:
  *         description: Internal server error
  */
-
 router.get("/doctors", nearbyLimiter, getDoctors);
 
 

@@ -101,6 +101,7 @@ model User {
   labBookings           LabBooking[]
   notifications         Notification[]
   patientProfiles       PatientProfile[]
+  reminders             Reminder[]
 }
 
 model PatientProfile {
@@ -288,6 +289,24 @@ model DoctorSymptom {
   @@unique([doctorId, symptomId], map: "DoctorSymptom_unique")
 }
 
+model Reminder {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  type        ReminderType
+  title       String
+  reminderAt  DateTime
+  repeat      ReminderRepeat @default(NONE)
+  notes       String?
+  isImportant Boolean        @default(false)
+  status      ReminderStatus @default(ACTIVE)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id])
+
+  @@index([userId, reminderAt])
+}
+
 enum HospitalStatus {
   PENDING
   APPROVED
@@ -341,4 +360,25 @@ enum GenderPreference {
   FEMALE
   MALE
   ALL
+}
+
+enum ReminderType {
+  MEDICINE
+  APPOINTMENT
+  TEST
+  CUSTOM
+}
+
+enum ReminderRepeat {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ReminderStatus {
+  ACTIVE
+  COMPLETED
+  SKIPPED
+  EXPIRED
 }

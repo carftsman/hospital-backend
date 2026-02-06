@@ -33,7 +33,7 @@ import profileRoutes from "./modules/hospital/user/routes/profile.routes.js";
 import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
 import appointmentRoutes from "./modules/hospital/user/routes/appointments.routes.js";
 import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.routes.js";
-
+import reminderRoutes from "./modules/hospital/user/routes/reminder.routes.js";
 
 //lab
 import labRoutes from "./modules/lab/user/routes/lab.routes.js";
@@ -97,6 +97,8 @@ app.use("/api/hospital/user", bookingRoutes);
 app.use("/api/hospital/user", userBookingRoutes);
 app.use("/api/hospital/user/profile", profileRoutes);
 app.use("/api/hospital/user", symptomRoutes);
+app.use("/api/hospital/user", reminderRoutes);
+
 
 
 //user 

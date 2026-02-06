@@ -45,10 +45,12 @@ export const getHospitalDoctors = async (req, res) => {
 /* ---------------- GLOBAL DOCTORS ---------------- */
 export const getDoctors = async (req, res) => {
   try {
-    const { specialization, page = 1, limit = 20 } = req.query;
+    const { specialization, women = "false",page = 1, limit = 20 } = req.query;
 
     const { rows, total } = await fetchDoctors(
-      { specialization },
+      { specialization ,
+        women:  women === "true"
+      },
       Number(page),
       Number(limit)
     );

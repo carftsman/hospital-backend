@@ -4,13 +4,24 @@ import prisma from "../../../../prisma/client.js";
 export const fetchDoctors = async (filters, page, limit) => {
   const skip = (page - 1) * limit;
 
-  const where = {};
-  if (filters.specialization) {
-    where.specialization = {
-      contains: filters.specialization,
-      mode: "insensitive",
-    };
-  }
+const where = {
+    ...(filters.specialization
+      ? {
+          specialization: {
+            contains: filters.specialization,
+            mode: "insensitive"
+          }
+        }
+      : {}),
+    ...(filters.women
+      ? {
+          category: {
+            isWomenSpecific: true
+          }
+        }
+      : {})
+  };
+    
 
   const rows = await prisma.doctor.findMany({
     skip,
