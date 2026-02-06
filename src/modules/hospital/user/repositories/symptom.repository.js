@@ -1,65 +1,29 @@
-// import prisma from "../../../../prisma/client.js";
-
-// export const findSymptoms = async (search, offset, limit) => {
-//   return prisma.symptom.findMany({
-//     where: search
-//       ? {
-//           name: {
-//             contains: search,
-//             mode: "insensitive"
-//           }
-//         }
-//       : undefined,
-
-//     select: {
-//       id: true,
-//       name: true,
-//       imageUrl: true,
-//       category: {
-//         select: {
-//           id: true,
-//           name: true
-//         }
-//       }
-//     },
-
-//     orderBy: {
-//       name: "asc"
-//     },
-
-//     skip: offset,
-//     take: limit
-//   });
-// };
-
-// export const countSymptoms = async (search) => {
-//   return prisma.symptom.count({
-//     where: search
-//       ? {
-//           name: {
-//             contains: search,
-//             mode: "insensitive"
-//           }
-//         }
-//       : undefined
-//   });
-// };
-
 import  prisma  from "../../../../prisma/client.js";
 
-export const findSymptoms = async (search, offset, limit) => {
+export const findSymptoms = async (
+  search, 
+  offset, 
+  limit, 
+  isWomen = false , 
+  isCritical = false) => {
   return prisma.symptom.findMany({
     where: {
-      name: {
-        contains: search,
-        mode: "insensitive"
-      }
+      AND: [
+        {
+          name: {
+            contains: search,
+            mode: "insensitive"
+          }
+        },
+        ...(isWomen ? [{ isWomenSpecific: true }] : []),
+        ...(isCritical ? [{ isCritical: true }] : [])
+      ]
     },
     select: {
       id: true,
       name: true,
       imageUrl: true,
-      Category: {              // ✅ MUST MATCH SCHEMA
+      Category: {              // MUST MATCH SCHEMA
         select: {
           id: true,
           name: true
@@ -72,13 +36,22 @@ export const findSymptoms = async (search, offset, limit) => {
   });
 };
 
-export const countSymptoms = async (search) => {
+export const countSymptoms = async (
+  search,
+  isWomen = false,
+  isCritical = false) => {
   return prisma.symptom.count({
     where: {
-      name: {
-        contains: search,
-        mode: "insensitive"
+      AND: [
+        {
+          name: {
+            contains: search,
+            mode: "insensitive"
+          }
+        },
+        ...(isWomen ? [{ isWomenSpecific: true }] : []),
+        ...(isCritical ? [{ isCritical: true }] : [])
+      ]
       }
-    }
-  });
-};
+    });
+  };

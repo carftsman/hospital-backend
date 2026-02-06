@@ -16,9 +16,17 @@ const router = express.Router();
  *         name: mode
  *         schema:
  *           type: string
- *           enum: [ONLINE, OFFLINE,BOTH]
+ *           enum: [ONLINE, OFFLINE, BOTH]
  *         required: false
  *         description: "Consultation mode (default: BOTH)"
+ *
+ *       - in: query
+ *         name: women
+ *         schema:
+ *           type: boolean
+ *           example: true
+ *         required: false
+ *         description: "If true, returns only women-specific categories"
  *
  *       - in: query
  *         name: page
@@ -45,12 +53,12 @@ const router = express.Router();
  *             schema:
  *               type: object
  *               properties:
- *                 cached:
- *                   type: boolean
- *                   example: false
  *                 mode:
  *                   type: string
  *                   example: ONLINE
+ *                 women:
+ *                   type: boolean
+ *                   example: true
  *                 page:
  *                   type: integer
  *                   example: 1
@@ -69,7 +77,7 @@ const router = express.Router();
  *                     type: object
  *                     example:
  *                       id: 1
- *                       name: "Dermatology"
+ *                       name: "Gynecology"
  *
  *       400:
  *         description: "Invalid mode"
@@ -77,7 +85,6 @@ const router = express.Router();
  *       500:
  *         description: "Internal server error"
  */
-
 
 router.get("/categories", nearbyLimiter, listCategoriesByMode);
 

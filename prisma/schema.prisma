@@ -8,45 +8,49 @@ datasource db {
 }
 
 model Hospital {
-  id               Int              @id @default(autoincrement())
-  name             String
-  location         String
-  place            String?
-  imageUrl         String?
-  pinCode          String
-  contactName      String?
-  contactNumber    String?
-  ownerEmail       String           @unique
-  ownerPassword    String
-  speciality       String?
-  consultationMode ConsultationMode @default(BOTH)
-  status           HospitalStatus   @default(PENDING)
-  createdAt        DateTime         @default(now())
-  isListed         Boolean          @default(true)
-  isOpen           Boolean          @default(true)
-  latitude         Float?
-  longitude        Float?
-  establishedYear  Int?
-  state            String?
-  city             String?
-  open24x7         Boolean?         @default(false)
-  rating           Float?           @default(0)
-  popularity       Int?             @default(0)
-  categories       Category[]
-  doctors          Doctor[]
-  notifications    Notification[]
+  id                   Int              @id @default(autoincrement())
+  name                 String
+  location             String
+  place                String?
+  imageUrl             String?
+  pinCode              String
+  contactName          String?
+  contactNumber        String?
+  ownerEmail           String           @unique
+  ownerPassword        String
+  speciality           String?
+  consultationMode     ConsultationMode @default(BOTH)
+  status               HospitalStatus   @default(PENDING)
+  createdAt            DateTime         @default(now())
+  isListed             Boolean          @default(true)
+  isOpen               Boolean          @default(true)
+  latitude             Float?
+  longitude            Float?
+  establishedYear      Int?
+  state                String?
+  city                 String?
+  open24x7             Boolean?         @default(false)
+  rating               Float?           @default(0)
+  popularity           Int?             @default(0)
+  isWomenFriendly      Boolean?         @default(false)
+  hasMaternityCare     Boolean?         @default(false)
+  isEmergencySupported Boolean?         @default(false)
+  categories           Category[]
+  doctors              Doctor[]
+  notifications        Notification[]
 }
 
 model Category {
-  id          Int       @id @default(autoincrement())
-  name        String
-  description String?
-  imageUrl    String?
-  hospitalId  Int
-  createdAt   DateTime  @default(now())
-  hospital    Hospital  @relation(fields: [hospitalId], references: [id])
-  doctors     Doctor[]
-  symptoms    Symptom[]
+  id              Int       @id @default(autoincrement())
+  name            String
+  description     String?
+  imageUrl        String?
+  hospitalId      Int
+  createdAt       DateTime  @default(now())
+  isWomenSpecific Boolean?  @default(false)
+  hospital        Hospital  @relation(fields: [hospitalId], references: [id])
+  doctors         Doctor[]
+  symptoms        Symptom[]
 }
 
 model Doctor {
@@ -65,9 +69,11 @@ model Doctor {
   rating             Decimal?             @default(0) @db.Decimal(2, 1)
   isfavorite         Boolean?             @default(false)
   consultationMode   ConsultationMode     @default(BOTH)
+  genderPreference   GenderPreference?    @default(ALL)
   category           Category             @relation(fields: [categoryId], references: [id])
   hospital           Hospital             @relation(fields: [hospitalId], references: [id])
   DoctorAvailability DoctorAvailability[]
+  DoctorSymptom      DoctorSymptom[]
   timeSlots          TimeSlot[]
 }
 
@@ -92,9 +98,9 @@ model User {
   fullName              String?
   isOnboardingCompleted Boolean          @default(false)
   bookings              Booking[]
+  labBookings           LabBooking[]
   notifications         Notification[]
   patientProfiles       PatientProfile[]
-  labBookings           LabBooking[]
 }
 
 model PatientProfile {
@@ -168,12 +174,15 @@ model Notification {
 }
 
 model Symptom {
-  id         Int      @id @default(autoincrement())
-  name       String
-  imageUrl   String?
-  categoryId Int
-  createdAt  DateTime @default(now())
-  Category   Category @relation(fields: [categoryId], references: [id])
+  id              Int             @id @default(autoincrement())
+  name            String
+  imageUrl        String?
+  categoryId      Int
+  createdAt       DateTime        @default(now())
+  isWomenSpecific Boolean?        @default(false)
+  isCritical      Boolean?        @default(false)
+  DoctorSymptom   DoctorSymptom[]
+  Category        Category        @relation(fields: [categoryId], references: [id])
 }
 
 model DoctorAvailability {
@@ -186,6 +195,81 @@ model DoctorAvailability {
   doctor    Doctor   @relation(fields: [doctorId], references: [id])
 
   @@index([doctorId, date])
+}
+
+model Lab {
+  id          Int           @id @default(autoincrement())
+  name        String
+  imageUrl    String?
+  description String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  latitude    Float?
+  longitude   Float?
+  isOpen      Boolean       @default(true)
+  rating      Float         @default(0)
+  createdAt   DateTime      @default(now())
+  bookings    LabBooking[]
+  categories  LabCategory[]
+  tests       LabTest[]
+}
+
+model LabCategory {
+  id        Int       @id @default(autoincrement())
+  name      String
+  labId     Int
+  createdAt DateTime  @default(now())
+  lab       Lab       @relation(fields: [labId], references: [id])
+  tests     LabTest[]
+}
+
+model LabTest {
+  id          Int          @id @default(autoincrement())
+  labId       Int
+  categoryId  Int
+  name        String
+  description String?
+  price       Int
+  reportTime  String
+  isAvailable Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  bookings    LabBooking[]
+  category    LabCategory  @relation(fields: [categoryId], references: [id])
+  lab         Lab          @relation(fields: [labId], references: [id])
+}
+
+model LabBooking {
+  id         Int              @id @default(autoincrement())
+  userId     Int
+  labId      Int
+  labTestId  Int
+  status     LabBookingStatus @default(PENDING)
+  sampleDate DateTime
+  createdAt  DateTime         @default(now())
+  lab        Lab              @relation(fields: [labId], references: [id])
+  labTest    LabTest          @relation(fields: [labTestId], references: [id])
+  user       User             @relation(fields: [userId], references: [id])
+  report     LabReport?
+}
+
+model LabReport {
+  id           Int        @id @default(autoincrement())
+  labBookingId Int        @unique
+  reportUrl    String
+  createdAt    DateTime   @default(now())
+  labBooking   LabBooking @relation(fields: [labBookingId], references: [id])
+}
+
+model DoctorSymptom {
+  id        Int     @id @default(autoincrement())
+  doctorId  Int
+  symptomId Int
+  Doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "DoctorSymptom_doctor_fkey")
+  Symptom   Symptom @relation(fields: [symptomId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "DoctorSymptom_symptom_fkey")
+
+  @@unique([doctorId, symptomId], map: "DoctorSymptom_unique")
 }
 
 enum HospitalStatus {
@@ -230,82 +314,15 @@ enum BloodGroup {
   O_NEG
 }
 
-//Lab
-
-model Lab {
-  id          Int      @id @default(autoincrement())
-  name        String
-  imageUrl    String?
-  description String?
-  phone       String?
-  address     String?
-  city        String?
-  state       String?
-  latitude    Float?
-  longitude   Float?
-  isOpen      Boolean  @default(true)
-  rating      Float    @default(0)
-  createdAt   DateTime @default(now())
-
-  categories LabCategory[]
-  tests      LabTest[]
-  bookings   LabBooking[]
-}
-
-model LabCategory {
-  id    Int    @id @default(autoincrement())
-  name  String
-  labId Int
-
-  lab   Lab       @relation(fields: [labId], references: [id])
-  tests LabTest[]
-
-  createdAt DateTime @default(now())
-}
-
-model LabTest {
-  id          Int      @id @default(autoincrement())
-  labId       Int
-  categoryId  Int
-  name        String
-  description String?
-  price       Int
-  reportTime  String
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-
-  lab      Lab          @relation(fields: [labId], references: [id])
-  category LabCategory  @relation(fields: [categoryId], references: [id])
-  bookings LabBooking[]
-}
-
-model LabBooking {
-  id         Int              @id @default(autoincrement())
-  userId     Int
-  labId      Int
-  labTestId  Int
-  status     LabBookingStatus @default(PENDING)
-  sampleDate DateTime
-  createdAt  DateTime         @default(now())
-
-  user    User       @relation(fields: [userId], references: [id])
-  lab     Lab        @relation(fields: [labId], references: [id])
-  labTest LabTest    @relation(fields: [labTestId], references: [id])
-  report  LabReport?
-}
-
-model LabReport {
-  id           Int      @id @default(autoincrement())
-  labBookingId Int      @unique
-  reportUrl    String
-  createdAt    DateTime @default(now())
-
-  labBooking LabBooking @relation(fields: [labBookingId], references: [id])
-}
-
 enum LabBookingStatus {
   PENDING
   SAMPLE_COLLECTED
   COMPLETED
   CANCELLED
+}
+
+enum GenderPreference {
+  FEMALE
+  MALE
+  ALL
 }

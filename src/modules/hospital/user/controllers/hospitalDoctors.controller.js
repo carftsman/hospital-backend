@@ -19,6 +19,8 @@ export const getHospitalDoctors = async (req, res) => {
     const mode = req.query.mode || null;
     const specialization = req.query.specialization || null; 
     const search = req.query.search || null;
+    const women = req.query.women === "true" ; // added newly
+    const symptomId = req.query.symptomId ? Number(req.query.symptomId) : null;
 
 
     const result = await fetchHospitalDoctors(
@@ -27,7 +29,9 @@ export const getHospitalDoctors = async (req, res) => {
       limit,
       mode,
       specialization,
-      search
+      search,
+      women ,
+      symptomId
     );
 
     return res.json(result);

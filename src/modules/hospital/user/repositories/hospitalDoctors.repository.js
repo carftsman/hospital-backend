@@ -20,12 +20,31 @@ const modeFilterSql = (mode) => {
   return Prisma.empty;
 };
 
+/* ---------------- WOMEN FILTER ---------------- */
+
+const womenFilterSql = (women) => {
+  if (women === true) {
+    return Prisma.sql`AND c."isWomenSpecific" = true`;
+  }
+  return Prisma.empty;
+};
+
 /* ---------------- DOCTORS BY HOSPITAL ---------------- */
 
-export const getDoctorsByHospital = async (hospitalId, mode, offset, limit) => {
+export const getDoctorsByHospital = async (hospitalId, mode, offset, limit,  women = false,
+  symptomId = null) => {
   const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const modeSql = modeFilterSql(mode);
+  const womenSql = womenFilterSql(women);
+
+const symptomJoinSql = symptomId
+  ? Prisma.sql`JOIN "DoctorSymptom" ds ON ds."doctorId" = d.id`
+  : Prisma.empty;
+
+const symptomWhereSql = symptomId
+  ? Prisma.sql`AND ds."symptomId" = ${symptomId}`
+  : Prisma.empty;   
 
   return prisma.$queryRaw`
     SELECT
@@ -50,11 +69,14 @@ export const getDoctorsByHospital = async (hospitalId, mode, offset, limit) => {
       h."consultationMode" AS "hospitalMode"
     FROM "Doctor" d
     JOIN "Hospital" h ON h.id = d."hospitalId"
+    ${symptomJoinSql}
     WHERE
       h.id = ${hospitalId}
       AND h.status = 'APPROVED'
       AND h."isListed" = true
       ${modeSql}
+      ${womenSql}                     //NEW
+      ${symptomWhereSql}              //new
     ORDER BY d.name ASC
     LIMIT ${safeLimit}
     OFFSET ${safeOffset};
@@ -62,18 +84,31 @@ export const getDoctorsByHospital = async (hospitalId, mode, offset, limit) => {
 };
 
 
-export const countDoctorsByHospital = async (hospitalId, mode) => {
+export const countDoctorsByHospital = async (hospitalId, mode, women = false, symptomId = null) => {
   const modeSql = modeFilterSql(mode);
+  const womenSql = womenFilterSql(women);
+
+  const symptomJoinSql = symptomId
+  ? Prisma.sql`JOIN "DoctorSymptom" ds ON ds."doctorId" = d.id`
+  : Prisma.empty;
+
+  const symptomWhereSql = symptomId
+  ? Prisma.sql`AND ds."symptomId" = ${symptomId}`
+  : Prisma.empty;
 
   const rows = await prisma.$queryRaw`
     SELECT COUNT(*)::int AS count
     FROM "Doctor" d
     JOIN "Hospital" h ON h.id = d."hospitalId"
+    JOIN "Category" c ON c."hospitalId" = h.id
+    ${symptomJoinSql}
     WHERE
       h.id = ${hospitalId}
       AND h.status = 'APPROVED'
       AND h."isListed" = true
-      ${modeSql};
+      ${modeSql}
+      ${womenSql}
+      ${symptomWhereSql}
   `;
 
   return rows?.[0]?.count ?? 0;

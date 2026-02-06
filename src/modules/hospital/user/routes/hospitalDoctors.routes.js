@@ -12,7 +12,7 @@ const router = express.Router();
  *     description: >
  *       Returns doctors available in a specific hospital.
  *       Supports filtering by consultation mode, specialization,
- *       and doctor name search with pagination.
+ *       doctor name search, women-specific doctors, and symptoms.
  *
  *     parameters:
  *       - in: path
@@ -36,16 +36,36 @@ const router = express.Router();
  *         required: false
  *         schema:
  *           type: string
- *           example: Cardiology
- *         description: Filter doctors by specialization (case-insensitive)
+ *           example: Gynecology
+ *         description: Filter doctors by specialization
  *
  *       - in: query
  *         name: search
  *         required: false
  *         schema:
  *           type: string
- *           example: Rajesh
- *         description: Search doctors by name (case-insensitive)
+ *           example: Anjali
+ *         description: Search doctors by name
+ *
+ *       - in: query
+ *         name: women
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *           example: true
+ *         description: >
+ *           When true, returns only women-specific doctors.
+ *           Used by Women Hospital Module.
+ *
+ *       - in: query
+ *         name: symptomId
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 11
+ *         description: >
+ *           Filter doctors based on a specific symptom.
+ *           Used for symptoms-based quick access.
  *
  *       - in: query
  *         name: page
@@ -69,35 +89,8 @@ const router = express.Router();
  *     responses:
  *       200:
  *         description: Doctors retrieved successfully
- *         content:
- *           application/json:
- *             example:
- *               total: 1
- *               count: 1
- *               page: 1
- *               limit: 10
- *               data:
- *                 - id: 1
- *                   name: "Dr. Rajesh Kumar"
- *                   imageUrl: "https://example.com/doctor.jpg"
- *                   experience: 12
- *                   specialization: "Cardiology"
- *                   consultationMode: "BOTH"
- *                   rating: 4.8
- *                   category:
- *                     id: 1
- *                     name: "Cardiology"
- *                   hospital:
- *                     id: 1
- *                     name: "Apollo Hospitals"
- *                     city: "Hyderabad"
- *                     state: "Telangana"
- *                     imageUrl: "https://example.com/hospital.jpg"
- *                     rating: 4.7
- *
  *       400:
  *         description: Invalid hospitalId or query parameters
- *
  *       500:
  *         description: Internal server error
  */

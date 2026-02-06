@@ -43,40 +43,15 @@ export const fetchDoctors = async (filters, page, limit) => {
 
 
 /* ---------------- HOSPITAL DOCTORS ---------------- */
-// export const fetchHospitalDoctors = async (hospitalId, page = 1, limit = 10) => {
-//   const safePage = Math.max(1, Number(page) || 1);
-//   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
-//   const skip = (safePage - 1) * safeLimit;
-
-//   const doctors = await prisma.doctor.findMany({
-//     where: { hospitalId },
-//     skip,
-//     take: safeLimit,
-//     orderBy: { rating: "desc" },
-//     include: {
-//       category: true,
-//     },
-//   });
-
-//   const total = await prisma.doctor.count({
-//     where: { hospitalId },
-//   });
-
-//   return {
-//     total,
-//     count: doctors.length,
-//     page: safePage,
-//     limit: safeLimit,
-//     data: doctors,
-//   };
-// };
 export const fetchHospitalDoctors = async (
   hospitalId,
   page = 1,
   limit = 10,
   mode = null,
   specialization = null,   // NEW
-  search = null         // NEW
+  search = null,      // NEW
+  women = false,    // NEW
+  symptomId = null   // NEW
 ) => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
@@ -99,8 +74,8 @@ export const fetchHospitalDoctors = async (
     ...(specialization
       ? {
           specialization: {
-            equals: specialization,
-            mode: "insensitive" // ✅ case-insensitive
+            contains: specialization,
+            mode: "insensitive" //case-insensitive
           }
         }
       : {}),
@@ -111,7 +86,23 @@ export const fetchHospitalDoctors = async (
           mode: "insensitive" // doctor name search
         }
       }
-    : {})
+    : {}),
+    ...(women
+      ? {
+          category: {
+            isWomenSpecific: true
+          }
+        }
+      : {}),
+    ...(symptomId
+      ? {
+          DoctorSymptom: {
+            some: {
+              symptomId: Number(symptomId)
+            }
+          }
+        }
+      : {}) 
   };
 
  /* ---------------- MAIN QUERY ---------------- */

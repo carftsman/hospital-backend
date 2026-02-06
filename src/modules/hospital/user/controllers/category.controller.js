@@ -4,6 +4,7 @@ import { getFromCache, setToCache } from "../../../../utils/simpleCache.js";
 export const listCategoriesByMode = async (req, res) => {
   try {
     const mode = String(req.query.mode || "BOTH").toUpperCase();
+    const isWomen = req.query.women === "true"; //ADDED newly for womens 
 
     if (!["ONLINE", "OFFLINE", "BOTH"].includes(mode)) {
       return res.status(400).json({
@@ -14,10 +15,11 @@ export const listCategoriesByMode = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Math.min(50, Number(req.query.limit) || 20);
 
-    const { categories, total } = await getCategoriesByMode(mode, page, limit);
+    const { categories, total } = await getCategoriesByMode(mode, page, limit,isWomen);
 
     return res.json({
       mode,
+      women: isWomen,
       page,
       limit,
       total,
