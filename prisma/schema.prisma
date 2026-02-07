@@ -106,19 +106,20 @@ model User {
 }
 
 model PatientProfile {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
   fullName  String
   phone     String?
   age       Int?
   gender    String?
-  isSelf    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSelf    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   email     String?
   dob       DateTime?
+  User      User      @relation(fields: [userId], references: [id])
+  Booking   Booking[]
 }
-
 
 model TimeSlot {
   id               Int              @id @default(autoincrement())
