@@ -102,25 +102,23 @@ model User {
   notifications         Notification[]
   patientProfiles       PatientProfile[]
   reminders             Reminder[]
+  LabCart               LabCart[]
 }
 
 model PatientProfile {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    Int
   fullName  String
   phone     String?
   age       Int?
   gender    String?
-  isSelf    Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
+  isSelf    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   email     String?
-  dob       DateTime? @db.Timestamp(6)
-  bookings  Booking[]
-  user      User      @relation(fields: [userId], references: [id])
-
-  @@index([userId])
+  dob       DateTime?
 }
+
 
 model TimeSlot {
   id               Int              @id @default(autoincrement())
@@ -145,7 +143,7 @@ model Booking {
   start            DateTime
   userId           Int
   patientProfileId Int?
-  status           BookingStatus   @default(CONFIRMED)
+  status           BookingStatus   @default(PENDING)
   expiresAt        DateTime?       @db.Timestamp(6)
   reason           String?
   patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
@@ -199,7 +197,7 @@ model DoctorAvailability {
 }
 
 model Lab {
-  id          Int           @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
   imageUrl    String?
   description String?
@@ -209,16 +207,16 @@ model Lab {
   state       String?
   latitude    Float?
   longitude   Float?
-  isOpen      Boolean       @default(true)
-  rating      Float         @default(0)
-  createdAt   DateTime      @default(now())
+  isOpen      Boolean  @default(true)
+  rating      Float    @default(0)
+  createdAt   DateTime @default(now())
 
   bookings   LabBooking[]
   categories LabCategory[]
   tests      LabTest[]
-  slots      LabSlot[]      // ✅ ADD THIS
+  slots      LabSlot[] // ✅ ADD THIS
+  LabCart    LabCart[]
 }
-
 
 model LabCategory {
   id        Int       @id @default(autoincrement())
@@ -230,41 +228,84 @@ model LabCategory {
 }
 
 model LabTest {
-  id          Int          @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   labId       Int
   categoryId  Int
   name        String
   description String?
   price       Int
   reportTime  String
-  isAvailable Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  bookings    LabBooking[]
-  category    LabCategory  @relation(fields: [categoryId], references: [id])
-  lab         Lab          @relation(fields: [labId], references: [id])
+  isAvailable Boolean @default(true)
+
+  minAge Int @default(0)
+  maxAge Int @default(120)
+
+  lab      Lab          @relation(fields: [labId], references: [id])
+  category LabCategory  @relation(fields: [categoryId], references: [id])
+  bookings LabBooking[]
+  LabCart  LabCart[]
 }
 
 model LabBooking {
-  id         Int              @id @default(autoincrement())
-  userId     Int
-  labId      Int
-  labTestId  Int
-  status     LabBookingStatus @default(PENDING)
-  sampleDate DateTime
-  createdAt  DateTime         @default(now())
-  lab        Lab              @relation(fields: [labId], references: [id])
-  labTest    LabTest          @relation(fields: [labTestId], references: [id])
-  user       User             @relation(fields: [userId], references: [id])
-  report     LabReport?
+  id        Int @id @default(autoincrement())
+  userId    Int
+  labId     Int
+  labTestId Int
+
+  status         LabBookingStatus @default(PENDING)
+  sampleDate     DateTime
+  collectedAt    DateTime?
+  reportIssuedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  lab     Lab     @relation(fields: [labId], references: [id])
+  labTest LabTest @relation(fields: [labTestId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  report   LabReport?
+  feedback LabFeedback?
 }
 
 model LabReport {
-  id           Int        @id @default(autoincrement())
-  labBookingId Int        @unique
-  reportUrl    String
-  createdAt    DateTime   @default(now())
-  labBooking   LabBooking @relation(fields: [labBookingId], references: [id])
+  id           Int @id @default(autoincrement())
+  labBookingId Int @unique
+
+  reportStatus ReportStatus
+  summary      String?
+
+  reportUrls String[]
+  samples    String[]
+
+  createdAt DateTime @default(now())
+
+  labBooking LabBooking @relation(fields: [labBookingId], references: [id])
 }
+
+model LabCart {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  labId     Int
+  labTestId Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  lab     Lab     @relation(fields: [labId], references: [id])
+  labTest LabTest @relation(fields: [labTestId], references: [id])
+
+  @@unique([userId, labTestId])
+}
+
+model LabFeedback {
+  id        Int     @id @default(autoincrement())
+  bookingId Int     @unique
+  rating    Int
+  comment   String?
+
+  booking LabBooking @relation(fields: [bookingId], references: [id])
+}
+
 model LabSlot {
   id        Int      @id @default(autoincrement())
   labId     Int
@@ -320,10 +361,16 @@ enum ConsultationMode {
 }
 
 enum BookingStatus {
-  CONFIRMED
+  PENDING
+  SAMPLE_COLLECTED
+  COMPLETED
   CANCELLED
-  HOLD
-  EXPIRED
+}
+
+enum ReportStatus {
+  NORMAL
+  ABNORMAL
+  BORDERLINE
 }
 
 enum OnboardingStage {
