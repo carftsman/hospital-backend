@@ -1,34 +1,86 @@
 import prisma from "../../../../prisma/client.js";
- 
-/**
- * 1️⃣ Nearby Labs
- */
+
 export const getNearbyLabs = async (req, res) => {
-  const { latitude, longitude, radius = 5 } = req.query;
-  if (!latitude || !longitude)
-    return res.status(400).json({ message: "Invalid coordinates" });
- 
-  const labs = await prisma.lab.findMany({
-    where: { latitude: { not: null }, longitude: { not: null } },
-  });
- 
-  const R = 6371;
-  const nearby = labs
-    .map(lab => {
-      const dLat = ((lab.latitude - latitude) * Math.PI) / 180;
-      const dLon = ((lab.longitude - longitude) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(latitude * Math.PI / 180) *
-          Math.cos(lab.latitude * Math.PI / 180) *
+  try {
+    const lat = Number(req.query.latitude);
+    const lon = Number(req.query.longitude);
+
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      return res.status(400).json({ message: "Invalid coordinates" });
+    }
+
+    const search = req.query.search;
+    const minRating = Number(req.query.minRating || 0);
+
+    const labs = await prisma.lab.findMany({
+      where: {
+        rating: { gte: minRating },
+        ...(search && {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { city: { contains: search, mode: "insensitive" } }
+          ]
+        })
+      },
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+        rating: true,
+        city: true,
+        isOpen: true,
+        latitude: true,
+        longitude: true,
+        _count: {
+          select: {
+            bookings: true   // ⭐ using bookings as reviews count
+          }
+        }
+      }
+    });
+
+    const R = 6371;
+
+    const formatted = labs.map(lab => {
+      let distanceKm = null;
+
+      if (lab.latitude && lab.longitude) {
+        const dLat = ((lab.latitude - lat) * Math.PI) / 180;
+        const dLon = ((lab.longitude - lon) * Math.PI) / 180;
+
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos((lat * Math.PI) / 180) *
+          Math.cos((lab.latitude * Math.PI) / 180) *
           Math.sin(dLon / 2) ** 2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return { ...lab, distance: R * c };
-    })
-    .filter(l => l.distance <= radius);
- 
-  res.json(nearby);
+
+        distanceKm = +(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))).toFixed(1);
+      }
+
+      return {
+        id: lab.id,
+        name: lab.name,
+        imageUrl: lab.imageUrl,
+        rating: lab.rating,
+        reviewsCount: lab._count.bookings,
+        city: lab.city,
+        isOpen: lab.isOpen,
+        distanceKm
+      };
+    });
+
+    res.json({
+      count: formatted.length,
+      labs: formatted
+    });
+
+  } catch (error) {
+    console.error("getNearbyLabs error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
+
+
  
 /**
  * 📦 Get Lab Packages by Age
@@ -105,59 +157,7 @@ export const getRecommendedPackageByAge = async (req, res) => {
   }
 };
 
-export const getLabPackageDetails = async (req, res) => {
-  try {
-    const packageId = Number(req.params.packageId);
 
-    if (!packageId) {
-      return res.status(400).json({ message: "packageId is required" });
-    }
-
-    const pkg = await prisma.labTest.findUnique({
-      where: { id: packageId },
-      include: {
-        lab: true,
-        category: true,
-      },
-    });
-
-    if (!pkg) {
-      return res.status(404).json({ message: "Package not found" });
-    }
-
-    // 🔹 Extract tests from description (temporary design)
-    const testsIncluded = pkg.description
-      ? pkg.description.split(",").map(t => t.trim())
-      : [];
-
-    // 🔹 Fake discount logic (frontend-friendly)
-    const originalPrice = Math.round(pkg.price * 1.5);
-    const discountedPrice = pkg.price;
-
-    res.json({
-      id: pkg.id,
-      name: pkg.name,
-      description: pkg.description,
-      price: discountedPrice,
-      originalPrice,
-      reportTime: pkg.reportTime,
-      testsCount: testsIncluded.length,
-      testsIncluded,
-      instructions: [
-        "Requires 10 - 12 hours of sleep and Overnight fasting. Only water is permitted",
-        "Avoid alcohol and smoking 24 hours prior to the test",
-      ],
-      lab: {
-        id: pkg.lab.id,
-        name: pkg.lab.name,
-      },
-      category: pkg.category.name,
-    });
-  } catch (error) {
-    console.error("getLabPackageDetails error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
 
 
 export const getUserPastLabBookings = async (req, res) => {
@@ -295,26 +295,36 @@ export const getLabById = async (req, res) => {
  */
 export const getCategoriesByLab = async (req, res) => {
   const labId = Number(req.params.labId);
-  const categories = await prisma.labCategory.findMany({ where: { labId } });
-  res.json({ data: categories });
+  if (!labId) {
+    return res.status(400).json({ message: "labId is required" });
+  }
+
+  const categories = await prisma.labCategory.findMany({
+    where: { labId },
+    orderBy: { createdAt: "asc" }
+  });
+
+  // ✅ remove duplicates by name
+  const unique = Object.values(
+    categories.reduce((acc, c) => {
+      if (!acc[c.name]) {
+        acc[c.name] = {
+          id: c.id,
+          name: c.name
+        };
+      }
+      return acc;
+    }, {})
+  );
+
+  res.json({ data: unique });
 };
+
  
 /**
  * 6️⃣ Lab Tests (Packages)
  */
-export const getLabTests = async (req, res) => {
-  const labId = Number(req.params.labId);
-  const { categoryId } = req.query;
- 
-  const tests = await prisma.labTest.findMany({
-    where: {
-      labId,
-      ...(categoryId && { categoryId: Number(categoryId) }),
-    },
-  });
- 
-  res.json({ labId, tests });
-};
+
  
 /**
  * 7️⃣ Search Tests (NEW)
@@ -342,7 +352,118 @@ export const getLabTestById = async (req, res) => {
   if (!test) return res.status(404).json({ message: "Test not found" });
   res.json(test);
 };
- 
+ // ================== PACKAGE DETAILS (UI READY) ==================
+
+
+export const getLabPackageDetails = async (req, res) => {
+  try {
+    const packageId = Number(req.params.packageId);
+
+    if (!packageId) {
+      return res.status(400).json({ message: "packageId is required" });
+    }
+
+    // 👉 Using LabCategory as Package (current MVP design)
+    const category = await prisma.labCategory.findUnique({
+      where: { id: packageId },
+      include: {
+        lab: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        tests: {
+          where: { isAvailable: true },
+          select: {
+            name: true,
+            price: true,
+            reportTime: true
+          }
+        }
+      }
+    });
+
+    if (!category) {
+      return res.status(404).json({ message: "Package not found" });
+    }
+
+    // ===============================
+    // 🔥 REMOVE DUPLICATE TESTS
+    // ===============================
+    const uniqueTestsMap = {};
+
+    category.tests.forEach(test => {
+      if (!uniqueTestsMap[test.name]) {
+        uniqueTestsMap[test.name] = test;
+      }
+    });
+
+    const uniqueTests = Object.values(uniqueTestsMap);
+
+    // ===============================
+    // 💰 PRICE CALCULATION
+    // ===============================
+    const originalPrice = uniqueTests.reduce(
+      (sum, t) => sum + (t.price || 0),
+      0
+    );
+
+    const discountPercent = 30;
+    const finalPrice = Math.round(originalPrice * (1 - discountPercent / 100));
+
+    // ===============================
+    // ⏱ REPORT TIME (MAX)
+    // ===============================
+    const reportTime =
+      uniqueTests.length > 0
+        ? Math.max(
+            ...uniqueTests
+              .map(t => parseInt(t.reportTime))
+              .filter(Boolean)
+          ) + " Hours"
+        : null;
+
+    // ===============================
+    // ✅ RESPONSE (UI READY)
+    // ===============================
+    res.json({
+      id: category.id,
+      name: category.name,
+      summary: {
+        testsCount: uniqueTests.length,
+        reportTime
+      },
+      testsIncluded: [
+        {
+          category: category.name,
+          tests: uniqueTests.map(t => t.name)
+        }
+      ],
+      instructions: [
+        "Requires 10–12 hours of overnight fasting",
+        "Only water is permitted",
+        "Avoid alcohol and smoking 24 hours prior to the test"
+      ],
+      pricing: {
+        originalPrice,
+        finalPrice,
+        discountPercent,
+        currency: "INR",
+        offerTag: "Limited time offer"
+      },
+      lab: category.lab
+    });
+
+  } catch (error) {
+    console.error("getLabPackageDetails error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
 /**
  * 9️⃣ Lab Slots
  */
@@ -659,19 +780,46 @@ export async function getLabReportDetails(req, res) {
 
 
 export const submitLabFeedback = async (req, res) => {
-  const { bookingId, rating, comment } = req.body;
+  try {
+    const { bookingId, rating, comment } = req.body;
 
-  if (!bookingId || !rating) {
-    return res.status(400).json({ message: "bookingId and rating required" });
+    if (!bookingId || !rating) {
+      return res.status(400).json({
+        message: "bookingId and rating are required"
+      });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({
+        message: "rating must be between 1 and 5"
+      });
+    }
+
+    // prevent duplicate feedback for same booking
+    const existing = await prisma.labFeedback.findFirst({
+      where: { bookingId }
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        message: "Feedback already submitted for this booking"
+      });
+    }
+
+    await prisma.labFeedback.create({
+      data: {
+        bookingId: Number(bookingId),
+        rating,
+        comment
+      }
+    });
+
+    res.json({
+      message: "Thank you for your feedback"
+    });
+
+  } catch (error) {
+    console.error("submitLabFeedback error:", error);
+    res.status(500).json({ message: "Server error" });
   }
-
-  await prisma.labFeedback.create({
-    data: {
-      bookingId,
-      rating,
-      comment,
-    },
-  });
-
-  res.json({ message: "Thank you for your feedback" });
 };
