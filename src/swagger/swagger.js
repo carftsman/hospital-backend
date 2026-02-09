@@ -16,7 +16,7 @@ const options = {
         description: "Local Development Server",
       },
       {
-        url: "https://hospital-backend-1-9jq0.onrender.com",
+        url: "************",
         description: "Render Production Server",
       },
     ],
@@ -29,11 +29,50 @@ const options = {
           bearerFormat: "JWT",
         },
       },
+
+      // ✅ ADD SCHEMAS HERE (THIS FIXES YOUR ERROR)
+      schemas: {
+        LabPrescription: {
+          type: "object",
+          properties: {
+            id: {
+              type: "integer",
+              example: 1,
+            },
+            userId: {
+              type: "integer",
+              example: 29,
+            },
+            labBookingId: {
+              type: "integer",
+              nullable: true,
+              example: null,
+            },
+            fileUrl: {
+              type: "string",
+              example:
+                "https://medicaldhatvi.blob.core.windows.net/labs/prescriptions/file.jpg",
+            },
+            fileType: {
+              type: "string",
+              example: "image/jpeg",
+            },
+            status: {
+              type: "string",
+              example: "UPLOADED",
+            },
+            createdAt: {
+              type: "string",
+              format: "date-time",
+            },
+          },
+        },
+      },
     },
   },
 
-   apis: [
-    "./src/modules/**/*.routes.js",  
+  apis: [
+    "./src/modules/**/*.routes.js",
     "./src/routes/**/*.js",
   ],
 };

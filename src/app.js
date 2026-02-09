@@ -38,7 +38,7 @@ import reminderRoutes from "./modules/hospital/user/routes/reminder.routes.js";
 //lab
 import labRoutes from "./modules/lab/user/routes/lab.routes.js";
 import labAdminReportRoutes from "./modules/lab/admin/routes/labAdminReport.routes.js";
-
+import labPrescriptionRoutes from "./modules/lab/user/routes/labPrescription.routes.js"
 // =======================
 // Swagger
 // =======================
@@ -120,6 +120,7 @@ app.use("/api/hospital/user", hospitalInfoRoutes);
 
 app.use("/api/labs", labRoutes);
 app.use("/api/lab-admin", labAdminReportRoutes);
+app.use("/api/lab-prescriptions",labPrescriptionRoutes);
 
 
 export default app;
