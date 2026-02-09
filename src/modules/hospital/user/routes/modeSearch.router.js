@@ -68,6 +68,43 @@ router.post("/modeSearch", nearbyLimiter, modeSearch);
 /**
  * @swagger
  * /api/hospital/user/modeSearch:
+ *   post:
+ *     summary: Search doctors, hospitals, or categories
+ *     tags: [Search]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - q
+ *             properties:
+ *               q:
+ *                 type: string
+ *                 example: cardio
+ *               type:
+ *                 type: string
+ *                 enum: [doctor, hospital, category, symptom, all]
+ *               mode:
+ *                 type: string
+ *                 enum: [ONLINE, OFFLINE, BOTH]
+ *               latitude:
+ *                 type: number
+ *                 nullable: true
+ *               longitude:
+ *                 type: number
+ *                 nullable: true
+ *               page:
+ *                 type: integer
+ *                 example: 1
+ *               limit:
+ *                 type: integer
+ *                 example: 20
+ *     responses:
+ *       200:
+ *         description: Search results retrieved successfully
+ *
  *   get:
  *     summary: Search doctors, hospitals, or categories (GET)
  *     tags: [Search]
@@ -77,39 +114,26 @@ router.post("/modeSearch", nearbyLimiter, modeSearch);
  *         required: true
  *         schema:
  *           type: string
- *
  *       - in: query
  *         name: type
  *         schema:
  *           type: string
- *           enum:
- *             - doctor
- *             - hospital
- *             - category
- *             - symptom
- *             - all
- *
+ *           enum: [doctor, hospital, category, symptom, all]
  *       - in: query
  *         name: mode
  *         schema:
  *           type: string
- *           enum:
- *             - ONLINE
- *             - OFFLINE
- *             - BOTH
- *
+ *           enum: [ONLINE, OFFLINE, BOTH]
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
- *
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 20
- *
  *     responses:
  *       200:
  *         description: Search results retrieved successfully

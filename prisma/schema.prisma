@@ -99,6 +99,7 @@ model User {
   isOnboardingCompleted Boolean          @default(false)
   bookings              Booking[]
   labBookings           LabBooking[]
+  LabCart               LabCart[]
   notifications         Notification[]
   patientProfiles       PatientProfile[]
   reminders             Reminder[]
@@ -144,7 +145,11 @@ model Booking {
   start            DateTime
   userId           Int
   patientProfileId Int?
+<<<<<<< Updated upstream
   status           BookingStatus   @default(PENDING)
+=======
+  status           BookingStatus
+>>>>>>> Stashed changes
   expiresAt        DateTime?       @db.Timestamp(6)
   reason           String?
   patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
@@ -208,6 +213,7 @@ model Lab {
   state       String?
   latitude    Float?
   longitude   Float?
+<<<<<<< Updated upstream
   isOpen      Boolean  @default(true)
   rating      Float    @default(0)
   createdAt   DateTime @default(now())
@@ -217,6 +223,15 @@ model Lab {
   tests      LabTest[]
   slots      LabSlot[] // ✅ ADD THIS
   LabCart    LabCart[]
+=======
+  isOpen      Boolean       @default(true)
+  rating      Float         @default(0)
+  createdAt   DateTime      @default(now())
+  bookings    LabBooking[]
+  LabCart     LabCart[]
+  categories  LabCategory[]
+  tests       LabTest[]
+>>>>>>> Stashed changes
 }
 
 model LabCategory {
@@ -236,6 +251,7 @@ model LabTest {
   description String?
   price       Int
   reportTime  String
+<<<<<<< Updated upstream
   isAvailable Boolean @default(true)
 
   minAge Int @default(0)
@@ -320,6 +336,47 @@ model LabSlot {
 
   @@index([labId, date])
 }
+=======
+  isAvailable Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  minAge      Int?
+  maxAge      Int?
+  imageUrl    String?
+  bookings    LabBooking[]
+  LabCart     LabCart[]
+  category    LabCategory  @relation(fields: [categoryId], references: [id])
+  lab         Lab          @relation(fields: [labId], references: [id])
+}
+
+model LabBooking {
+  id             Int              @id @default(autoincrement())
+  userId         Int
+  labId          Int
+  labTestId      Int
+  status         LabBookingStatus @default(PENDING)
+  sampleDate     DateTime
+  createdAt      DateTime         @default(now())
+  collectedAt    DateTime?        @db.Timestamp(6)
+  reportIssuedAt DateTime?        @db.Timestamp(6)
+  lab            Lab              @relation(fields: [labId], references: [id])
+  labTest        LabTest          @relation(fields: [labTestId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+  report         LabReport?
+}
+
+model LabReport {
+  id           Int        @id @default(autoincrement())
+  labBookingId Int        @unique
+  reportUrl    String?
+  collectedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  reportStatus String?
+  summary      String?
+  reportUrls   String[]
+  samples      String[]
+  labBooking   LabBooking @relation(fields: [labBookingId], references: [id])
+}
+>>>>>>> Stashed changes
 
 model DoctorSymptom {
   id        Int     @id @default(autoincrement())
@@ -340,13 +397,27 @@ model Reminder {
   repeat      ReminderRepeat @default(NONE)
   notes       String?
   isImportant Boolean        @default(false)
-  status      ReminderStatus @default(ACTIVE)
   isActive    Boolean        @default(true)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  status      ReminderStatus @default(ACTIVE)
   user        User           @relation(fields: [userId], references: [id])
 
   @@index([userId, reminderAt])
+}
+
+model LabCart {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  labId     Int
+  labTestId Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  LabTest   LabTest  @relation(fields: [labTestId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_labTest_fkey")
+  Lab       Lab      @relation(fields: [labId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_lab_fkey")
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_user_fkey")
+
+  @@unique([userId, labTestId], map: "LabCart_user_labTest_unique")
 }
 
 enum HospitalStatus {
@@ -363,6 +434,7 @@ enum ConsultationMode {
 
 enum BookingStatus {
   PENDING
+<<<<<<< Updated upstream
   SAMPLE_COLLECTED
   COMPLETED
   CANCELLED
@@ -372,6 +444,14 @@ enum ReportStatus {
   NORMAL
   ABNORMAL
   BORDERLINE
+=======
+  CONFIRMED
+  HOLD
+  SAMPLE_COLLECTED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+>>>>>>> Stashed changes
 }
 
 enum OnboardingStage {
