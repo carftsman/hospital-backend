@@ -406,16 +406,75 @@ export const searchLabTests = async (req, res) => {
   res.json(tests);
 };
  
-/**
- * 8️⃣ Test Details (STRICT)
- */
-export const getLabTestById = async (req, res) => {
-  const id = Number(req.params.labTestId);
-  const test = await prisma.labTest.findUnique({ where: { id } });
-  if (!test) return res.status(404).json({ message: "Test not found" });
-  res.json(test);
+export const getLabDetailsById = async (req, res) => {
+  try {
+    const labId = Number(req.params.labId);
+
+    if (!labId) {
+      return res.status(400).json({ message: "labId is required" });
+    }
+
+    const lab = await prisma.lab.findUnique({
+      where: { id: labId },
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+        rating: true,
+        phone: true,
+        address: true,
+        isOpen: true,
+        LabCategory: {
+          select: {
+            id: true,
+            name: true,
+            LabTest: {
+              where: { isAvailable: true },
+              select: { name: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!lab) {
+      return res.status(404).json({ message: "Lab not found" });
+    }
+
+    res.json({
+      id: lab.id,
+      name: lab.name,
+      imageUrl: lab.imageUrl,
+      rating: lab.rating,
+      reviewsCount: 23, // static for now
+      phone: lab.phone,
+      address: lab.address,
+
+      status: {
+        isOpen: lab.isOpen,
+        closesAt: "8:00 PM"
+      },
+
+      timings: {
+        monFri: "9 AM - 9 PM",
+        satSun: "9 AM - 9 PM"
+      },
+
+      packagesIncluded: lab.LabCategory.map(pkg => ({
+        id: pkg.id,
+        name: pkg.name,
+        tests: [...new Set(pkg.LabTest.map(t => t.name))]
+      }))
+    });
+
+  } catch (error) {
+    console.error("getLabDetailsById error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
- 
+
+
+
 /**
  * 9️⃣ Lab Slots
  */

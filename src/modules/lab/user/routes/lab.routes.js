@@ -520,27 +520,31 @@ router.get("/:labId/tests/search", controller.searchLabTests);
  */
 router.get("/:labId/slots", controller.getLabSlots);
  
+
 /**
  * @swagger
- * /api/labs/tests/{labTestId}:
+ * /api/labs/{labId}/details:
  *   get:
- *     summary: Get single lab test details (Package details screen)
+ *     summary: Get lab details with packages
+ *     description: Used for Lab Details screen (packages expandable)
  *     tags: [Labs]
  *     parameters:
  *       - in: path
- *         name: labTestId
+ *         name: labId
  *         required: true
  *         schema:
  *           type: integer
- *           example: 10
+ *           example: 1
  *     responses:
  *       200:
- *         description: Lab test details
+ *         description: Lab details with packages
+ *       400:
+ *         description: labId is required
  *       404:
- *         description: Test not found
+ *         description: Lab not found
  */
-router.get("/tests/:labTestId", controller.getLabTestById);
- 
+router.get("/:labId/details", controller.getLabDetailsById);
+
 
  /**
  * @swagger
