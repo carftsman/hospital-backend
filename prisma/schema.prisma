@@ -136,6 +136,7 @@ model Lab {
   LabBooking  LabBooking[]
   LabCart     LabCart[]
   LabCategory LabCategory[]
+  LabPackage  LabPackage[]
   LabTest     LabTest[]
 }
 
@@ -213,22 +214,23 @@ model LabReport {
 }
 
 model LabTest {
-  id          Int          @id @default(autoincrement())
-  labId       Int
-  categoryId  Int
-  name        String
-  description String?
-  price       Int
-  reportTime  String
-  isAvailable Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  minAge      Int?
-  maxAge      Int?
-  imageUrl    String?
-  LabBooking  LabBooking[]
-  LabCart     LabCart[]
-  LabCategory LabCategory  @relation(fields: [categoryId], references: [id])
-  Lab         Lab          @relation(fields: [labId], references: [id])
+  id             Int              @id @default(autoincrement())
+  labId          Int
+  categoryId     Int
+  name           String
+  description    String?
+  price          Int
+  reportTime     String
+  isAvailable    Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  minAge         Int?
+  maxAge         Int?
+  imageUrl       String?
+  LabBooking     LabBooking[]
+  LabCart        LabCart[]
+  LabPackageItem LabPackageItem[]
+  LabCategory    LabCategory      @relation(fields: [categoryId], references: [id])
+  Lab            Lab              @relation(fields: [labId], references: [id])
 
   @@unique([labId, categoryId, name], map: "labtest_unique_per_lab_category")
   @@unique([labId, categoryId, name], map: "unique_lab_category_test")
@@ -341,6 +343,29 @@ model User {
   Notification          Notification[]
   PatientProfile        PatientProfile[]
   Reminder              Reminder[]
+}
+
+model LabPackage {
+  id             Int              @id @default(autoincrement())
+  labId          Int
+  name           String
+  description    String?
+  reportTime     String?
+  originalPrice  Int              @default(0)
+  finalPrice     Int              @default(0)
+  createdAt      DateTime?        @default(now()) @db.Timestamp(6)
+  Lab            Lab              @relation(fields: [labId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  LabPackageItem LabPackageItem[]
+}
+
+model LabPackageItem {
+  id         Int        @id @default(autoincrement())
+  packageId  Int
+  labTestId  Int
+  LabTest    LabTest    @relation(fields: [labTestId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  LabPackage LabPackage @relation(fields: [packageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([packageId, labTestId], map: "LabPackageItem_unique")
 }
 
 enum BloodGroup {

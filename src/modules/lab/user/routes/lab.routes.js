@@ -17,8 +17,12 @@ router.use("/cart", labCartRoutes);
  * @swagger
  * /api/labs/nearby:
  *   get:
- *     summary: Get nearby labs (Labs List screen)
+ *     summary: Get nearby labs with filters (List + Filter bottom sheet)
+ *     description: >
+ *       Returns nearby diagnostic labs based on user location.
+ *       Supports search, sort, rating filter, distance slider and pagination.
  *     tags: [Labs]
+ *
  *     parameters:
  *       - in: query
  *         name: latitude
@@ -26,21 +30,103 @@ router.use("/cart", labCartRoutes);
  *         schema:
  *           type: number
  *           example: 17.4401
+ *         description: User latitude
+ *
  *       - in: query
  *         name: longitude
  *         required: true
  *         schema:
  *           type: number
  *           example: 78.3489
+ *         description: User longitude
+ *
  *       - in: query
  *         name: radius
  *         schema:
  *           type: number
+ *           example: 8
+ *         description: Distance filter in KM (slider)
+ *
+ *       
+ *
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [distance, rating, popularity]
+ *           example: distance
+ *         description: Sort labs by distance, rating or popularity
+ *
+ *       - in: query
+ *         name: minRating
+ *         schema:
+ *           type: number
+ *           example: 3
+ *         description: Minimum lab rating
+ *
+ *       - in: query
+ *         name: maxRating
+ *         schema:
+ *           type: number
  *           example: 5
+ *         description: Maximum lab rating
+ *
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Page number for pagination
+ *
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *         description: Number of labs per page
+ *
  *     responses:
  *       200:
- *         description: Nearby labs list
+ *         description: Filtered nearby labs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   example: 3
+ *                 labs:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       name:
+ *                         type: string
+ *                         example: ""
+ *                       rating:
+ *                         type: number
+ *                         example: 4.5
+ *                       isOpen:
+ *                         type: boolean
+ *                         example: true
+ *                       distance:
+ *                         type: number
+ *                         example: 2.4
+ *                       city:
+ *                         type: string
+ *                         example: Hyderabad
+ *
+ *       400:
+ *         description: Invalid or missing coordinates
+ *
+ *       500:
+ *         description: Internal server error
  */
+
 router.get("/nearby", controller.getNearbyLabs);
 /**
  * @swagger
@@ -64,7 +150,7 @@ router.get("/nearby", controller.getNearbyLabs);
  *         name: categoryId
  *         schema:
  *           type: integer
- *           example: 2
+ *           example: 4
  *       - in: query
  *         name: minPrice
  *         schema:
@@ -143,9 +229,6 @@ router.get("/auto-suggest", controller.autoSuggestLabs);
 
 
 
-
-
-
 /**
  * @swagger
  * /api/labs/packages/by-age:
@@ -173,6 +256,35 @@ router.get("/auto-suggest", controller.autoSuggestLabs);
  *         description: age and labId are required
  */
 router.get("/packages/by-age", controller.getPackagesByAge);
+
+
+/**
+ * @swagger
+ * /api/labs/packages/{packageId}:
+ *   get:
+ *     summary: Get lab package details
+ *     description: Returns full lab package details for the Package Details screen
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: path
+ *         name: packageId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Lab category ID (treated as package)
+ *     responses:
+ *       200:
+ *         description: Lab package details
+ *       400:
+ *         description: packageId is required
+ *       404:
+ *         description: Package not found
+ *       500:
+ *         description: Server error
+ */
+
+router.get("/packages/:packageId", controller.getLabPackageDetails);
+
 
 
 
@@ -336,41 +448,12 @@ router.get(
   controller.getLabReportDetails
 );
 
-
-/**
- * @swagger
- * /api/labs/{labId}/packages/recommended:
- *   get:
- *     summary: Get recommended lab package based on age
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: age
- *         required: true
- *         schema:
- *           type: integer
- *           example: 34
- *     responses:
- *       200:
- *         description: Recommended lab package
- */
-router.get(
-  "/:labId/packages/recommended",
-  controller.getRecommendedPackageByAge
-);
-
  
 /**
  * @swagger
  * /api/labs/{labId}/categories:
  *   get:
- *     summary: Get categories inside a lab (Packages category screen)
+ *     summary: Get Tests with lab id (Search Screen)
  *     tags: [Labs]
  *     parameters:
  *       - in: path
@@ -410,29 +493,7 @@ router.get("/:labId/categories", controller.getCategoriesByLab);
  */
 router.get("/:labId/tests/search", controller.searchLabTests);
  
-/**
- * @swagger
- * /api/labs/{labId}/tests:
- *   get:
- *     summary: Get lab tests/packages (Packages list screen)
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: categoryId
- *         schema:
- *           type: integer
- *           example: 4
- *     responses:
- *       200:
- *         description: Lab tests list
- */
-router.get("/:labId/tests", controller.getLabTests);
+
  
 /**
  * @swagger
@@ -519,24 +580,7 @@ router.get("/bookings/past", controller.getUserPastLabBookings);
  */
 router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
 
-/**
- * @swagger
- * /api/labs/packages/{packageId}:
- *   get:
- *     summary: Get lab package details (Package Details screen)
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: packageId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 30
- *     responses:
- *       200:
- *         description: Lab package details
- */
-router.get("/packages/:packageId", controller.getLabPackageDetails);
+
 
 /**
  * @swagger
@@ -558,7 +602,7 @@ router.get("/packages/:packageId", controller.getLabPackageDetails);
  *             properties:
  *               userId:
  *                 type: integer
- *                 example: 21
+ *                 example: 24
  *               labId:
  *                 type: integer
  *                 example: 1
@@ -600,27 +644,61 @@ router.post("/book", controller.bookLabTest);
  */
 router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
 
-
 /**
  * @swagger
- * /api/labs/{labId}:
- *   get:
- *     summary: Get lab details by ID (Lab Details screen)
+ * /api/labs/feedback:
+ *   post:
+ *     summary: Submit lab feedback
+ *     description: >
+ *       Submit user feedback for a completed lab booking.
+ *       Used in "Rate your Experience" screen after report is viewed.
  *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - bookingId
+ *               - rating
+ *             properties:
+ *               bookingId:
+ *                 type: integer
+ *                 example: 21
+ *                 description: Lab booking ID
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 4
+ *                 description: User rating (1 to 5 stars)
+ *               comment:
+ *                 type: string
+ *                 example: Reports were delivered on time and staff was polite
+ *                 description: Optional user feedback comment
+ *
  *     responses:
  *       200:
- *         description: Lab details
- *       404:
- *         description: Lab not found
+ *         description: Feedback submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Thank you for your feedback
+ *
+ *       400:
+ *         description: Invalid request
+ *
+ *       500:
+ *         description: Internal server error
  */
-router.get("/:labId", controller.getLabById);
- 
- 
+
+router.post("/feedback", controller.submitLabFeedback);
+
+
 export default router;

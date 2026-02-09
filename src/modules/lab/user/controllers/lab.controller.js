@@ -10,68 +10,80 @@ export const getNearbyLabs = async (req, res) => {
     }
 
     const search = req.query.search;
+    const sortBy = req.query.sortBy || "distance";
     const minRating = Number(req.query.minRating || 0);
+    const maxRating = Number(req.query.maxRating || 5);
 
-    const labs = await prisma.lab.findMany({
-      where: {
-        rating: { gte: minRating },
-        ...(search && {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { city: { contains: search, mode: "insensitive" } }
-          ]
-        })
-      },
-      select: {
-        id: true,
-        name: true,
-        imageUrl: true,
-        rating: true,
-        city: true,
-        isOpen: true,
-        latitude: true,
-        longitude: true,
-        _count: {
-          select: {
-            bookings: true   // ⭐ using bookings as reviews count
-          }
-        }
-      }
-    });
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 10);
+    const skip = (page - 1) * limit;
+
+    let radius = Number(req.query.radius || 5);
+    const MAX_RADIUS = 30;
+    const MIN_RESULTS = 10;
 
     const R = 6371;
 
-    const formatted = labs.map(lab => {
-      let distanceKm = null;
+    let finalLabs = [];
 
-      if (lab.latitude && lab.longitude) {
-        const dLat = ((lab.latitude - lat) * Math.PI) / 180;
-        const dLon = ((lab.longitude - lon) * Math.PI) / 180;
+    // 🔁 Auto-expand radius until minimum labs found
+    while (radius <= MAX_RADIUS && finalLabs.length < MIN_RESULTS) {
+      const labs = await prisma.lab.findMany({
+        where: {
+          latitude: { not: null },
+          longitude: { not: null },
+          rating: { gte: minRating, lte: maxRating },
+          ...(search && {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { city: { contains: search, mode: "insensitive" } }
+            ]
+          })
+        }
+      });
 
-        const a =
-          Math.sin(dLat / 2) ** 2 +
-          Math.cos((lat * Math.PI) / 180) *
-          Math.cos((lab.latitude * Math.PI) / 180) *
-          Math.sin(dLon / 2) ** 2;
+      finalLabs = labs
+        .map(lab => {
+          const dLat = ((lab.latitude - lat) * Math.PI) / 180;
+          const dLon = ((lab.longitude - lon) * Math.PI) / 180;
 
-        distanceKm = +(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))).toFixed(1);
-      }
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((lat * Math.PI) / 180) *
+              Math.cos((lab.latitude * Math.PI) / 180) *
+              Math.sin(dLon / 2) ** 2;
 
-      return {
-        id: lab.id,
-        name: lab.name,
-        imageUrl: lab.imageUrl,
-        rating: lab.rating,
-        reviewsCount: lab._count.bookings,
-        city: lab.city,
-        isOpen: lab.isOpen,
-        distanceKm
-      };
-    });
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+          return {
+            id: lab.id,
+            name: lab.name,
+            rating: lab.rating,
+            isOpen: lab.isOpen,
+            city: lab.city,
+            distance: Number((R * c).toFixed(2))
+          };
+        })
+        .filter(lab => lab.distance <= radius);
+
+      radius += 5; // 🔼 expand radius
+    }
+
+    // 🧮 Sorting
+    if (sortBy === "rating") {
+      finalLabs.sort((a, b) => b.rating - a.rating);
+    } else {
+      finalLabs.sort((a, b) => a.distance - b.distance);
+    }
+
+    // 📄 Pagination
+    const paginated = finalLabs.slice(skip, skip + limit);
 
     res.json({
-      count: formatted.length,
-      labs: formatted
+      count: finalLabs.length,
+      page,
+      limit,
+      labs: paginated
     });
 
   } catch (error) {
@@ -80,12 +92,91 @@ export const getNearbyLabs = async (req, res) => {
   }
 };
 
+export const getLabPackageDetails = async (req, res) => {
+  try {
+    const packageId = Number(req.params.packageId);
+
+    if (!packageId) {
+      return res.status(400).json({ message: "packageId is required" });
+    }
+
+    const category = await prisma.labCategory.findUnique({
+      where: { id: packageId },
+      include: {
+        Lab: {
+          select: { id: true, name: true }
+        },
+        LabTest: {
+          where: { isAvailable: true },
+          select: {
+            name: true,
+            price: true,
+            reportTime: true
+          }
+        }
+      }
+    });
+
+    if (!category) {
+      return res.status(404).json({ message: "Package not found" });
+    }
+
+    // 💰 Pricing
+    const prices = category.LabTest.map(t => t.price);
+    const originalPrice = prices.reduce((a, b) => a + b, 0);
+    const finalPrice = Math.round(originalPrice * 0.7);
+    const discountPercent =
+      originalPrice > 0
+        ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100)
+        : 0;
+
+    // ✅ DEDUPE TEST NAMES
+    const uniqueTests = [
+      ...new Set(category.LabTest.map(t => t.name))
+    ];
+
+    res.json({
+      id: category.id,
+      name: category.name,
+      summary: {
+        testsCount: uniqueTests.length,
+        reportTime: category.LabTest[0]?.reportTime ?? null
+      },
+      testsIncluded: [
+        {
+          category: category.name,
+          tests: uniqueTests
+        }
+      ],
+      instructions: [
+        "Requires 10–12 hours of overnight fasting",
+        "Only water is permitted",
+        "Avoid alcohol and smoking 24 hours prior to the test"
+      ],
+      pricing: {
+        originalPrice,
+        finalPrice,
+        discountPercent,
+        currency: "INR",
+        offerTag: "Limited time offer"
+      },
+      lab: category.Lab
+    });
+
+  } catch (error) {
+    console.error("getLabPackageDetails error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
  
 /**
  * 📦 Get Lab Packages by Age
  * Screen: Labs → Age Selection → Packages
  */
+
 export const getPackagesByAge = async (req, res) => {
   try {
     const age = Number(req.query.age);
@@ -168,22 +259,19 @@ export const getUserPastLabBookings = async (req, res) => {
       return res.status(400).json({ message: "userId is required" });
     }
 
-    const bookings = await prisma.labBooking.findMany({
-      where: {
-        userId,
-        status: {
-          in: ["COMPLETED", "CANCELLED"],
-        },
-      },
-      include: {
-        lab: true,
-        labTest: true,
-        report: true, // useful for past bookings
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+const bookings = await prisma.labBooking.findMany({
+  where: {
+    userId,
+    status: { in: ["COMPLETED", "CANCELLED"] }
+  },
+  include: {
+    Lab: true,
+    LabTest: true,
+    LabReport: true
+  },
+  orderBy: { createdAt: "desc" }
+});
+
 
     res.json({
       type: "PAST",
@@ -206,29 +294,26 @@ export const getUserUpcomingLabBookings = async (req, res) => {
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
-        status: {
-          in: ["PENDING", "SAMPLE_COLLECTED"],
-        },
+        status: { in: ["PENDING", "SAMPLE_COLLECTED"] }
       },
       include: {
-        lab: true,
-        labTest: true,
+        Lab: true,
+        LabTest: true
       },
-      orderBy: {
-        sampleDate: "asc", // upcoming → nearest first
-      },
+      orderBy: { sampleDate: "asc" }
     });
 
     res.json({
       type: "UPCOMING",
       count: bookings.length,
-      bookings,
+      bookings
     });
   } catch (error) {
     console.error("getUserUpcomingLabBookings error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 /**
@@ -295,31 +380,9 @@ export const getLabById = async (req, res) => {
  */
 export const getCategoriesByLab = async (req, res) => {
   const labId = Number(req.params.labId);
-  if (!labId) {
-    return res.status(400).json({ message: "labId is required" });
-  }
-
-  const categories = await prisma.labCategory.findMany({
-    where: { labId },
-    orderBy: { createdAt: "asc" }
-  });
-
-  // ✅ remove duplicates by name
-  const unique = Object.values(
-    categories.reduce((acc, c) => {
-      if (!acc[c.name]) {
-        acc[c.name] = {
-          id: c.id,
-          name: c.name
-        };
-      }
-      return acc;
-    }, {})
-  );
-
-  res.json({ data: unique });
+  const categories = await prisma.labCategory.findMany({ where: { labId } });
+  res.json({ data: categories });
 };
-
  
 /**
  * 6️⃣ Lab Tests (Packages)
@@ -352,118 +415,7 @@ export const getLabTestById = async (req, res) => {
   if (!test) return res.status(404).json({ message: "Test not found" });
   res.json(test);
 };
- // ================== PACKAGE DETAILS (UI READY) ==================
-
-
-export const getLabPackageDetails = async (req, res) => {
-  try {
-    const packageId = Number(req.params.packageId);
-
-    if (!packageId) {
-      return res.status(400).json({ message: "packageId is required" });
-    }
-
-    // 👉 Using LabCategory as Package (current MVP design)
-    const category = await prisma.labCategory.findUnique({
-      where: { id: packageId },
-      include: {
-        lab: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        tests: {
-          where: { isAvailable: true },
-          select: {
-            name: true,
-            price: true,
-            reportTime: true
-          }
-        }
-      }
-    });
-
-    if (!category) {
-      return res.status(404).json({ message: "Package not found" });
-    }
-
-    // ===============================
-    // 🔥 REMOVE DUPLICATE TESTS
-    // ===============================
-    const uniqueTestsMap = {};
-
-    category.tests.forEach(test => {
-      if (!uniqueTestsMap[test.name]) {
-        uniqueTestsMap[test.name] = test;
-      }
-    });
-
-    const uniqueTests = Object.values(uniqueTestsMap);
-
-    // ===============================
-    // 💰 PRICE CALCULATION
-    // ===============================
-    const originalPrice = uniqueTests.reduce(
-      (sum, t) => sum + (t.price || 0),
-      0
-    );
-
-    const discountPercent = 30;
-    const finalPrice = Math.round(originalPrice * (1 - discountPercent / 100));
-
-    // ===============================
-    // ⏱ REPORT TIME (MAX)
-    // ===============================
-    const reportTime =
-      uniqueTests.length > 0
-        ? Math.max(
-            ...uniqueTests
-              .map(t => parseInt(t.reportTime))
-              .filter(Boolean)
-          ) + " Hours"
-        : null;
-
-    // ===============================
-    // ✅ RESPONSE (UI READY)
-    // ===============================
-    res.json({
-      id: category.id,
-      name: category.name,
-      summary: {
-        testsCount: uniqueTests.length,
-        reportTime
-      },
-      testsIncluded: [
-        {
-          category: category.name,
-          tests: uniqueTests.map(t => t.name)
-        }
-      ],
-      instructions: [
-        "Requires 10–12 hours of overnight fasting",
-        "Only water is permitted",
-        "Avoid alcohol and smoking 24 hours prior to the test"
-      ],
-      pricing: {
-        originalPrice,
-        finalPrice,
-        discountPercent,
-        currency: "INR",
-        offerTag: "Limited time offer"
-      },
-      lab: category.lab
-    });
-
-  } catch (error) {
-    console.error("getLabPackageDetails error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-
-
-
+ 
 /**
  * 9️⃣ Lab Slots
  */
@@ -624,8 +576,8 @@ export const globalSearchLabs = async (req, res) => {
         : {})
     },
     include: {
-      lab: { select: { name: true } },
-      category: { select: { name: true } }
+      Lab: { select: { name: true } },
+      LabCategory: { select: { name: true } }
     }
   });
 
@@ -635,8 +587,8 @@ export const globalSearchLabs = async (req, res) => {
       testId: t.id,
       testName: t.name,
       price: t.price,
-      categoryName: t.category.name,
-      labName: t.lab.name
+      categoryName: t.LabCategory?.name ?? null,
+      labName: t.Lab?.name ?? null
     }))
   });
 };
