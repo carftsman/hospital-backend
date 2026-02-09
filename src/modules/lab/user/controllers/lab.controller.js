@@ -515,40 +515,51 @@ export async function getUserLabReports(req, res) {
 
     const reports = await prisma.labReport.findMany({
       where: {
-        labBooking: { userId },
+        LabBooking: {        // ✅ FIX
+          userId
+        }
       },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         reportStatus: true,
         createdAt: true,
-        labBooking: {
+        LabBooking: {        // ✅ FIX
           select: {
             id: true,
             status: true,
-            labTest: { select: { name: true } },
-            lab: { select: { name: true } },
-          },
-        },
-      },
+            LabTest: {        // ✅ FIX
+              select: { name: true }
+            },
+            Lab: {            // ✅ FIX
+              select: { name: true }
+            }
+          }
+        }
+      }
     });
 
     const formatted = reports.map(r => ({
       reportId: r.id,
-      bookingId: r.labBooking.id,
+      bookingId: r.LabBooking.id,
       reportStatus: r.reportStatus,
-      bookingStatus: r.labBooking.status,
-      testName: r.labBooking.labTest.name,
-      labName: r.labBooking.lab.name,
-      bookedDate: r.createdAt,
+      bookingStatus: r.LabBooking.status,
+      testName: r.LabBooking.LabTest.name,
+      labName: r.LabBooking.Lab.name,
+      bookedDate: r.createdAt
     }));
 
-    res.json({ count: formatted.length, reports: formatted });
-  } catch (err) {
-    console.error("getUserLabReports error:", err);
+    res.json({
+      count: formatted.length,
+      reports: formatted
+    });
+
+  } catch (error) {
+    console.error("getUserLabReports error:", error);
     res.status(500).json({ message: "Server error" });
   }
 }
+
 
 
 /* ===================== REPORT DETAILS ===================== */
@@ -695,39 +706,47 @@ export async function getLabReportDetails(req, res) {
         id: true,
         collectedAt: true,
         reportIssuedAt: true,
-        labTest: { select: { name: true } },
-        lab: { select: { name: true } },
-        report: {
+
+        // ✅ CORRECT relation names
+        LabTest: {
+          select: { name: true }
+        },
+        Lab: {
+          select: { name: true }
+        },
+        LabReport: {
           select: {
             reportStatus: true,
             summary: true,
             samples: true,
-            reportUrls: true,
-          },
-        },
-      },
+            reportUrls: true
+          }
+        }
+      }
     });
 
-    if (!booking || !booking.report) {
+    if (!booking || !booking.LabReport) {
       return res.status(404).json({ message: "Report not found" });
     }
 
     res.json({
       bookingId: booking.id,
-      testName: booking.labTest.name,
-      labName: booking.lab.name,
+      testName: booking.LabTest.name,
+      labName: booking.Lab.name,
       collectedAt: booking.collectedAt,
       reportIssuedAt: booking.reportIssuedAt,
-      reportStatus: booking.report.reportStatus,
-      summary: booking.report.summary,
-      samples: booking.report.samples,
-      reports: booking.report.reportUrls.map(url => ({ url })),
+      reportStatus: booking.LabReport.reportStatus,
+      summary: booking.LabReport.summary,
+      samples: booking.LabReport.samples,
+      reports: booking.LabReport.reportUrls.map(url => ({ url }))
     });
-  } catch (err) {
-    console.error("getLabReportDetails error:", err);
+
+  } catch (error) {
+    console.error("getLabReportDetails error:", error);
     res.status(500).json({ message: "Server error" });
   }
 }
+
 
 
 
