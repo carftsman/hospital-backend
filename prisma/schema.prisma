@@ -7,75 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Booking {
-  id               Int             @id @default(autoincrement())
-  timeslotId       Int             @unique
-  createdAt        DateTime        @default(now())
-  doctorId         Int
-  end              DateTime
-  start            DateTime
-  userId           Int
-  patientProfileId Int?
-  status           BookingStatus
-  expiresAt        DateTime?       @db.Timestamp(6)
-  reason           String?
-  PatientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  TimeSlot         TimeSlot        @relation(fields: [timeslotId], references: [id], onUpdate: NoAction)
-  User             User            @relation(fields: [userId], references: [id])
-  Notification     Notification?
-
-  @@index([userId])
-}
-
-model Category {
-  id              Int       @id @default(autoincrement())
-  name            String
-  description     String?
-  imageUrl        String?
-  hospitalId      Int
-  createdAt       DateTime  @default(now())
-  isWomenSpecific Boolean?  @default(false)
-  Hospital        Hospital  @relation(fields: [hospitalId], references: [id])
-  Doctor          Doctor[]
-  Symptom         Symptom[]
-}
-
-model Doctor {
-  id                 Int                  @id @default(autoincrement())
-  name               String
-  imageUrl           String?
-  experience         Int
-  specialization     String?
-  qualification      String?
-  about              String?
-  categoryId         Int
-  hospitalId         Int
-  createdAt          DateTime             @default(now())
-  consultationFee    Int                  @default(0)
-  languages          String[]             @default([])
-  rating             Decimal?             @default(0) @db.Decimal(2, 1)
-  isfavorite         Boolean?             @default(false)
-  consultationMode   ConsultationMode     @default(BOTH)
-  genderPreference   GenderPreference?    @default(ALL)
-  Category           Category             @relation(fields: [categoryId], references: [id])
-  Hospital           Hospital             @relation(fields: [hospitalId], references: [id])
-  DoctorAvailability DoctorAvailability[]
-  DoctorSymptom      DoctorSymptom[]
-  TimeSlot           TimeSlot[]
-}
-
-model DoctorAvailability {
-  id        Int      @id @default(autoincrement())
-  doctorId  Int
-  date      DateTime
-  startTime String
-  endTime   String
-  isBooked  Boolean  @default(false)
-  Doctor    Doctor   @relation(fields: [doctorId], references: [id])
-
-  @@index([doctorId, date])
-}
-
 model DoctorSymptom {
   id        Int     @id @default(autoincrement())
   doctorId  Int
@@ -114,11 +45,6 @@ model Hospital {
   isWomenFriendly      Boolean?         @default(false)
   hasMaternityCare     Boolean?         @default(false)
   isEmergencySupported Boolean?         @default(false)
-<<<<<<< Updated upstream
-  Category             Category[]
-  Doctor               Doctor[]
-  Notification         Notification[]
-=======
   categories           Category[]
   doctors              Doctor[]
   notifications        Notification[]
@@ -190,38 +116,6 @@ model User {
   LabPrescription       LabPrescription[]
 }
 
-model PatientProfile {
-  id        Int       @id @default(autoincrement())
-  userId    Int
-  fullName  String
-  phone     String?
-  age       Int?
-  gender    String?
-  isSelf    Boolean   @default(false)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
-  email     String?
-  dob       DateTime? @db.Timestamp(6)
-  Booking   Booking[]
-  User      User      @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
-model TimeSlot {
-  id               Int              @id @default(autoincrement())
-  doctorId         Int
-  start            DateTime
-  end              DateTime
-  consultationMode ConsultationMode @default(BOTH)
-  isActive         Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  booking          Booking?
-  doctor           Doctor           @relation(fields: [doctorId], references: [id])
-
-  @@index([doctorId, start])
-}
-
 model Booking {
   id               Int             @id @default(autoincrement())
   timeslotId       Int             @unique
@@ -260,18 +154,6 @@ model Notification {
   user         User?    @relation(fields: [userId], references: [id])
 }
 
-model Symptom {
-  id              Int             @id @default(autoincrement())
-  name            String
-  imageUrl        String?
-  categoryId      Int
-  createdAt       DateTime        @default(now())
-  isWomenSpecific Boolean?        @default(false)
-  isCritical      Boolean?        @default(false)
-  DoctorSymptom   DoctorSymptom[]
-  Category        Category        @relation(fields: [categoryId], references: [id])
-}
-
 model DoctorAvailability {
   id        Int      @id @default(autoincrement())
   doctorId  Int
@@ -282,7 +164,6 @@ model DoctorAvailability {
   doctor    Doctor   @relation(fields: [doctorId], references: [id])
 
   @@index([doctorId, date])
->>>>>>> Stashed changes
 }
 
 model Lab {
@@ -408,24 +289,6 @@ model LabTest {
   @@unique([labId, categoryId, name], map: "unique_lab_category_test")
 }
 
-model Notification {
-  id           Int      @id @default(autoincrement())
-  userId       Int?
-  hospitalId   Int
-  bookingId    Int      @unique
-  doctorName   String
-  hospitalName String
-  userName     String?
-  userPhone    String?
-  slotStart    DateTime
-  slotEnd      DateTime
-  createdAt    DateTime @default(now())
-  read         Boolean  @default(false)
-  Booking      Booking  @relation(fields: [bookingId], references: [id])
-  Hospital     Hospital @relation(fields: [hospitalId], references: [id])
-  User         User?    @relation(fields: [userId], references: [id])
-}
-
 model PatientProfile {
   id        Int       @id @default(autoincrement())
   userId    Int
@@ -488,35 +351,6 @@ model TimeSlot {
   @@index([doctorId, start])
 }
 
-model User {
-  id                    Int               @id @default(autoincrement())
-  phone                 String?           @unique
-  email                 String?           @unique
-  password              String?
-  termsAccepted         Boolean           @default(false)
-  acceptedAt            DateTime?
-  status                UserStatus        @default(ACTIVE)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime
-  isPhoneVerified       Boolean           @default(false)
-  onboardingStage       OnboardingStage?
-  otpCode               String?
-  otpExpiresAt          DateTime?
-  refreshToken          String?
-  bloodGroup            BloodGroup?
-  emContactName         String?
-  emContactNumber       String?
-  fullName              String?
-  isOnboardingCompleted Boolean           @default(false)
-  Booking               Booking[]
-  LabBooking            LabBooking[]
-  LabCart               LabCart[]
-  LabPrescription       LabPrescription[]
-  Notification          Notification[]
-  PatientProfile        PatientProfile[]
-  Reminder              Reminder[]
-}
-
 model LabPackage {
   id             Int              @id @default(autoincrement())
   labId          Int
@@ -571,12 +405,6 @@ enum GenderPreference {
   FEMALE
   MALE
   ALL
-}
-
-enum HospitalStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }
 
 enum LabBookingStatus {
