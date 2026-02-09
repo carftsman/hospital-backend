@@ -358,18 +358,11 @@ model LabFeedback {
 model LabPrescription {
   id            Int      @id @default(autoincrement())
   userId        Int
-<<<<<<< Updated upstream
-  appointmentId Int?
-=======
   labBookingId  Int?
->>>>>>> Stashed changes
   fileUrl       String
   fileType      String
   status        String   @default("UPLOADED")
   createdAt     DateTime @default(now())
-<<<<<<< Updated upstream
-  User          User     @relation(fields: [userId], references: [id])
-=======
 
   User          User     @relation(fields: [userId], references: [id])
 }
@@ -377,7 +370,6 @@ enum HospitalStatus {
   PENDING
   APPROVED
   REJECTED
->>>>>>> Stashed changes
 }
 
 model LabReport {
