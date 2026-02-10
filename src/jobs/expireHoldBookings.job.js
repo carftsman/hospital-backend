@@ -3,36 +3,37 @@ import prisma from "../prisma/client.js";
 
 export async function expireHoldBookings() {
   try {
-    // Find PENDING bookings that have passed expiresAt
     const expiredBookings = await prisma.booking.findMany({
       where: {
-        status: "PENDING", // VALID ENUM value
-        expiresAt: { lt: new Date() },
+        status: "HOLD"
+,
+        expiresAt: { lt: new Date() }
       },
-      select: { id: true, timeslotId: true },
+      select: {
+        id: true,
+        timeSlotId: true   // ✅ correct
+      }
     });
 
-    if (expiredBookings.length === 0) {
-      return;
-    }
+    if (expiredBookings.length === 0) return;
 
     const bookingIds = expiredBookings.map(b => b.id);
-    const timeslotIds = expiredBookings.map(b => b.timeslotId);
+    const timeSlotIds = expiredBookings.map(b => b.timeSlotId);
 
-    // Mark bookings as CANCELLED (valid enum), in bulk
+    // Mark bookings as EXPIRED
     await prisma.booking.updateMany({
       where: { id: { in: bookingIds } },
-      data: { status: "CANCELLED" },
+      data: { status: "EXPIRED" }
     });
 
-    // Release related timeslots
+    // (Optional) deactivate slots if you want
     await prisma.timeSlot.updateMany({
-      where: { id: { in: timeslotIds } },
-      data: { isActive: true },
+      where: { id: { in: timeSlotIds } },
+      data: { isActive: true }
     });
 
-    console.log(`✅ Expired ${bookingIds.length} bookings and released slots`);
+    console.log(`✅ Expired ${bookingIds.length} HOLD bookings`);
   } catch (err) {
-    console.error("❌ Expire booking job failed:", err?.message ?? err);
+    console.error("❌ Expire booking job failed:", err);
   }
 }

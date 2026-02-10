@@ -1,497 +1,181 @@
-// src/modules/hospital/user/controllers/appointment.controller.js
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
-//import razorpay from "../../../../config/razorpay.js";
-import { generateSlotsIfMissing } from "../services/slotGenerator.service.js";
 
 const prisma = new PrismaClient();
 
-/**
- * 1️⃣ Doctor availability for next 12 days (UI date tabs)
- */
-// export const getDoctorAvailability = async (req, res) => {
-//   const { doctorId } = req.query;
-//   if (!doctorId) {
-//     return res.status(400).json({ message: "doctorId required" });
-//   }
 
-//   const today = new Date();
-//   const days = [];
-
-//   for (let i = 0; i < 12; i++) {
-//     const date = new Date(today);
-//     date.setDate(today.getDate() + i);
-
-//     const start = new Date(date);
-//     start.setHours(0, 0, 0, 0);
-
-//     const end = new Date(date);
-//     end.setHours(23, 59, 59, 999);
-
-//     const slotsCount = await prisma.timeSlot.count({
-//       where: {
-//         doctorId: Number(doctorId),
-//         start: { gte: start, lte: end },
-//         isActive: true,
-//         booking: null,
-//       },
-//     });
-
-//     days.push({
-//       date: start.toISOString().slice(0, 10),
-//       label:
-//         i === 0
-//           ? "Today"
-//           : i === 1
-//           ? "Tomorrow"
-//           : start.toLocaleDateString("en-IN", {
-//               weekday: "short",
-//               month: "short",
-//               day: "numeric",
-//             }),
-//       slotsAvailable: slotsCount,
-//     });
-//   }
-
-//   res.json({ doctorId: Number(doctorId), days });
-// };
+/* ======================================================
+   1️⃣ DOCTOR AVAILABILITY (NEXT 12 DAYS)
+====================================================== */
 export const getDoctorAvailability = async (req, res) => {
-  const { doctorId } = req.query;
-  if (!doctorId) {
-    return res.status(400).json({ message: "doctorId required" });
-  }
-
-  const today = new Date();
-  const days = [];
-
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-
-    const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
-
-    const slotsCount = await prisma.doctorAvailability.count({
-  where: {
-    doctorId: Number(doctorId),
-    date: new Date(`${dateStr}T00:00:00.000Z`),
-    isBooked: false,
-  },
-});
-
-
-    days.push({
-      date: dateStr,
-      label:
-        i === 0
-          ? "Today"
-          : i === 1
-          ? "Tomorrow"
-          : d.toLocaleDateString("en-IN", {
-              weekday: "short",
-              // month: "short",
-              // day: "numeric",
-            }),
-      slotsAvailable: slotsCount,
-    });
-  }
-
-  res.json({ doctorId: Number(doctorId), days });
-};
-
-/**
- * 2️⃣ Get slots for selected date
- */
-// export const getAvailableSlots = async (req, res) => {
-//   const { doctorId, date } = req.query;
-//   if (!doctorId || !date) {
-//     return res.status(400).json({ message: "doctorId and date required" });
-//   }
-
-//   const start = new Date(date);
-//   start.setHours(0, 0, 0, 0);
-
-//   const end = new Date(date);
-//   end.setHours(23, 59, 59, 999);
-
-//   const slots = await prisma.timeSlot.findMany({
-//     where: {
-//       doctorId: Number(doctorId),
-//       start: { gte: start, lte: end },
-//       isActive: true,
-//       booking: null,
-//     },
-//     orderBy: { start: "asc" },
-//   });
-
-//   res.json({
-//     date,
-//     slots: slots.map(s => ({
-//       slotId: s.id,
-//       time: s.start.toLocaleTimeString("en-IN", {
-//         hour: "2-digit",
-//         minute: "2-digit",
-//       }),
-//       mode: s.consultationMode,
-//     })),
-//   });
-// };
-export const getAvailableSlots = async (req, res) => {
   try {
-    const { doctorId, date } = req.query;
+    const doctorId = Number(req.query.doctorId);
+    if (!doctorId) {
+      return res.status(400).json({ message: "doctorId required" });
+    }
 
-    if (!doctorId || !date) {
-      return res.status(400).json({
-        message: "doctorId and date required"
+    const today = new Date();
+    const days = [];
+
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+
+      const dateStr = d.toISOString().slice(0, 10);
+
+      const slotsAvailable = await prisma.timeSlot.count({
+        where: {
+          doctorId,
+          start: {
+            gte: new Date(`${dateStr}T00:00:00.000Z`),
+            lte: new Date(`${dateStr}T23:59:59.999Z`)
+          },
+          isActive: true,
+          booking: null   // ✅ FIXED (lowercase)
+        }
+      });
+
+      days.push({
+        date: dateStr,
+        label:
+          i === 0
+            ? "Today"
+            : i === 1
+            ? "Tomorrow"
+            : d.toLocaleDateString("en-IN", { weekday: "short" }),
+        slotsAvailable
       });
     }
 
-    // Generate slots if not present
-    await generateSlotsIfMissing(Number(doctorId), date);
+    res.json({ doctorId, days });
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+  } catch (e) {
+    console.error("getDoctorAvailability error:", e);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
 
-    const now = new Date();
+/* ======================================================
+   2️⃣ GET AVAILABLE SLOTS
+====================================================== */
+export const getAvailableSlots = async (req, res) => {
+  try {
+    const doctorId = Number(req.query.doctorId);
+    const date = req.query.date;
+
+    if (!doctorId || !date) {
+      return res.status(400).json({ message: "doctorId and date required" });
+    }
+
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
 
     const slots = await prisma.timeSlot.findMany({
       where: {
-        doctorId: Number(doctorId),
-        start: {
-          gte: startOfDay,
-          lte: endOfDay
-        }
-      },
-      select: {
-        id: true,
-        start: true,
-        end: true,
+        doctorId,
+        start: { gte: start, lte: end },
         isActive: true,
-        booking: {
-          select: {
-            status: true,
-            expiresAt: true
+        OR: [
+          { booking: null },
+          {
+            booking: {
+              status: "HOLD"
+,
+              expiresAt: { lt: new Date() } // ✅ FIXED
+            }
           }
-        }
+        ]
       },
       orderBy: { start: "asc" }
     });
 
-    const responseSlots = slots.map(slot => {
-      const blocked =
-        slot.booking &&
-        (
-          slot.booking.status === "CONFIRMED" ||
-          (slot.booking.status === "HOLD" && slot.booking.expiresAt > now)
-        );
-
-      return {
-        slotId: slot.id,
-        time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`,
-        isAvailable: slot.isActive && !blocked
-      };
-    });
-
-    return res.json({
-      doctorId: Number(doctorId),
+    res.json({
       date,
-      slots: responseSlots
+      count: slots.length,
+      slots: slots.map(s => ({
+        slotId: s.id,
+        start: s.start,
+        end: s.end,
+        time: `${s.start.toTimeString().slice(0, 5)} - ${s.end
+          .toTimeString()
+          .slice(0, 5)}`
+      }))
     });
-
-  } catch (error) {
-    console.error("getAvailableSlots error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+  } catch (e) {
+    console.error("getAvailableSlots error:", e);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-const formatTime = (date) =>
-  date.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  });
 
 
-/**
- * 3️⃣ Hold appointment (SELF / OTHER)
- */
-// export const holdAppointment = async (req, res) => {
-//   const userId = req.user.id;
-//   const { slotId, bookingFor, patient } = req.body;
-
-//   if (!slotId) {
-//     return res.status(400).json({ message: "slotId required" });
-//   }
-
-//   const slot = await prisma.timeSlot.findUnique({
-//     where: { id: Number(slotId) },
-//     include: { booking: true },
-//   });
-
-//   if (!slot || !slot.isActive || slot.booking) {
-//     return res.status(409).json({ message: "Slot not available" });
-//   }
-
-//   let patientProfile;
-
-//   if (bookingFor === "SELF") {
-//     patientProfile = await prisma.patientProfile.findFirst({
-//       where: { userId, isSelf: true },
-//     });
-
-//     if (!patientProfile) {
-//       const user = await prisma.user.findUnique({ where: { id: userId } });
-//       patientProfile = await prisma.patientProfile.create({
-//         data: {
-//           userId,
-//           fullName: user.fullName ?? "Self",
-//           phone: user.phone,
-//           isSelf: true,
-//         },
-//       });
-//     }
-//   } else {
-//     if (!patient?.fullName || !patient?.phone) {
-//       return res.status(400).json({ message: "Patient details required" });
-//     }
-
-//     patientProfile = await prisma.patientProfile.create({
-//       data: {
-//         userId,
-//         fullName: patient.fullName,
-//         phone: patient.phone,
-//         age: patient.age,
-//         gender: patient.gender,
-//         isSelf: false,
-//       },
-//     });
-//   }
-
-//   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-//   const booking = await prisma.$transaction(async tx => {
-//     const b = await tx.booking.create({
-//       data: {
-//         timeslotId: slot.id,
-//         userId,
-//         doctorId: slot.doctorId,
-//         patientProfileId: patientProfile.id,
-//         start: slot.start,
-//         end: slot.end,
-//         status: "HOLD",
-//         expiresAt,
-//       },
-//     });
-
-//     await tx.timeSlot.update({
-//       where: { id: slot.id },
-//       data: { isActive: false },
-//     });
-
-//     return b;
-//   });
-
-//   res.status(201).json({
-//     bookingId: booking.id,
-//     expiresAt: booking.expiresAt,
-//   });
-// };
+/* ======================================================
+   3️⃣ HOLD APPOINTMENT
+====================================================== */
 export const holdAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { slotId, bookingFor, patient, reason } = req.body;
+    const { slotId } = req.body;
 
     if (!slotId) {
       return res.status(400).json({ message: "slotId required" });
     }
 
-    const now = new Date();
-
-    /* ---------------- FETCH SLOT ---------------- */
     const slot = await prisma.timeSlot.findUnique({
-      where: { id: Number(slotId) }
+      where: { id: Number(slotId) },
+      include: { booking: true }
     });
 
-    if (!slot || !slot.isActive) {
-      return res.status(409).json({ message: "Slot not available" });
+    if (!slot) {
+      return res.status(404).json({ message: "Slot not found" });
     }
 
-    /* ---------------- PATIENT PROFILE ---------------- */
-    let patientProfile;
-
-    if (bookingFor === "SELF") {
-      patientProfile = await prisma.patientProfile.findFirst({
-        where: { userId, isSelf: true }
-      });
-
-      if (!patientProfile) {
-        const user = await prisma.user.findUnique({
-          where: { id: userId }
-        });
-
-        patientProfile = await prisma.patientProfile.create({
-          data: {
-            userId,
-            fullName: user.fullName ?? "Self",
-            phone: user.phone,
-            email: user.email ?? null,
-            isSelf: true
-          }
-        });
-      }
-    } else {
-      if (
-        !patient?.fullName ||
-        !patient?.phone ||
-        !patient?.email ||
-        !patient?.dob
-      ) {
-        return res.status(400).json({
-          message: "Patient name, phone, email and date of birth are required"
-        });
-      }
-
-      patientProfile = await prisma.patientProfile.create({
-        data: {
-          userId,
-          fullName: patient.fullName,
-          phone: patient.phone,
-          email: patient.email,
-          dob: new Date(patient.dob),
-          age: patient.age ?? null,
-          gender: patient.gender ?? null,
-          isSelf: false
-        }
-      });
+    if (
+      slot.booking &&
+      (slot.booking.status === "CONFIRMED" ||
+        (slot.booking.status === "PENDING" &&
+          slot.booking.expiresAt > new Date()))
+    ) {
+      return res.status(409).json({ message: "Slot already booked" });
     }
 
-    /* ---------------- HOLD TRANSACTION ---------------- */
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    const booking = await prisma.$transaction(async (tx) => {
-      const existing = await tx.booking.findUnique({
-        where: { timeslotId: slot.id }
-      });
-
-      //  BLOCK active bookings
-      if (
-        existing &&
-        (
-          existing.status === "CONFIRMED" ||
-          (existing.status === "HOLD" && existing.expiresAt > now)
-        )
-      ) {
-        throw new Error("Slot already booked");
+    const booking = await prisma.booking.upsert({
+      where: { timeSlotId: slot.id },
+      update: {
+        userId,
+        status: "HOLD"
+,
+        expiresAt
+      },
+      create: {
+        timeSlotId: slot.id,
+        userId,
+        doctorId: slot.doctorId,
+        start: slot.start,
+        end: slot.end,
+        status: "HOLD"
+,
+        expiresAt
       }
-
-      //  REUSE expired booking
-      if (existing) {
-        const updated = await tx.booking.update({
-          where: { id: existing.id },
-          data: {
-            userId,
-            doctorId: slot.doctorId,
-            patientProfileId: patientProfile.id,
-            start: slot.start,
-            end: slot.end,
-            status: "HOLD",
-            expiresAt,
-            reason: reason ?? null
-          }
-        });
-
-        await tx.timeSlot.update({
-          where: { id: slot.id },
-          data: { isActive: false }
-        });
-
-        return updated;
-      }
-
-      //  FIRST booking for slot
-      const created = await tx.booking.create({
-        data: {
-          timeslotId: slot.id,
-          userId,
-          doctorId: slot.doctorId,
-          patientProfileId: patientProfile.id,
-          start: slot.start,
-          end: slot.end,
-          status: "HOLD",
-          expiresAt,
-          reason: reason ?? null
-        }
-      });
-
-      await tx.timeSlot.update({
-        where: { id: slot.id },
-        data: { isActive: false }
-      });
-
-      return created;
     });
 
-    return res.status(201).json({
-      message: "Appointment slot held successfully",
+    res.status(201).json({
       bookingId: booking.id,
-      expiresAt: booking.expiresAt
+      expiresAt
     });
-
-  } catch (error) {
-    console.error("holdAppointment error:", error);
-    return res.status(409).json({
-      message: error.message || "Internal server error"
-    });
+  } catch (e) {
+    console.error("holdAppointment error:", e);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 
-
-/**
- * 4️⃣ Booking summary (Payment screen)
- */
-// export const getBookingSummary = async (req, res) => {
-//   const bookingId = Number(req.params.bookingId);
-//   const userId = req.user.id;
-
-//   const booking = await prisma.booking.findFirst({
-//     where: { id: bookingId, userId },
-//     include: {
-//       patientProfile: true,
-//       timeSlot: {
-//         include: {
-//           doctor: { include: { hospital: true } },
-//         },
-//       },
-//     },
-//   });
-
-//   if (!booking) {
-//     return res.status(404).json({ message: "Booking not found" });
-//   }
-
-//   const fee = booking.timeSlot.doctor.consultationFee;
-//   const gst = Math.round(fee * 0.18);
-
-//   res.json({
-//     bookingId,
-//     doctor: booking.timeSlot.doctor.fullName,
-//     hospital: booking.timeSlot.doctor.hospital.name,
-//     patient: booking.patientProfile.fullName,
-//     date: booking.start.toDateString(),
-//     time: booking.start.toLocaleTimeString("en-IN", {
-//       hour: "2-digit",
-//       minute: "2-digit",
-//     }),
-//     consultationFee: fee,
-//     serviceFee: 0,
-//     gst,
-//     total: fee + gst,
-//     status: booking.status,
-//   });
-// };
+/* ======================================================
+   4️⃣ BOOKING SUMMARY
+====================================================== */
 export const getBookingSummary = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
@@ -500,7 +184,11 @@ export const getBookingSummary = async (req, res) => {
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, userId },
       include: {
-        patientProfile: true,
+        user: {
+          include: {
+            patientProfiles: true
+          }
+        },
         timeSlot: {
           include: {
             doctor: {
@@ -513,79 +201,93 @@ export const getBookingSummary = async (req, res) => {
       }
     });
 
-    if (!booking || !booking.timeSlot || !booking.timeSlot.doctor) {
+    if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    const doctor = booking.timeSlot.doctor;
-
-    const fee = doctor.consultationFee ?? 0;
-    const gst = Math.round(fee * 0.18);
-    const serviceFee = 0;
-    const totalPayable = fee + gst + serviceFee;
-
-    const formatTime = (date) =>
-      date
-        .toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true
-        })
-        .toUpperCase();
-
-    // Normalize booking status for UI
-    const status =
-      booking.status === "EXPIRED" ? "UNAVAILABLE" : booking.status;
-
-    return res.json({
+    res.json({
       bookingId: booking.id,
-
-      doctor: {
-        name: doctor.name,
-        image: doctor.imageUrl ?? null,
-        specialization: doctor.specialization,
-        experience: doctor.experience,
-        rating: Number(doctor.rating ?? 0),
-        reviews: doctor.reviewsCount ?? 0,
-        hospital: doctor.hospital.name
-      },
-
-      patient: booking.patientProfile?.fullName ?? "Self",
-
-      slot: {
-  date: booking.timeSlot.start.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short"
-  }),
-  time: `${formatTime(booking.timeSlot.start)} - ${formatTime(booking.timeSlot.end)}`
-},
-
-      reason: booking.reason || "Not specified",
-
-      payment: {
-        consultationFee: fee,
-        serviceFee,
-        gst,
-        totalPayable
-      },
-
-      status
+      doctor: booking.timeSlot.doctor.name,
+      hospital: booking.timeSlot.doctor.hospital.name,
+      patient: booking.user.patientProfiles?.[0]?.fullName ?? "Self",
+      date: booking.timeSlot.start.toDateString(),
+      time: `${booking.timeSlot.start.toTimeString().slice(0,5)} - ${booking.timeSlot.end.toTimeString().slice(0,5)}`,
+      status: booking.status
     });
 
   } catch (error) {
     console.error("getBookingSummary error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 
-/**
- * 5️⃣ Create Razorpay order
- */
-/**
- * 5️⃣ Confirm booking (NO PAYMENT - DEV MODE)
- */
+/* ======================================================
+   5️⃣ MY APPOINTMENTS (PAST + UPCOMING)
+====================================================== */
+export const getMyAppointments = async (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
+    }
+
+    const bookings = await prisma.booking.findMany({
+      where: { userId },
+      include: {
+        user: {
+          include: {
+            patientProfiles: true
+          }
+        },
+        timeSlot: {
+          include: {
+            doctor: {
+              include: {
+                hospital: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { start: "desc" }
+    });
+
+    const now = new Date();
+    const pastAppointments = [];
+    const upcomingAppointments = [];
+
+    bookings.forEach(b => {
+      const item = {
+        bookingId: b.id,
+        status: b.status,
+        doctor: {
+          name: b.timeSlot.doctor.name,
+          hospital: b.timeSlot.doctor.hospital.name
+        },
+        patient: b.user.patientProfiles?.[0]?.fullName ?? "Self",
+        appointment: {
+          date: b.timeSlot.start.toDateString(),
+          time: `${b.timeSlot.start.toTimeString().slice(0,5)} - ${b.timeSlot.end.toTimeString().slice(0,5)}`
+        }
+      };
+
+      if (b.timeSlot.end < now) {
+        pastAppointments.push(item);
+      } else {
+        upcomingAppointments.push(item);
+      }
+    });
+
+    res.json({ pastAppointments, upcomingAppointments });
+
+  } catch (error) {
+    console.error("getMyAppointments error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 export const createPaymentOrder = async (req, res) => {
   const { bookingId } = req.params;
   const userId = req.user.id;
@@ -594,7 +296,9 @@ export const createPaymentOrder = async (req, res) => {
     where: {
       id: Number(bookingId),
       userId,
-      status: "HOLD",
+      status: "HOLD"
+
+,
     },
   });
 
@@ -633,7 +337,9 @@ export const verifyPaymentAndConfirm = async (req, res) => {
   } = req.body;
 
   const booking = await prisma.booking.findFirst({
-    where: { id: Number(bookingId), status: "HOLD", orderId: razorpay_order_id },
+    where: { id: Number(bookingId), status: "HOLD"
+
+, orderId: razorpay_order_id },
   });
 
   if (!booking) {
@@ -698,89 +404,6 @@ export const getDoctorBookedSlots = async (req, res) => {
  * 9️⃣ Get all bookings of logged-in user
  * Returns pastAppointments & upcomingAppointments separately
  */
-export const getMyAppointments = async (req, res) => {
-  try {
-    // ⚠️ TEMP: userId taken from query since auth removed
-    const userId = Number(req.query.userId);
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
-    const now = new Date();
-
-    const bookings = await prisma.booking.findMany({
-      where: { userId },
-      orderBy: {
-        timeSlot: {
-          start: "desc"
-        }
-      },
-      include: {
-        timeSlot: {
-          include: {
-            doctor: {
-              include: {
-                hospital: true
-              }
-            }
-          }
-        },
-        patientProfile: true
-      }
-    });
-
-    const formatTime = (date) =>
-      date.toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true
-      });
-
-    const pastAppointments = [];
-    const upcomingAppointments = [];
-
-    bookings.forEach(b => {
-      const appointmentData = {
-        bookingId: b.id,
-        status: b.status,
-
-        doctor: {
-          name: b.timeSlot.doctor.name,
-          specialization: b.timeSlot.doctor.specialization,
-          hospital: b.timeSlot.doctor.hospital.name
-        },
-
-        patient: b.patientProfile?.fullName ?? "Self",
-
-        appointment: {
-          date: b.timeSlot.start.toLocaleDateString("en-IN", {
-            weekday: "short",
-            day: "2-digit",
-            month: "short"
-          }),
-          time: `${formatTime(b.timeSlot.start)} - ${formatTime(b.timeSlot.end)}`
-        }
-      };
-
-      if (b.timeSlot.end < now) {
-        pastAppointments.push(appointmentData);
-      } else {
-        upcomingAppointments.push(appointmentData);
-      }
-    });
-
-    return res.json({
-      pastAppointments,
-      upcomingAppointments
-    });
-
-  } catch (error) {
-    console.error("getMyAppointments error:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-
 
 
 // 8️⃣ Payment success details
@@ -809,69 +432,22 @@ export const getPaymentSuccessDetails = async (req, res) => {
     });
 
     if (!booking) {
-      return res.status(404).json({
-        message: "Booking not found or not confirmed"
-      });
+      return res.status(404).json({ message: "Booking not found" });
     }
 
     const doctor = booking.timeSlot.doctor;
     const hospital = doctor.hospital;
 
-    const fee = doctor.consultationFee ?? 0;
-    const gst = Math.round(fee * 0.18);
-    const totalPaid = fee + gst;
-
-    const formatTime = (date) =>
-      date
-        .toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true
-        })
-        .toUpperCase();
-
-    const baseUrl =
-      process.env.APP_URL ||
-      `${req.protocol}://${req.get("host")}`;
-
-    return res.json({
+    res.json({
       bookingId: booking.id,
-
-      payment: {
-        status: "SUCCESS",
-        amountPaid: totalPaid,
-        hospital: hospital.name
-      },
-
-      doctor: {
-        name: doctor.name,
-        image: doctor.imageUrl ?? null,
-        specialization: doctor.specialization,
-        experience: doctor.experience,
-        rating: Number(doctor.rating ?? 0),
-        reviews: doctor.reviewsCount ?? 0
-      },
-
-      appointment: {
-  date: booking.timeSlot.start.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short"
-  }),
-  time: `${formatTime(booking.timeSlot.start)} - ${formatTime(booking.timeSlot.end)}`
-},
-
-      hospital: {
-        name: hospital.name,
-        latitude: hospital.latitude,
-        longitude: hospital.longitude
-      },
-
-      shareLink: `${baseUrl}/appointments/${booking.id}`
+      doctor: doctor.name,
+      hospital: hospital.name,
+      date: booking.timeSlot.start,
+      time: `${booking.timeSlot.start.toTimeString().slice(0,5)} - ${booking.timeSlot.end.toTimeString().slice(0,5)}`
     });
 
   } catch (error) {
     console.error("getPaymentSuccessDetails error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Server error" });
   }
 };

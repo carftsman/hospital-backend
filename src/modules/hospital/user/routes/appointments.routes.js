@@ -202,6 +202,8 @@ router.get("/my", controller.getMyAppointments);
  *               gst: 90
  *               total: 590
  *               status: "HOLD"
+
+
  */
 router.get("/:bookingId", auth, role("USER"), controller.getBookingSummary);
 

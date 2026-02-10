@@ -7,8 +7,9 @@ export async function releaseExpiredBookings() {
         status: "CANCELLED", // ✅ VALID ENUM
       },
       select: {
-        timeslotId: true,
-      },
+  id: true,
+  timeSlotId: true
+},
     });
 
     if (cancelled.length === 0) return;

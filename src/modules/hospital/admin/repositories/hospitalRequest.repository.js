@@ -9,7 +9,9 @@ export const createHospitalRequest = (data) => {
 
 export const findPendingRequests = (skip = 0, take = 20) => {
   return prisma.hospital.findMany({
-    where: { status: "PENDING" },
+    where: { status: "HOLD"
+
+ },
     orderBy: { createdAt: "desc" },
     skip,
     take

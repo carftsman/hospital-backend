@@ -103,10 +103,13 @@ export const getLabPackageDetails = async (req, res) => {
     const category = await prisma.labCategory.findUnique({
       where: { id: packageId },
       include: {
-        Lab: {
-          select: { id: true, name: true }
+        labs: {
+          select: {
+            id: true,
+            name: true
+          }
         },
-        LabTest: {
+        tests: {
           where: { isAvailable: true },
           select: {
             name: true,
@@ -122,7 +125,7 @@ export const getLabPackageDetails = async (req, res) => {
     }
 
     // 💰 Pricing
-    const prices = category.LabTest.map(t => t.price);
+    const prices = category.tests.map(t => t.price);
     const originalPrice = prices.reduce((a, b) => a + b, 0);
     const finalPrice = Math.round(originalPrice * 0.7);
     const discountPercent =
@@ -130,17 +133,15 @@ export const getLabPackageDetails = async (req, res) => {
         ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100)
         : 0;
 
-    // ✅ DEDUPE TEST NAMES
-    const uniqueTests = [
-      ...new Set(category.LabTest.map(t => t.name))
-    ];
+    // ✅ Unique test names
+    const uniqueTests = [...new Set(category.tests.map(t => t.name))];
 
     res.json({
       id: category.id,
       name: category.name,
       summary: {
         testsCount: uniqueTests.length,
-        reportTime: category.LabTest[0]?.reportTime ?? null
+        reportTime: category.tests[0]?.reportTime ?? null
       },
       testsIncluded: [
         {
@@ -160,7 +161,7 @@ export const getLabPackageDetails = async (req, res) => {
         currency: "INR",
         offerTag: "Limited time offer"
       },
-      lab: category.Lab
+      labs: category.labs
     });
 
   } catch (error) {
@@ -184,7 +185,7 @@ export const getPackagesByAge = async (req, res) => {
 
     if (!age || !labId) {
       return res.status(400).json({
-        message: "age and labId are required",
+        message: "age and labId are required"
       });
     }
 
@@ -192,58 +193,34 @@ export const getPackagesByAge = async (req, res) => {
       where: {
         labId,
         isAvailable: true,
-        minAge: { lte: age },
-        maxAge: { gte: age },
+        AND: [
+          {
+            OR: [
+              { minAge: null },
+              { minAge: { lte: age } }
+            ]
+          },
+          {
+            OR: [
+              { maxAge: null },
+              { maxAge: { gte: age } }
+            ]
+          }
+        ]
       },
       orderBy: {
-        price: "asc",
-      },
+        price: "asc"
+      }
     });
 
     res.json({
       age,
       labId,
-      packages,
+      count: packages.length,
+      packages
     });
   } catch (error) {
     console.error("getPackagesByAge error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-export const getRecommendedPackageByAge = async (req, res) => {
-  try {
-    const labId = Number(req.params.labId);
-    const age = Number(req.query.age);
-
-    if (!labId || age === undefined) {
-      return res.status(400).json({ message: "labId and age are required" });
-    }
-
-    // 1️⃣ Get all matching packages for age
-    const packages = await prisma.labTest.findMany({
-      where: {
-        labId,
-        minAge: { lte: age },
-        maxAge: { gte: age },
-        isAvailable: true,
-      },
-      orderBy: [
-        { maxAge: "asc" }, // narrower age range
-        { price: "desc" }  // premium preference
-      ],
-    });
-
-    if (packages.length === 0) {
-      return res.status(404).json({ message: "No packages found for this age" });
-    }
-
-    res.json({
-      recommended: packages[0],   // ⭐ MAIN PACKAGE
-      others: packages.slice(1),  // optional list
-    });
-
-  } catch (error) {
-    console.error("getRecommendedPackageByAge error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -254,39 +231,6 @@ export const getRecommendedPackageByAge = async (req, res) => {
 export const getUserPastLabBookings = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
-const bookings = await prisma.labBooking.findMany({
-  where: {
-    userId,
-    status: { in: ["COMPLETED", "CANCELLED"] }
-  },
-  include: {
-    Lab: true,
-    LabTest: true,
-    LabReport: true
-  },
-  orderBy: { createdAt: "desc" }
-});
-
-
-    res.json({
-      type: "PAST",
-      count: bookings.length,
-      bookings,
-    });
-  } catch (error) {
-    console.error("getUserPastLabBookings error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-export const getUserUpcomingLabBookings = async (req, res) => {
-  try {
-    const userId = Number(req.query.userId);
-
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
@@ -294,11 +238,39 @@ export const getUserUpcomingLabBookings = async (req, res) => {
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
+        status: { in: ["COMPLETED", "CANCELLED"] }
+      },
+      include: {
+        lab: true,     // ✅ correct
+        test: true     // ✅ correct
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    res.json({
+      type: "PAST",
+      count: bookings.length,
+      bookings
+    });
+  } catch (error) {
+    console.error("getUserPastLabBookings error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+export const getUserUpcomingLabBookings = async (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
+
+    const bookings = await prisma.labBooking.findMany({
+      where: {
+        userId,
         status: { in: ["PENDING", "SAMPLE_COLLECTED"] }
       },
       include: {
-        Lab: true,
-        LabTest: true
+        lab: true,
+        test: true
       },
       orderBy: { sampleDate: "asc" }
     });
@@ -379,10 +351,28 @@ export const getLabById = async (req, res) => {
  * 5️⃣ Categories inside Lab
  */
 export const getCategoriesByLab = async (req, res) => {
-  const labId = Number(req.params.labId);
-  const categories = await prisma.labCategory.findMany({ where: { labId } });
-  res.json({ data: categories });
+  try {
+    const labId = Number(req.params.labId);
+
+    const categories = await prisma.labCategory.findMany({
+      where: {
+        labs: {
+          some: { id: labId }
+        }
+      },
+      select: {
+        id: true,
+        name: true
+      }
+    });
+
+    res.json({ data: categories });
+  } catch (error) {
+    console.error("getCategoriesByLab error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
+
  
 /**
  * 6️⃣ Lab Tests (Packages)
@@ -410,25 +400,19 @@ export const getLabDetailsById = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
 
-    if (!labId) {
-      return res.status(400).json({ message: "labId is required" });
-    }
-
     const lab = await prisma.lab.findUnique({
       where: { id: labId },
       select: {
         id: true,
         name: true,
-        imageUrl: true,
         rating: true,
-        phone: true,
-        address: true,
+        city: true,
         isOpen: true,
-        LabCategory: {
+        categories: {
           select: {
             id: true,
             name: true,
-            LabTest: {
+            tests: {
               where: { isAvailable: true },
               select: { name: true }
             }
@@ -444,29 +428,15 @@ export const getLabDetailsById = async (req, res) => {
     res.json({
       id: lab.id,
       name: lab.name,
-      imageUrl: lab.imageUrl,
       rating: lab.rating,
-      reviewsCount: 23, // static for now
-      phone: lab.phone,
-      address: lab.address,
-
-      status: {
-        isOpen: lab.isOpen,
-        closesAt: "8:00 PM"
-      },
-
-      timings: {
-        monFri: "9 AM - 9 PM",
-        satSun: "9 AM - 9 PM"
-      },
-
-      packagesIncluded: lab.LabCategory.map(pkg => ({
+      city: lab.city,
+      isOpen: lab.isOpen,
+      packagesIncluded: lab.categories.map(pkg => ({
         id: pkg.id,
         name: pkg.name,
-        tests: [...new Set(pkg.LabTest.map(t => t.name))]
+        tests: [...new Set(pkg.tests.map(t => t.name))]
       }))
     });
-
   } catch (error) {
     console.error("getLabDetailsById error:", error);
     res.status(500).json({ message: "Server error" });
@@ -506,7 +476,7 @@ export const bookLabTest = async (req, res) => {
 
     if (!userId || !labId || !labTestId || !sampleDate) {
       return res.status(400).json({
-        message: "userId, labId, labTestId and sampleDate are required",
+        message: "userId, labId, labTestId and sampleDate are required"
       });
     }
 
@@ -516,11 +486,15 @@ export const bookLabTest = async (req, res) => {
         labId: Number(labId),
         labTestId: Number(labTestId),
         sampleDate: new Date(sampleDate),
-        status: "PENDING",
-      },
+        status: "PENDING" // ✅ VALID ENUM
+      }
     });
 
-    res.json(booking);
+    res.status(201).json({
+      message: "Lab booking created",
+      booking
+    });
+
   } catch (error) {
     console.error("bookLabTest error:", error);
     res.status(500).json({ message: "Server error" });
@@ -565,59 +539,48 @@ export const cancelLabBooking = async (req, res) => {
 
 // src/modules/lab/user/controllers/labReports.controller.js
 
-export async function getUserLabReports(req, res) {
+export const getUserLabReports = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
     if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
+      return res.status(400).json({ message: "userId required" });
     }
 
     const reports = await prisma.labReport.findMany({
       where: {
-        LabBooking: {        // ✅ FIX
-          userId
-        }
+        booking: {
+          userId,
+          status: "COMPLETED",
+        },
+        reportStatus: "READY",
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
       select: {
         id: true,
         reportStatus: true,
         createdAt: true,
-        LabBooking: {        // ✅ FIX
+        booking: {
           select: {
             id: true,
             status: true,
-            LabTest: {        // ✅ FIX
-              select: { name: true }
-            },
-            Lab: {            // ✅ FIX
-              select: { name: true }
-            }
-          }
-        }
-      }
+            test: { select: { name: true } },
+            lab: { select: { name: true } },
+          },
+        },
+      },
     });
 
-    const formatted = reports.map(r => ({
-      reportId: r.id,
-      bookingId: r.LabBooking.id,
-      reportStatus: r.reportStatus,
-      bookingStatus: r.LabBooking.status,
-      testName: r.LabBooking.LabTest.name,
-      labName: r.LabBooking.Lab.name,
-      bookedDate: r.createdAt
-    }));
-
-    res.json({
-      count: formatted.length,
-      reports: formatted
-    });
-
-  } catch (error) {
-    console.error("getUserLabReports error:", error);
+    res.json({ count: reports.length, reports });
+  } catch (e) {
+    console.error("getUserLabReports error:", e);
     res.status(500).json({ message: "Server error" });
   }
-}
+};
+
+
+
 
 
 
@@ -625,42 +588,51 @@ export async function getUserLabReports(req, res) {
 
 // src/modules/lab/user/controllers/labReportDetails.controller.js
 export const globalSearchLabs = async (req, res) => {
-  const { query, labId, categoryId, minPrice, maxPrice } = req.query;
+  try {
+    const { query, labId, categoryId, minPrice, maxPrice } = req.query;
 
-  if (!query) {
-    return res.status(400).json({ message: "query is required" });
-  }
-
-  const tests = await prisma.labTest.findMany({
-    where: {
-      name: { contains: query, mode: "insensitive" },
-      ...(labId && { labId: Number(labId) }),
-      ...(categoryId && { categoryId: Number(categoryId) }),
-      ...(minPrice || maxPrice
-        ? {
-            price: {
-              gte: Number(minPrice || 0),
-              lte: Number(maxPrice || 99999)
-            }
-          }
-        : {})
-    },
-    include: {
-      Lab: { select: { name: true } },
-      LabCategory: { select: { name: true } }
+    if (!query) {
+      return res.status(400).json({ message: "query is required" });
     }
-  });
 
-  res.json({
-    count: tests.length,
-    results: tests.map(t => ({
-      testId: t.id,
-      testName: t.name,
-      price: t.price,
-      categoryName: t.LabCategory?.name ?? null,
-      labName: t.Lab?.name ?? null
-    }))
-  });
+    const tests = await prisma.labTest.findMany({
+      where: {
+        name: { contains: query, mode: "insensitive" },
+        ...(labId && { labId: Number(labId) }),
+        ...(categoryId && { categoryId: Number(categoryId) }),
+        ...(minPrice || maxPrice
+          ? {
+              price: {
+                gte: Number(minPrice || 0),
+                lte: Number(maxPrice || 99999)
+              }
+            }
+          : {})
+      },
+      include: {
+        lab: {
+          select: { name: true }
+        },
+        category: {
+          select: { name: true }
+        }
+      }
+    });
+
+    res.json({
+      count: tests.length,
+      results: tests.map(t => ({
+        testId: t.id,
+        testName: t.name,
+        price: t.price,
+        labName: t.lab?.name ?? null,
+        categoryName: t.category?.name ?? null
+      }))
+    });
+  } catch (error) {
+    console.error("globalSearchLabs error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const getLabSearchSuggestions = async (req, res) => {
@@ -755,56 +727,72 @@ export const autoSuggestLabs = async (req, res) => {
   res.json({ labs, categories, tests });
 };
 
-export async function getLabReportDetails(req, res) {
+export const getLabReportDetails = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
 
-    const booking = await prisma.labBooking.findUnique({
-      where: { id: bookingId },
-      select: {
-        id: true,
-        collectedAt: true,
-        reportIssuedAt: true,
+    if (!bookingId) {
+      return res.status(400).json({
+        message: "bookingId is required",
+      });
+    }
 
-        // ✅ CORRECT relation names
-        LabTest: {
-          select: { name: true }
+    const report = await prisma.labReport.findFirst({
+      where: {
+        bookingId,
+      },
+      include: {
+        booking: {
+          include: {
+            lab: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            test: {
+              select: {
+                id: true,
+                name: true,
+                reportTime: true,
+              },
+            },
+          },
         },
-        Lab: {
-          select: { name: true }
-        },
-        LabReport: {
-          select: {
-            reportStatus: true,
-            summary: true,
-            samples: true,
-            reportUrls: true
-          }
-        }
-      }
+      },
     });
 
-    if (!booking || !booking.LabReport) {
-      return res.status(404).json({ message: "Report not found" });
+    // ✅ THIS IS THE CRITICAL FIX
+    if (!report) {
+      return res.status(404).json({
+        message: "Lab report not found for this booking",
+      });
     }
 
     res.json({
-      bookingId: booking.id,
-      testName: booking.LabTest.name,
-      labName: booking.Lab.name,
-      collectedAt: booking.collectedAt,
-      reportIssuedAt: booking.reportIssuedAt,
-      reportStatus: booking.LabReport.reportStatus,
-      summary: booking.LabReport.summary,
-      samples: booking.LabReport.samples,
-      reports: booking.LabReport.reportUrls.map(url => ({ url }))
+      reportId: report.id,
+      bookingId: report.bookingId,
+      status: report.reportStatus,
+      createdAt: report.createdAt,
+      lab: {
+        id: report.booking.lab.id,
+        name: report.booking.lab.name,
+      },
+      test: {
+        id: report.booking.test.id,
+        name: report.booking.test.name,
+        reportTime: report.booking.test.reportTime,
+      },
+      reportUrls: report.reportUrls,
     });
 
   } catch (error) {
     console.error("getLabReportDetails error:", error);
     res.status(500).json({ message: "Server error" });
   }
-}
+};
+
+
 
 
 

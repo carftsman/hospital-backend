@@ -1,6 +1,7 @@
 // src/modules/hospital/user/controllers/booking.controller.js
 import * as service from "../services/booking.service.js";
 
+
 export const createBooking = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -16,27 +17,26 @@ export const createBooking = async (req, res) => {
 
     const booking = await service.bookTimeslot({
       userId,
-      timeslotId,
+      timeslotId
     });
 
     return res.status(201).json({
       message: "Appointment booked successfully",
       booking: {
         bookingId: booking.id,
+        status: booking.status,
+        doctor: booking.timeSlot.doctor.name,
+        hospital: booking.timeSlot.doctor.hospital.name,
         date: booking.start.toISOString().slice(0, 10),
         time: `${booking.start.toISOString().slice(11, 16)} - ${booking.end
           .toISOString()
-          .slice(11, 16)}`,
-        status: booking.status,
-        doctor: booking.timeSlot.doctor,
-        hospital: booking.timeSlot.doctor.hospital,
-        patient: booking.user,
-      },
+          .slice(11, 16)}`
+      }
     });
 
   } catch (err) {
     if (err.message === "TIMESLOT_NOT_FOUND") {
-      return res.status(404).json({ message: "Timeslot not found or inactive" });
+      return res.status(404).json({ message: "Timeslot not found" });
     }
 
     if (err.message === "TIMESLOT_ALREADY_BOOKED") {
