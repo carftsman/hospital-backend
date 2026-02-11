@@ -467,48 +467,54 @@ export const getLabDetailsById = async (req, res) => {
 };
 
 export const getLabPackages = async (req, res) => {
-  const { labId } = req.params;
-  const { page = 1, limit = 10 } = req.query;
+  try {
+    const { labId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
 
-  const offset = (page - 1) * limit;
+    const skip = (Number(page) - 1) * Number(limit);
 
-  const packages = await prisma.$queryRaw`
-    SELECT
-      lp.id AS "packageId",
-      lp.name AS "packageName",
-      COUNT(lpi."labTestId") AS "testsCount",
-      lp."originalPrice",
-      lp."finalPrice",
-      CASE
-        WHEN lp."originalPrice" > 1
-        THEN ROUND(
-          (lp."originalPrice" - lp."finalPrice") * 100.0
-          / lp."originalPrice"
-        )
-        ELSE NULL
-      END AS "discountPercent",
-      lp."reportTime",
-      lp."labId",
-      l.name AS "labName",
-      MAX(lb."createdAt") AS "lastBookedOn"
-    FROM "LabPackage" lp
-    JOIN "Lab" l ON l.id = lp."labId"
-    LEFT JOIN "LabPackageItem" lpi ON lpi."packageId" = lp.id
-    LEFT JOIN "LabBooking" lb ON lb."packageId" = lp.id
-    WHERE lp."labId" = ${Number(labId)}
-    GROUP BY lp.id, l.name
-    ORDER BY lp.id DESC
-    LIMIT ${Number(limit)}
-    OFFSET ${Number(offset)};
-  `;
+    const packages = await prisma.labPackage.findMany({
+      where: {
+        labId: Number(labId)
+      },
+      include: {
+        _count: {
+          select: { items: true }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      skip,
+      take: Number(limit)
+    });
 
-  res.json({
-    count: packages.length,
-    page: Number(page),
-    limit: Number(limit),
-    packages
-  });
+    res.json({
+      count: packages.length,
+      page: Number(page),
+      limit: Number(limit),
+      packages: packages.map(p => ({
+        packageId: p.id,
+        packageName: p.name,
+        originalPrice: p.originalPrice,
+        finalPrice: p.finalPrice,
+        discountPercent:
+          p.originalPrice > 0
+            ? Math.round(
+                ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
+              )
+            : 0,
+        reportTime: p.reportTime,
+        testsCount: p._count.items
+      }))
+    });
+
+  } catch (error) {
+    console.error("getLabPackages error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
+
 
 
 export const filterLabPackages = async (req, res) => {
