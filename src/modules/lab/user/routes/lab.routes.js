@@ -342,58 +342,89 @@ router.get("/:labId/packages", controller.getLabPackages);
  * /api/labs/{labId}/packages/filter:
  *   get:
  *     summary: Filter lab packages
- *     description: Used for Filters bottom sheet
+ *     description: >
+ *       Returns filtered lab packages based on price range,
+ *       age range, gender preference and sorting option.
+ *       Used in the Filters bottom sheet of Packages screen.
  *     tags: [Labs]
+ *
  *     parameters:
  *       - in: path
  *         name: labId
  *         required: true
  *         schema:
  *           type: integer
- *       - in: query
- *         name: sortBy
- *         schema:
- *           type: string
- *           enum: [distance, rating, popularity]
- *       - in: query
- *         name: minRating
- *         schema:
- *           type: number
- *           example: 3
- *       - in: query
- *         name: maxRating
- *         schema:
- *           type: number
- *           example: 5
- *       - in: query
- *         name: distance
- *         schema:
- *           type: number
- *           example: 8
+ *           example: 1
+ *         description: Lab ID
+ *
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
  *           example: 100
+ *         description: Minimum package price
+ *
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *           example: 1000
+ *           example: 2000
+ *         description: Maximum package price
+ *
  *       - in: query
  *         name: minAge
  *         schema:
  *           type: number
  *           example: 20
+ *         description: Minimum age supported by package
+ *
  *       - in: query
  *         name: maxAge
  *         schema:
  *           type: number
  *           example: 40
+ *         description: Maximum age supported by package
+ *
+ *       - in: query
+ *         name: gender
+ *         schema:
+ *           type: string
+ *           enum: [MALE, FEMALE, ALL]
+ *           example: MALE
+ *         description: Gender-specific packages
+ *
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [price_asc, price_desc]
+ *           example: price_asc
+ *         description: Sort packages by price
+ *
  *     responses:
  *       200:
- *         description: Filtered packages
+ *         description: Filtered lab packages
+ *         content:
+ *           application/json:
+ *             example:
+ *               count: 2
+ *               packages:
+ *                 - packageId: 1
+ *                   packageName: Prime Full Body Checkup
+ *                   originalPrice: 3000
+ *                   finalPrice: 1999
+ *                   discountPercent: 33
+ *                   testsCount: 12
+ *                   reportTime: 24 Hours
+ *                   gender: ALL
+ *
+ *       400:
+ *         description: labId is required
+ *
+ *       500:
+ *         description: Internal server error
  */
+
  
 router.get("/:labId/packages/filter", controller.filterLabPackages);
  

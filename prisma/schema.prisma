@@ -318,7 +318,7 @@ model LabBooking {
   sampleDate     DateTime
   createdAt      DateTime         @default(now())
   collectedAt    DateTime?        @db.Timestamp(6)
-  reportIssuedAt DateTime?        @db.Timestamp(6)
+  reportedIssueAt DateTime? @db.Timestamp(6)
   lab            Lab              @relation(fields: [labId], references: [id])
   test           LabTest          @relation(fields: [labTestId], references: [id])
   user           User             @relation(fields: [userId], references: [id])
@@ -397,6 +397,12 @@ model Reminder {
   @@index([userId, reminderAt])
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  ALL
+}
+
 model LabPackage {
   id            Int       @id @default(autoincrement())
   labId         Int
@@ -405,13 +411,16 @@ model LabPackage {
   reportTime    String?
   originalPrice Int       @default(0)
   finalPrice    Int       @default(0)
-  minage        Int? // 🔥 ADD BACK
-  maxage        Int? // 🔥 ADD BACK
-  createdAt     DateTime? @default(now()) @db.Timestamp(6)
+  minage        Int?
+  maxage        Int?
+  gender        String?   // ✅ CHANGE THIS
+  createdAt     DateTime? @default(now())
 
   lab   Lab              @relation(fields: [labId], references: [id])
   items LabPackageItem[]
 }
+
+
 
 model LabPackageItem {
   id        Int @id @default(autoincrement())
