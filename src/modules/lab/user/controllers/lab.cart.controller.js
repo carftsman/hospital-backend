@@ -89,6 +89,7 @@ export const getLabCart = async (req, res) => {
             price: true,
             reportTime: true,
           },
+          patient: true,
         },
       },
       orderBy: { id: "desc" },
@@ -160,33 +161,40 @@ export const removeFromLabCart = async (req, res) => {
 // CLEAR CART
 // =========================
 export const clearLabCart = async (req, res) => {
-  try {
-    const userId = Number(req.query.userId);
+  const userId = Number(req.query.userId);
+  await prisma.labCart.deleteMany({ where: { userId } });
+  res.json({ message: "Cart cleared" });
+};
+
+export const checkoutLabCart = async (req, res) => {
+  const { sampleDate } = req.body;
+  const userId = req.user.id;
 
     await prisma.labCart.deleteMany({ where: { userId } });
 
-    res.json({ message: "Cart cleared" });
-
-  } catch (error) {
-    console.error("clearLabCart error:", error);
-    res.status(500).json({ message: "Server error" });
+  if (!cartItems.length) {
+    return res.status(400).json({ message: "Cart is empty" });
   }
 };
 
-
-// =========================
-// CHECKOUT (FINAL PRODUCTION)
-// =========================
-export const checkoutLabCart = async (req, res) => {
+export const addPatientAndAttachToCart = async (req, res) => {
   try {
-    const { userId, patientProfileId, slotId, sampleDate } = req.body;
+    const {
+      userId,
+      fullName,
+      age,
+      gender,
+      phone,
+      consultationType,
+    } = req.body;
 
-    if (!userId || !patientProfileId || !slotId || !sampleDate) {
+    if (!userId || !fullName || !consultationType) {
       return res.status(400).json({
-        message: "userId, patientProfileId, slotId and sampleDate required",
+        message: "userId, fullName and consultationType are required",
       });
     }
 
+    // 1️⃣ Check cart exists
     const cartItems = await prisma.labCart.findMany({
       where: { userId },
     });
@@ -195,53 +203,32 @@ export const checkoutLabCart = async (req, res) => {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    const slot = await prisma.labSlot.findUnique({
-      where: { id: slotId },
+    // 2️⃣ Create Patient Profile
+    const patient = await prisma.patientProfile.create({
+      data: {
+        userId,
+        fullName,
+        age: age ? Number(age) : null,
+        gender,
+        phone,
+      },
     });
 
-    if (!slot || slot.isBooked) {
-      return res.status(400).json({ message: "Slot unavailable" });
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-
-      // Create bookings
-      const bookings = [];
-
-      for (const item of cartItems) {
-        const booking = await tx.labBooking.create({
-          data: {
-            userId,
-            labId: item.labId,
-            labTestId: item.labTestId,
-            sampleDate: new Date(sampleDate),
-          },
-        });
-
-        bookings.push(booking);
-      }
-
-      // Mark slot booked
-      await tx.labSlot.update({
-        where: { id: slotId },
-        data: { isBooked: true },
-      });
-
-      // Clear cart
-      await tx.labCart.deleteMany({
-        where: { userId },
-      });
-
-      return bookings;
+    // 3️⃣ Attach patient + consultation to cart
+    await prisma.labCart.updateMany({
+      where: { userId },
+      data: {
+        patientProfileId: patient.id,
+        consultationType,
+      },
     });
 
     res.json({
-      message: "Booking confirmed successfully",
-      bookings: result,
+      message: "Patient created and attached successfully",
+      patient,
     });
-
   } catch (error) {
-    console.error("checkoutLabCart error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("addPatientAndAttachToCart error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

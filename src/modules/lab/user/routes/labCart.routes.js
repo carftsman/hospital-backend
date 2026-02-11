@@ -83,6 +83,66 @@ router.get("/", controller.getLabCart);
 
 /**
  * @swagger
+ * /api/labs/cart/clear:
+ *   delete:
+ *     summary: Clear entire lab cart
+ *     tags: [Lab Cart]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 21
+ *     responses:
+ *       200:
+ *         description: Cart cleared
+ */
+router.delete("/clear", controller.clearLabCart);
+
+/**
+ * @swagger
+ * /api/labs/cart/add-patient:
+ *   post:
+ *     summary: Create patient and attach to cart
+ *     tags: [Lab Cart]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - fullName
+ *               - consultationType
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 21
+ *               fullName:
+ *                 type: string
+ *                 example: John Doe
+ *               age:
+ *                 type: integer
+ *                 example: 30
+ *               gender:
+ *                 type: string
+ *                 example: Male
+ *               phone:
+ *                 type: string
+ *                 example: 8383983838
+ *               consultationType:
+ *                 type: string
+ *                 enum: [LAB_VISIT, SAMPLE_COLLECTION]
+ *     responses:
+ *       200:
+ *         description: Patient created and attached
+ */
+router.post("/add-patient", controller.addPatientAndAttachToCart);
+
+/**
+ * @swagger
  * /api/labs/cart/{id}:
  *   delete:
  *     summary: Remove specific item from cart
@@ -99,26 +159,6 @@ router.get("/", controller.getLabCart);
  *         description: Cart item removed successfully
  */
 router.delete("/:id", controller.removeFromLabCart);
-
-
-/**
- * @swagger
- * /api/labs/cart/clear:
- *   delete:
- *     summary: Clear entire cart for user
- *     tags: [Lab Cart]
- *     parameters:
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 21
- *     responses:
- *       200:
- *         description: Cart cleared successfully
- */
-router.delete("/clear", controller.clearLabCart);
 
 
 /**
