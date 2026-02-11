@@ -36,9 +36,16 @@ import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.rout
 import reminderRoutes from "./modules/hospital/user/routes/reminder.routes.js";
 
 //lab
+import labAddressRoutes from "./modules/lab/user/routes/labAddress.routes.js";
+
+import labCartRoutes from "./modules/lab/user/routes/labCart.routes.js";
+
 import labRoutes from "./modules/lab/user/routes/lab.routes.js";
+import labSlotRoutes from "./modules/lab/user/routes/labSlot.routes.js"; // ✅ ADD THIS
 import labAdminReportRoutes from "./modules/lab/admin/routes/labAdminReport.routes.js";
-import labPrescriptionRoutes from "./modules/lab/user/routes/labPrescription.routes.js"
+import labPrescriptionRoutes from "./modules/lab/user/routes/labPrescription.routes.js";
+
+
 // =======================
 // Swagger
 // =======================
@@ -118,9 +125,13 @@ app.use("/api/hospital/user", hospitalInfoRoutes);
 
 
 
+// Lab
 app.use("/api/labs", labRoutes);
-app.use("/api/lab-admin", labAdminReportRoutes);
-app.use("/api/lab-prescriptions",labPrescriptionRoutes);
+app.use("/api/labs", labSlotRoutes);
+app.use("/api/labs/cart", labCartRoutes);
+app.use("/api/labs/address", labAddressRoutes);
 
+app.use("/api/lab-admin", labAdminReportRoutes);
+app.use("/api/lab-prescriptions", labPrescriptionRoutes);
 
 export default app;
