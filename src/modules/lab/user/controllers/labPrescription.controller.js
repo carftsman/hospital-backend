@@ -1,48 +1,53 @@
 import prisma from "../../../../prisma.js";
 import { uploadToAzure } from "../../../../utils/azureBlob.js";
+import { randomUUID } from "crypto";
 
-/**
- * Upload lab prescription (pre-booking)
- */
 export const uploadPrescription = async (req, res) => {
   try {
     const userId = req.user.id;
-    const file = req.file;
+    const files = req.files; // 👈 MULTIPLE FILES
 
-    if (!file) {
-      return res.status(400).json({ message: "File is required" });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "At least one file is required" });
     }
 
-    const fileUrl = await uploadToAzure(file);
+    // Group all uploaded files together
+    const groupId = randomUUID();
 
-    const prescription = await prisma.labPrescription.create({
-      data: {
-        userId,
-        fileUrl,
-        fileType: file.mimetype,
-        status: "UPLOADED",
-        labBookingId: null
-      }
-    });
+    const uploadedFiles = [];
 
-     const responseData = {
-      id: prescription.id,
-      userId: prescription.userId,
-      labBookingId: prescription.labBookingId,
-      fileUrl: prescription.fileUrl,
-      fileType: prescription.fileType,
-      status: prescription.status,
-      createdAt: prescription.createdAt
-    };
+    for (const file of files) {
+      const fileUrl = await uploadToAzure(file);
+
+      const record = await prisma.labPrescription.create({
+        data: {
+          userId,
+          labBookingId: null,
+          groupId,
+          fileUrl,
+          fileType: file.mimetype,
+          status: "UPLOADED"
+        }
+      });
+
+      uploadedFiles.push({
+        id: record.id,
+        fileUrl: record.fileUrl,
+        fileType: record.fileType
+      });
+    }
 
     return res.status(201).json({
-      message: "Prescription uploaded successfully",
-      data: responseData
+      message: "Prescription files uploaded successfully",
+      data: {
+        groupId,
+        files: uploadedFiles
+      }
     });
 
   } catch (error) {
     console.error("uploadPrescription error:", error);
-    return res.status(500).json({ message: "Failed to upload prescription" });
+    return res.status(500).json({ message: "Failed to upload prescriptions" });
   }
 };
 

@@ -9,17 +9,14 @@ import {
 const router = express.Router();
 
 /**
- * Upload prescription (camera / gallery)
- * POST /api/lab-prescriptions/upload
- */
-/**
  * @swagger
  * /api/lab-prescriptions/upload:
  *   post:
- *     summary: Upload lab prescription
+ *     summary: Upload lab prescription files
  *     description: >
- *       Upload a lab prescription image or PDF before booking a lab.
- *       Appointment or lab booking is NOT required at this stage.
+ *       Upload one or more lab prescription images or PDFs before booking a lab.
+ *       Multiple files can be uploaded in a single request.
+ *       Lab booking is NOT required at this stage.
  *     tags:
  *       - Lab Prescriptions
  *     security:
@@ -31,28 +28,46 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - file
+ *               - files
  *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: Prescription image or PDF (jpg, png, pdf)
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: >
+ *                   Prescription files (JPG, PNG, PDF).
+ *                   You can upload multiple files (max 5).
  *     responses:
  *       201:
- *         description: Prescription uploaded successfully
+ *         description: Prescription files uploaded successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/LabPrescription'
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Prescription files uploaded successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     groupId:
+ *                       type: string
+ *                       example: 8d6a9e7a-4c2b-4a4f-9f3c-9f1c88cfa123
+ *                     files:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/LabPrescription'
  *       400:
- *         description: File missing or invalid
+ *         description: No files uploaded
  *       401:
  *         description: Unauthorized
  */
 router.post(
   "/upload",
   authenticate,
-  upload.single("file"),
+  upload.array("files", 5), //  max 5 files
   uploadPrescription
 );
 

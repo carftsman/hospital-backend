@@ -4,31 +4,30 @@ import prisma from "../../../../prisma/client.js";
 export const fetchDoctors = async (filters, page, limit) => {
   const skip = (page - 1) * limit;
 
-const where = {
-    ...(filters.specialization
-      ? {
-          specialization: {
+  const where = {};
+
+  // Category-based specialization
+  if (filters.specialization || filters.women) {
+    where.category = {
+      is: {
+        ...(filters.specialization && {
+          name: {
             contains: filters.specialization,
             mode: "insensitive"
           }
-        }
-      : {}),
-    ...(filters.women
-      ? {
-          category: {
-            isWomenSpecific: true
-          }
-        }
-      : {})
-  };
-    
+        }),
+        ...(filters.women && {
+          isWomenSpecific: true
+        })
+      }
+    };
+  }
 
   const rows = await prisma.doctor.findMany({
     skip,
     take: limit,
     where,
     orderBy: { rating: "desc" },
-
     include: {
       category: true,
       hospital: {
@@ -41,10 +40,10 @@ const where = {
           latitude: true,
           longitude: true,
           consultationMode: true,
-          isOpen: true,
-        },
-      },
-    },
+          isOpen: true
+        }
+      }
+    }
   });
 
   const total = await prisma.doctor.count({ where });
@@ -59,64 +58,62 @@ export const fetchHospitalDoctors = async (
   page = 1,
   limit = 10,
   mode = null,
-  specialization = null,   // NEW
-  search = null,      // NEW
-  women = false,    // NEW
-  symptomId = null   // NEW
+  specialization = null,
+  search = null,
+  women = false,
+  symptomId = null
 ) => {
-  const safePage = Math.max(1, Number(page) || 1);
-  const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+  const safePage = Math.max(1, Number(page));
+  const safeLimit = Math.min(50, Math.max(1, Number(limit)));
   const skip = (safePage - 1) * safeLimit;
 
-  let modeFilter = {};
+  const where = { hospitalId };
 
-  if (mode === "ONLINE") {
-    modeFilter = { in: ["ONLINE", "BOTH"] };
-  } else if (mode === "OFFLINE") {
-    modeFilter = { in: ["OFFLINE", "BOTH"] };
-  } else if (mode === "BOTH") {
-    modeFilter = { equals: "BOTH" };
+  // 🔍 Doctor name search
+  if (search) {
+    where.name = {
+      contains: search,
+      mode: "insensitive"
+    };
   }
 
-  /* ---------------- WHERE CONDITION ---------------- */
-  const where = {
-    hospitalId,
-    ...(mode ? { consultationMode: modeFilter } : {}),
-    ...(specialization
-      ? {
-          specialization: {
+  // 👩 Category filters
+  if (specialization || women) {
+    where.category = {
+      is: {
+        ...(specialization && {
+          name: {
             contains: specialization,
-            mode: "insensitive" //case-insensitive
+            mode: "insensitive"
           }
-        }
-      : {}),
-      ...(search
-    ? {
-        name: {
-          contains: search,
-          mode: "insensitive" // doctor name search
-        }
+        }),
+        ...(women && {
+          isWomenSpecific: true
+        })
       }
-    : {}),
-    ...(women
-      ? {
-          category: {
-            isWomenSpecific: true
-          }
-        }
-      : {}),
-    ...(symptomId
-      ? {
-          DoctorSymptom: {
-            some: {
-              symptomId: Number(symptomId)
-            }
-          }
-        }
-      : {}) 
-  };
+    };
+  }
 
- /* ---------------- MAIN QUERY ---------------- */
+  // 🧬 Symptom filter
+  if (symptomId) {
+    where.DoctorSymptom = {
+      some: {
+        symptomId: Number(symptomId)
+      }
+    };
+  }
+
+  // 🏥 Mode filter (IMPORTANT – now actually used)
+  if (mode === "ONLINE") {
+    where.hospital = {
+      consultationMode: { in: ["ONLINE", "BOTH"] }
+    };
+  } else if (mode === "OFFLINE") {
+    where.hospital = {
+      consultationMode: { in: ["OFFLINE", "BOTH"] }
+    };
+  }
+
   const doctors = await prisma.doctor.findMany({
     where,
     skip,
@@ -124,17 +121,15 @@ export const fetchHospitalDoctors = async (
     orderBy: { rating: "desc" },
     include: {
       category: {
-        select: {
-          id: true,
-          name: true
-        }
+        select: { id: true, name: true }
       },
       hospital: {
         select: {
           id: true,
           name: true,
           location: true,
-          place: true, latitude: true,
+          place: true,
+          latitude: true,
           longitude: true,
           consultationMode: true,
           city: true,
@@ -147,9 +142,7 @@ export const fetchHospitalDoctors = async (
     }
   });
 
-  const total = await prisma.doctor.count({
-    where
-  });
+  const total = await prisma.doctor.count({ where });
 
   return {
     total,
@@ -159,8 +152,6 @@ export const fetchHospitalDoctors = async (
     data: doctors
   };
 };
-
-
 
 /* ---------------- DOCTOR PROFILE ---------------- */
 export const fetchDoctorInfo = async (doctorId) => {

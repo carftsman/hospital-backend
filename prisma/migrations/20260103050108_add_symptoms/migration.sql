@@ -1,2 +1,0 @@
--- This migration was rolled back using prisma migrate resolve
--- Keeping file to satisfy Prisma migration history

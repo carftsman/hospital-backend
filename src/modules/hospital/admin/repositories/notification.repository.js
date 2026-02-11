@@ -26,7 +26,6 @@ export const findNotifications = ({ where = {}, skip = 0, take = 25 }) => {
       booking: {
         select: {
           id: true,
-          timeslotId: true,
           userId: true,
           userName: true,
           userEmail: true,
@@ -77,7 +76,6 @@ export const findNotificationById = (id) => {
       booking: {
         select: {
           id: true,
-          timeslotId: true,
           userId: true,
           userName: true,
           userEmail: true,

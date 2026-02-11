@@ -11,6 +11,7 @@ export const getNearbyHospitalsWithFilters = async ({
   mode = "BOTH",
   openNow = false,
   open24x7 = false,
+  women,
   state,
   city,
   sort = "distance",
@@ -27,20 +28,22 @@ export const getNearbyHospitalsWithFilters = async ({
       ? Prisma.sql`AND (h."consultationMode" = 'OFFLINE' OR h."consultationMode" = 'BOTH')`
       : Prisma.empty;
 
-  /* ---------------- AVAILABILITY ---------------- */
-  const openCondition = openNow
-    ? Prisma.sql`AND h."isOpen" = true`
-    : Prisma.empty;
 
-  const open24x7Condition = open24x7
-  ? Prisma.sql`AND h."open24x7" = true`
-  : Prisma.empty;
+/* ---------------- AVAILABILITY ---------------- */
+const availabilityCondition =
+  openNow && open24x7
+    ? Prisma.sql`AND (h."isOpen" = true OR h."open24x7" = true)`
+    : openNow
+    ? Prisma.sql`AND h."isOpen" = true`
+    : open24x7
+    ? Prisma.sql`AND h."open24x7" = true`
+    : Prisma.empty;
 
 
 
   /* ---------------- LOCATION ---------------- */
-  const stateCondition = state
-  ? Prisma.sql`AND h.location ILIKE ${`%${state}%`}`
+ const stateCondition = state
+  ? Prisma.sql`AND h."state" ILIKE ${`%${state}%`}`
   : Prisma.empty;
 
 
@@ -53,16 +56,24 @@ export const getNearbyHospitalsWithFilters = async ({
     `
   : Prisma.empty;
 
-
+/* ---------------- WOMEN FILTER ---------------- */
+const womenCondition = women
+  ? Prisma.sql`
+      AND (
+        h."isWomenFriendly" = true
+        OR h."hasMaternityCare" = true
+      )
+    `
+  : Prisma.empty;
   /* ---------------- CATEGORY ---------------- */
-  const categoryJoin =
-    categoryIds.length > 0
-      ? Prisma.sql`
-          JOIN "Category" c
-            ON c."hospitalId" = h.id
-           AND c.id IN (${Prisma.join(categoryIds)})
-        `
-      : Prisma.empty;
+const categoryJoin =
+  !women && categoryIds.length > 0
+    ? Prisma.sql`
+        JOIN "Category" c
+          ON c."hospitalId" = h.id
+         AND c.id IN (${Prisma.join(categoryIds)})
+      `
+    : Prisma.empty;
 
   /* ---------------- SORT ---------------- */
   const orderBy =
@@ -100,10 +111,10 @@ export const getNearbyHospitalsWithFilters = async ({
     AND h.latitude IS NOT NULL
     AND h.longitude IS NOT NULL
     ${modeCondition}
-    ${openCondition}
-    ${open24x7Condition}
+    ${availabilityCondition}
     ${stateCondition}
     ${cityCondition}
+    ${womenCondition}
     AND (
       6371 * acos(
         cos(radians(${lat}))
@@ -127,10 +138,10 @@ const countRows = await prisma.$queryRaw`
     AND h.latitude IS NOT NULL
     AND h.longitude IS NOT NULL
     ${modeCondition}
-    ${openCondition}
-    ${open24x7Condition}
+    ${availabilityCondition}
     ${stateCondition}
     ${cityCondition}
+    ${womenCondition}
     AND (
       6371 * acos(
         cos(radians(${lat}))

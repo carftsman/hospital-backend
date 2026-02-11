@@ -212,35 +212,6 @@ model PatientProfile {
 }
 
 model Lab {
-<<<<<<< Updated upstream
-  id          Int      @id @default(autoincrement())
-  name        String
-  imageUrl    String?
-  description String?
-  phone       String?
-  address     String?
-  city        String?
-  state       String?
-  latitude    Float?
-  longitude   Float?
-  isOpen      Boolean  @default(true)
-  rating      Float    @default(0)
-  popularity  Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  // relations
-  tests      LabTest[]
-  categories LabCategory[] @relation("LabCategories")
-  bookings   LabBooking[]
-  carts      LabCart[]
-
-  // ✅ ADD THIS
-  packages LabPackage[]
-}
-
-model LabTest {
-  id          Int      @id @default(autoincrement())
-=======
   id                                 Int           @id @default(autoincrement())
   name                               String
   imageUrl                           String?
@@ -274,46 +245,12 @@ model LabCategory {
 
 model LabTest {
   id          Int          @id @default(autoincrement())
->>>>>>> Stashed changes
   labId       Int
   categoryId  Int
   name        String
   description String?
   price       Int
   reportTime  String
-<<<<<<< Updated upstream
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  minAge      Int?
-  maxAge      Int?
-  imageUrl    String?
-
-  bookings LabBooking[]
-  carts    LabCart[]
-
-  category LabCategory @relation(fields: [categoryId], references: [id])
-  lab      Lab         @relation(fields: [labId], references: [id])
-
-  // ✅ ADD THIS
-  packageItems LabPackageItem[]
-
-  @@unique([labId, categoryId, name])
-}
-
-model LabCategory {
-  id       Int     @id @default(autoincrement())
-  name     String
-  group    String?
-  imageUrl String?
-
-  // 🔥 ADD THESE BACK
-  labId     Int?
-  type      String?
-  createdAt DateTime @default(now())
-
-  labs  Lab[]     @relation("LabCategories")
-  tests LabTest[]
-=======
   isAvailable Boolean      @default(true)
   createdAt   DateTime     @default(now())
   minAge      Int?
@@ -325,7 +262,6 @@ model LabCategory {
   lab         Lab          @relation(fields: [labId], references: [id])
 
   @@unique([labId, categoryId, name], map: "unique_lab_category_test")
->>>>>>> Stashed changes
 }
 
 model LabBooking {
@@ -342,26 +278,6 @@ model LabBooking {
   test           LabTest          @relation(fields: [labTestId], references: [id])
   user           User             @relation(fields: [userId], references: [id])
   feedback       LabFeedback?
-<<<<<<< Updated upstream
-  report         LabReport?
-}
-
-enum LabReportStatus {
-  NORMAL
-  ABNORMAL
-  BORDERLINE
-}
-
-model LabReport {
-  id           Int             @id @default(autoincrement())
-  labBookingId Int             @unique
-  reportStatus LabReportStatus
-  summary      String?
-  reportUrls   String[]
-  createdAt    DateTime        @default(now())
-
-  booking LabBooking @relation(fields: [labBookingId], references: [id])
-=======
   LabReport      LabReport?
 }
 
@@ -375,7 +291,6 @@ model LabReport {
   samples      String[]
   collectedAt  DateTime?
   LabBooking   LabBooking @relation(fields: [labBookingId], references: [id])
->>>>>>> Stashed changes
 }
 
 model LabFeedback {
@@ -438,16 +353,7 @@ model LabPackage {
   reportTime    String?
   originalPrice Int       @default(0)
   finalPrice    Int       @default(0)
-<<<<<<< Updated upstream
-  minage        Int? // 🔥 ADD BACK
-  maxage        Int? // 🔥 ADD BACK
   createdAt     DateTime? @default(now()) @db.Timestamp(6)
-
-  lab   Lab              @relation(fields: [labId], references: [id])
-  items LabPackageItem[]
-=======
-  createdAt     DateTime? @default(now()) @db.Timestamp(6)
->>>>>>> Stashed changes
 }
 
 model LabPackageItem {
@@ -455,14 +361,7 @@ model LabPackageItem {
   packageId Int
   labTestId Int
 
-<<<<<<< Updated upstream
-  package LabPackage @relation(fields: [packageId], references: [id])
-  test    LabTest    @relation(fields: [labTestId], references: [id])
-
-  @@unique([packageId, labTestId])
-=======
   @@unique([packageId, labTestId], map: "LabPackageItem_unique")
->>>>>>> Stashed changes
 }
 
 enum ConsultationMode {
@@ -492,6 +391,11 @@ enum LabBookingStatus {
   SAMPLE_COLLECTED
   COMPLETED
   CANCELLED
+}
+
+enum ReportStatus {
+  PENDING
+  READY
 }
 
 enum GenderPreference {
@@ -538,17 +442,6 @@ enum BloodGroup {
   O_NEG
 }
 
-<<<<<<< Updated upstream
-enum OnboardingStage {
-  PHONE_VERIFICATION
-  PROFILE_SETUP
-  COMPLETED
-}
-
-enum ReportStatus {
-  PENDING
-  READY
-=======
 enum LabReportStatus {
   NORMAL
   BORDERLINE
@@ -559,7 +452,6 @@ enum OnboardingStage {
   PHONE_VERIFICATION
   PROFILE_SETUP
   COMPLETED
->>>>>>> Stashed changes
 }
 
 enum report_status_enum {
