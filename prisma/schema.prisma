@@ -287,11 +287,12 @@ model LabBooking {
 model LabReport {
   id           Int             @id @default(autoincrement())
   labBookingId Int             @unique
-  createdAt    DateTime        @default(now())
-  summary      String?
   reportStatus LabReportStatus
+  summary      String?
   reportUrls   String[]
-  LabBooking   LabBooking      @relation(fields: [labBookingId], references: [id])
+  createdAt    DateTime        @default(now())
+
+  booking LabBooking @relation(fields: [labBookingId], references: [id])
 }
 
 model LabFeedback {
@@ -320,12 +321,15 @@ model LabCart {
 model LabPrescription {
   id           Int      @id @default(autoincrement())
   userId       Int
+  groupId      String?
   fileUrl      String
   fileType     String
   status       String   @default("UPLOADED")
   createdAt    DateTime @default(now())
   labBookingId Int?
   user         User     @relation(fields: [userId], references: [id])
+
+  @@index([groupId])
 }
 
 model Reminder {
@@ -339,7 +343,7 @@ model Reminder {
   isImportant Boolean        @default(false)
   isActive    Boolean        @default(true)
   createdAt   DateTime       @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime       @updatedAt
   status      ReminderStatus @default(ACTIVE)
   user        User           @relation(fields: [userId], references: [id])
 
@@ -347,26 +351,28 @@ model Reminder {
 }
 
 model LabPackage {
-  id             Int              @id @default(autoincrement())
-  labId          Int
-  name           String
-  description    String?
-  reportTime     String?
-  originalPrice  Int              @default(0)
-  finalPrice     Int              @default(0)
-  createdAt      DateTime?        @default(now()) @db.Timestamp(6)
-  minage         Int?
-  maxage         Int?
-  Lab            Lab              @relation(fields: [labId], references: [id])
-  LabPackageItem LabPackageItem[]
+  id            Int       @id @default(autoincrement())
+  labId         Int
+  name          String
+  description   String?
+  reportTime    String?
+  originalPrice Int       @default(0)
+  finalPrice    Int       @default(0)
+  minage        Int? // 🔥 ADD BACK
+  maxage        Int? // 🔥 ADD BACK
+  createdAt     DateTime? @default(now()) @db.Timestamp(6)
+
+  lab   Lab              @relation(fields: [labId], references: [id])
+  items LabPackageItem[]
 }
 
 model LabPackageItem {
-  id         Int        @id @default(autoincrement())
-  packageId  Int
-  labTestId  Int
-  LabTest    LabTest    @relation(fields: [labTestId], references: [id])
-  LabPackage LabPackage @relation(fields: [packageId], references: [id])
+  id        Int @id @default(autoincrement())
+  packageId Int
+  labTestId Int
+
+  package LabPackage @relation(fields: [packageId], references: [id])
+  test    LabTest    @relation(fields: [labTestId], references: [id])
 
   @@unique([packageId, labTestId])
 }

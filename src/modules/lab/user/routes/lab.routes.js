@@ -1,9 +1,9 @@
 import { Router } from "express";
 import labCartRoutes from "./labCart.routes.js";
 import * as controller from "../controllers/lab.controller.js";
-
+ 
 const router = Router();
-
+ 
 // 🔥 MUST BE FIRST
 router.use("/cart", labCartRoutes);
 /**
@@ -47,7 +47,7 @@ router.use("/cart", labCartRoutes);
  *           example: 8
  *         description: Distance filter in KM (slider)
  *
- *       
+ *      
  *
  *       - in: query
  *         name: sortBy
@@ -126,7 +126,7 @@ router.use("/cart", labCartRoutes);
  *       500:
  *         description: Internal server error
  */
-
+ 
 router.get("/nearby", controller.getNearbyLabs);
 /**
  * @swagger
@@ -199,7 +199,7 @@ router.get("/nearby", controller.getNearbyLabs);
  *       500:
  *         description: Server error
  */
-
+ 
 router.get("/global-search", controller.globalSearchLabs);
 /**
  * @swagger
@@ -241,11 +241,11 @@ router.get("/global-search", controller.globalSearchLabs);
  *       400:
  *         description: query is required
  */
-
+ 
 router.get("/auto-suggest", controller.autoSuggestLabs);
-
-
-
+ 
+ 
+ 
 /**
  * @swagger
  * /api/labs/packages/by-age:
@@ -273,8 +273,8 @@ router.get("/auto-suggest", controller.autoSuggestLabs);
  *         description: age and labId are required
  */
 router.get("/packages/by-age", controller.getPackagesByAge);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/packages/{packageId}:
@@ -299,7 +299,7 @@ router.get("/packages/by-age", controller.getPackagesByAge);
  *       500:
  *         description: Server error
  */
-
+ 
 router.get("/packages/:packageId", controller.getLabPackageDetails);
 /**
  * @swagger
@@ -334,9 +334,9 @@ router.get("/packages/:packageId", controller.getLabPackageDetails);
  *       200:
  *         description: Packages list
  */
-
+ 
 router.get("/:labId/packages", controller.getLabPackages);
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}/packages/filter:
@@ -394,10 +394,10 @@ router.get("/:labId/packages", controller.getLabPackages);
  *       200:
  *         description: Filtered packages
  */
-
+ 
 router.get("/:labId/packages/filter", controller.filterLabPackages);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/search:
@@ -430,14 +430,14 @@ router.get("/search", controller.searchLabs);
 router.get("/categories/all", controller.getLabCategories);
  
  
-
+ 
 /**
  * @swagger
  * tags:
  *   - name: Lab Reports
  *     description: Lab reports list, details & downloads
  */
-
+ 
 /**
  * @swagger
  * /api/labs/reports:
@@ -503,60 +503,71 @@ router.get("/categories/all", controller.getLabCategories);
  *       500:
  *         description: Server error
  */
-
+ 
 router.get("/reports", controller.getUserLabReports);
-
+ 
 /**
- * @swagger
- * /api/labs/reports/{bookingId}/details:
- *   get:
- *     tags: [Lab Reports]
- *     summary: Get detailed lab report (Detailed Report screen)
- *     description: >
- *       Returns complete lab report details including summary,
- *       sample collection info and downloadable PDFs.
- *
- *     parameters:
- *       - in: path
- *         name: bookingId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 21
- *         description: Lab booking ID
- *
- *     responses:
- *       200:
- *         description: Detailed report data for UI
- *         content:
- *           application/json:
- *             example:
- *               reportId: 123456
- *               bookingId: 21
- *               packageName: Prime Full Body Checkup
- *               labName: Multi Specialty laboratory
- *               collectedDate: 2026-01-30
- *               issuedDate: 2026-02-10
- *               samplesCollected:
- *                 - Blood Samples
- *                 - Urine Samples
- *               resultSummary: >
- *                 Your blood sugar level is higher than normal.
- *                 Reducing sugar intake and consulting a doctor is advised.
- *               reports:
- *                 - name: Report-1
- *                   url: https://cdn.app/reports/report-1.pdf
- *                 - name: Report-2
- *                   url: https://cdn.app/reports/report-2.pdf
- *
- *       404:
- *         description: Lab report not found
- *
- *       500:
- *         description: Server error
- */
+* @swagger
+* tags:
+*   - name: Lab Reports
+*     description: Lab reports list, details & downloads
+*/
+ 
+/**
+* @swagger
+* /api/labs/reports/{reportId}/details:
+*   get:
+*     tags: [Lab Reports]
+*     summary: Get detailed lab report (Detailed Report screen)
+*     description: >
+*       Returns complete lab report details including summary,
+*       sample collection information and downloadable PDF links.
+*       Uses reportId (not bookingId).
+*
+*     parameters:
+*       - in: path
+*         name: reportId
+*         required: true
+*         schema:
+*           type: integer
+*           example: 5
+*         description: Unique Lab Report ID
+*
+*     responses:
+*       200:
+*         description: Detailed report data for UI
+*         content:
+*           application/json:
+*             example:
+*               reportId: 5
+*               bookingId: 21
+*               packageName: Prime Full Body Checkup
+*               labName: Multi Specialty Laboratory
+*               collectedDate: 2026-02-09
+*               issuedDate: 2026-02-10
+*               samplesCollected:
+*                 - Blood Samples
+*                 - Urine Samples
+*               resultSummary: >
+*                 Your blood sugar level is higher than normal.
+*                 Reducing sugar intake and consulting a doctor is advised.
+*               reports:
+*                 - name: Report-1
+*                   url: https://cdn.app/reports/report-1.pdf
+*                 - name: Report-2
+*                   url: https://cdn.app/reports/report-2.pdf
+*
+*       400:
+*         description: reportId is required
+*
+*       404:
+*         description: Lab report not found
+*
+*       500:
+*         description: Server error
+*/
 
-router.get("/reports/:bookingId/details", controller.getLabReportDetails);
+router.get("/reports/:reportId/details", controller.getLabReportDetails);
 
 /**
  * @swagger
@@ -589,11 +600,11 @@ router.get("/reports/:bookingId/details", controller.getLabReportDetails);
  *       500:
  *         description: Server error
  */
-
+ 
 router.get("/reports/:reportId/download", controller.downloadLabReport);
-
-
-
+ 
+ 
+ 
 /**
  * @swagger
  * /api/labs/{labId}/categories:
@@ -638,7 +649,7 @@ router.get("/:labId/categories", controller.getCategoriesByLab);
  */
 router.get("/:labId/tests/search", controller.searchLabTests);
  
-
+ 
  
 /**
  * @swagger
@@ -665,7 +676,7 @@ router.get("/:labId/tests/search", controller.searchLabTests);
  */
 router.get("/:labId/slots", controller.getLabSlots);
  
-
+ 
 /**
  * @swagger
  * /api/labs/{labId}/details:
@@ -689,8 +700,8 @@ router.get("/:labId/slots", controller.getLabSlots);
  *         description: Lab not found
  */
 router.get("/:labId/details", controller.getLabDetailsById);
-
-
+ 
+ 
  /**
  * @swagger
  * /api/labs/bookings/past:
@@ -709,7 +720,7 @@ router.get("/:labId/details", controller.getLabDetailsById);
  *         description: Past lab bookings
  */
 router.get("/bookings/past", controller.getUserPastLabBookings);
-
+ 
 /**
  * @swagger
  * /api/labs/bookings/upcoming:
@@ -728,8 +739,8 @@ router.get("/bookings/past", controller.getUserPastLabBookings);
  *         description: Upcoming lab bookings
  */
 router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
-
-
+ 
+ 
 /**
  * @swagger
  * /api/labs/tests/recent:
@@ -765,7 +776,7 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  *                   lastBookedOn: 2026-02-10
  */
 router.get("/tests/recent", controller.getRecentLabTests);
-
+ 
 /**
  * @swagger
  * /api/labs/book:
@@ -827,7 +838,7 @@ router.post("/book", controller.bookLabTest);
  *         description: Booking cancelled
  */
 router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
-
+ 
 /**
  * @swagger
  * /api/labs/feedback:
@@ -881,8 +892,8 @@ router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
  *       500:
  *         description: Internal server error
  */
-
+ 
 router.post("/feedback", controller.submitLabFeedback);
-
-
+ 
+ 
 export default router;
