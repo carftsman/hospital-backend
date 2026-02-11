@@ -44,7 +44,7 @@ export const getLabCart = async (req, res) => {
             city: true,
           },
         },
-        labTest: {
+        test: {
           select: {
             id: true,
             name: true,
@@ -54,12 +54,12 @@ export const getLabCart = async (req, res) => {
         },
       },
       orderBy: {
-        createdAt: "desc",
+        id: "desc",
       },
     });
 
     const totalAmount = items.reduce(
-      (sum, item) => sum + item.labTest.price * item.quantity,
+      (sum, item) => sum + item.test.price * item.quantity,
       0
     );
 

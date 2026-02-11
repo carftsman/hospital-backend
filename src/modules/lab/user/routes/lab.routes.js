@@ -132,7 +132,11 @@ router.get("/nearby", controller.getNearbyLabs);
  * @swagger
  * /api/labs/global-search:
  *   get:
- *     summary: Global search for labs, categories, and lab tests with filters
+ *     summary: Global search for labs, categories, and lab tests (UI optimized)
+ *     description: >
+ *       Performs a global search across labs, packages (categories),
+ *       and lab tests. Test results are grouped for easy UI rendering
+ *       and price comparison across labs.
  *     tags: [Labs]
  *     parameters:
  *       - in: query
@@ -155,23 +159,56 @@ router.get("/nearby", controller.getNearbyLabs);
  *         name: minPrice
  *         schema:
  *           type: integer
- *           example: 1
+ *           example: 100
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: integer
- *           example: 10001
+ *           example: 1000
  *     responses:
  *       200:
  *         description: Global search results
+ *         content:
+ *           application/json:
+ *             example:
+ *               labs:
+ *                 - id: 1
+ *                   name: Apollo Diagnostics
+ *                   imageUrl: null
+ *                   rating: 4.5
+ *                   city: Hyderabad
+ *                   isOpen: true
+ *               categories:
+ *                 - id: 1
+ *                   name: Blood Tests
+ *               tests:
+ *                 - name: Fasting Blood Sugar
+ *                   minPrice: 150
+ *                   maxPrice: 160
+ *                   labs:
+ *                     - testId: 3
+ *                       labId: 1
+ *                       labName: Apollo Diagnostics
+ *                       price: 150
+ *                     - testId: 30
+ *                       labId: 2
+ *                       labName: Thyrocare
+ *                       price: 160
+ *       400:
+ *         description: query is required
+ *       500:
+ *         description: Server error
  */
+
 router.get("/global-search", controller.globalSearchLabs);
 /**
  * @swagger
  * /api/labs/auto-suggest:
  *   get:
  *     summary: Auto-suggest while typing (Labs, Categories, Tests)
- *     description: Returns lightweight suggestions for search-as-you-type
+ *     description: >
+ *       Returns lightweight suggestions for search-as-you-type.
+ *       Optimized for fast UI rendering.
  *     tags: [Labs]
  *     parameters:
  *       - in: query
@@ -190,41 +227,21 @@ router.get("/global-search", controller.globalSearchLabs);
  *         description: Auto-suggest results
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 labs:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       name:
- *                         type: string
- *                 categories:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       name:
- *                         type: string
- *                 tests:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       name:
- *                         type: string
- *                       price:
- *                         type: number
+ *             example:
+ *               labs:
+ *                 - id: 1
+ *                   name: Apollo Diagnostics
+ *               categories:
+ *                 - id: 1
+ *                   name: Blood Tests
+ *               tests:
+ *                 - id: 3
+ *                   name: Fasting Blood Sugar
+ *                   startingPrice: 150
  *       400:
  *         description: query is required
  */
+
 router.get("/auto-suggest", controller.autoSuggestLabs);
 
 
@@ -284,8 +301,101 @@ router.get("/packages/by-age", controller.getPackagesByAge);
  */
 
 router.get("/packages/:packageId", controller.getLabPackageDetails);
+/**
+ * @swagger
+ * /api/labs/{labId}/packages:
+ *   get:
+ *     summary: Get lab packages list
+ *     description: Used for Packages List screen
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: Full Body
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     responses:
+ *       200:
+ *         description: Packages list
+ */
 
+router.get("/:labId/packages", controller.getLabPackages);
 
+/**
+ * @swagger
+ * /api/labs/{labId}/packages/filter:
+ *   get:
+ *     summary: Filter lab packages
+ *     description: Used for Filters bottom sheet
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [distance, rating, popularity]
+ *       - in: query
+ *         name: minRating
+ *         schema:
+ *           type: number
+ *           example: 3
+ *       - in: query
+ *         name: maxRating
+ *         schema:
+ *           type: number
+ *           example: 5
+ *       - in: query
+ *         name: distance
+ *         schema:
+ *           type: number
+ *           example: 8
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *           example: 100
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *           example: 1000
+ *       - in: query
+ *         name: minAge
+ *         schema:
+ *           type: number
+ *           example: 20
+ *       - in: query
+ *         name: maxAge
+ *         schema:
+ *           type: number
+ *           example: 40
+ *     responses:
+ *       200:
+ *         description: Filtered packages
+ */
+
+router.get("/:labId/packages/filter", controller.filterLabPackages);
 
 
 /**
@@ -320,17 +430,24 @@ router.get("/search", controller.searchLabs);
 router.get("/categories/all", controller.getLabCategories);
  
  
- 
- 
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Lab Reports
+ *     description: Lab reports list, details & downloads
+ */
+
 /**
  * @swagger
  * /api/labs/reports:
  *   get:
- *     summary: Get lab reports for a user (Reports List screen)
- *     description: >
- *       Fetch lab reports for a user with optional filters.
- *       Use '*' to fetch all reports without filtering.
  *     tags: [Lab Reports]
+ *     summary: Get lab reports (Reports List screen)
+ *     description: >
+ *       Returns completed lab reports for a user.
+ *       Used in the Reports List screen with status chips and filters.
+ *
  *     parameters:
  *       - in: query
  *         name: userId
@@ -342,113 +459,141 @@ router.get("/categories/all", controller.getLabCategories);
  *
  *       - in: query
  *         name: reportStatus
- *         required: false
  *         schema:
  *           type: string
- *           enum: ["*", "NORMAL", "ABNORMAL", "BORDERLINE"]
- *           example: "*"
- *         description: Filter by report status or use '*' for all
- *
- *       - in: query
- *         name: bookingStatus
- *         required: false
- *         schema:
- *           type: string
- *           enum: ["*", "PENDING", "COMPLETED", "CANCELLED"]
- *           example: "*"
- *         description: Filter by booking status or use '*' for all
+ *           enum: [Normal, Abnormal, Borderline]
+ *           example: Normal
+ *         description: Filter by report status chip
  *
  *       - in: query
  *         name: fromDate
- *         required: false
  *         schema:
  *           type: string
  *           format: date
- *           example: "2026-02-01"
- *         description: Start date (YYYY-MM-DD)
+ *           example: 2026-02-01
+ *         description: Start date filter
  *
  *       - in: query
  *         name: toDate
- *         required: false
  *         schema:
  *           type: string
  *           format: date
- *           example: "2026-02-07"
- *         description: End date (YYYY-MM-DD)
+ *           example: 2026-02-10
+ *         description: End date filter
  *
  *     responses:
  *       200:
- *         description: List of lab reports
+ *         description: Reports list for UI
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 count:
- *                   type: integer
- *                   example: 1
- *                 reports:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       reportId:
- *                         type: integer
- *                         example: 4
- *                       bookingId:
- *                         type: integer
- *                         example: 4
- *                       reportStatus:
- *                         type: string
- *                         example: NORMAL
- *                       bookingStatus:
- *                         type: string
- *                         example: COMPLETED
- *                       testName:
- *                         type: string
- *                         example: CBC
- *                       labName:
- *                         type: string
- *                         example: Apollo Diagnostics
- *                       bookedDate:
- *                         type: string
- *                         format: date-time
- *                         example: 2026-02-07T10:27:22.576Z
+ *             example:
+ *               count: 3
+ *               reports:
+ *                 - reportId: 123456
+ *                   bookingId: 21
+ *                   status: Normal
+ *                   testName: Prime Full Body Checkup
+ *                   testsCount: 12
+ *                   labName: Multi Specialty laboratory
+ *                   date: 2026-02-12
  *
  *       400:
  *         description: userId is required
  *
  *       500:
- *         description: Internal server error
+ *         description: Server error
  */
+
 router.get("/reports", controller.getUserLabReports);
 
- 
 /**
  * @swagger
  * /api/labs/reports/{bookingId}/details:
  *   get:
- *     summary: Get detailed lab report by booking ID
  *     tags: [Lab Reports]
+ *     summary: Get detailed lab report (Detailed Report screen)
+ *     description: >
+ *       Returns complete lab report details including summary,
+ *       sample collection info and downloadable PDFs.
+ *
  *     parameters:
  *       - in: path
  *         name: bookingId
  *         required: true
  *         schema:
  *           type: integer
- *           example: 2
+ *           example: 21
+ *         description: Lab booking ID
+ *
  *     responses:
  *       200:
- *         description: Lab report details
+ *         description: Detailed report data for UI
+ *         content:
+ *           application/json:
+ *             example:
+ *               reportId: 123456
+ *               bookingId: 21
+ *               packageName: Prime Full Body Checkup
+ *               labName: Multi Specialty laboratory
+ *               collectedDate: 2026-01-30
+ *               issuedDate: 2026-02-10
+ *               samplesCollected:
+ *                 - Blood Samples
+ *                 - Urine Samples
+ *               resultSummary: >
+ *                 Your blood sugar level is higher than normal.
+ *                 Reducing sugar intake and consulting a doctor is advised.
+ *               reports:
+ *                 - name: Report-1
+ *                   url: https://cdn.app/reports/report-1.pdf
+ *                 - name: Report-2
+ *                   url: https://cdn.app/reports/report-2.pdf
+ *
  *       404:
- *         description: Report not found
+ *         description: Lab report not found
+ *
+ *       500:
+ *         description: Server error
  */
-router.get(
-  "/reports/:bookingId/details",
-  controller.getLabReportDetails
-);
 
- 
+router.get("/reports/:bookingId/details", controller.getLabReportDetails);
+
+/**
+ * @swagger
+ * /api/labs/reports/{reportId}/download:
+ *   get:
+ *     tags: [Lab Reports]
+ *     summary: Download lab report PDF
+ *     description: Downloads a single lab report file.
+ *
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 123456
+ *
+ *     responses:
+ *       200:
+ *         description: Report file download
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *
+ *       404:
+ *         description: Report file not found
+ *
+ *       500:
+ *         description: Server error
+ */
+
+router.get("/reports/:reportId/download", controller.downloadLabReport);
+
+
+
 /**
  * @swagger
  * /api/labs/{labId}/categories:
@@ -585,6 +730,41 @@ router.get("/bookings/past", controller.getUserPastLabBookings);
 router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
 
 
+/**
+ * @swagger
+ * /api/labs/tests/recent:
+ *   get:
+ *     summary: Get recently viewed / booked lab tests
+ *     description: >
+ *       Used for "Recently Viewed Tests" section on Labs Home screen.
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 21
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 5
+ *     responses:
+ *       200:
+ *         description: Recent lab tests
+ *         content:
+ *           application/json:
+ *             example:
+ *               count: 2
+ *               tests:
+ *                 - testId: 3
+ *                   testName: Thyroid Test
+ *                   price: 300
+ *                   labName: Apollo Diagnostics
+ *                   lastBookedOn: 2026-02-10
+ */
+router.get("/tests/recent", controller.getRecentLabTests);
 
 /**
  * @swagger
