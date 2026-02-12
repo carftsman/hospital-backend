@@ -305,7 +305,7 @@ router.get("/packages/:packageId", controller.getLabPackageDetails);
  * @swagger
  * /api/labs/{labId}/packages:
  *   get:
- *     summary: Get lab packages list
+ *     summary: Get lab packages list (search for packages in specific labs)
  *     description: Used for Packages List screen
  *     tags: [Labs]
  *     parameters:
@@ -454,6 +454,13 @@ router.get("/search", controller.searchLabs);
  *   get:
  *     summary: Get all lab categories (Categories screen)
  *     tags: [Labs]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Search category by name
  *     responses:
  *       200:
  *         description: List of lab categories
@@ -466,7 +473,7 @@ router.get("/categories/all", controller.getLabCategories);
  * @swagger
  * tags:
  *   - name: Lab Reports
- *     description: Lab reports list, details & downloads
+ *     description: Lab reports list, detailed report & downloads
  */
  
 /**
@@ -474,10 +481,8 @@ router.get("/categories/all", controller.getLabCategories);
  * /api/labs/reports:
  *   get:
  *     tags: [Lab Reports]
- *     summary: Get lab reports (Reports List screen)
- *     description: >
- *       Returns completed lab reports for a user.
- *       Used in the Reports List screen with status chips and filters.
+ *     summary: Get user lab reports (Reports List screen)
+ *     description: Returns completed lab reports with filtering options.
  *
  *     parameters:
  *       - in: query
@@ -486,47 +491,40 @@ router.get("/categories/all", controller.getLabCategories);
  *         schema:
  *           type: integer
  *           example: 21
- *         description: Logged-in user ID
  *
  *       - in: query
  *         name: reportStatus
  *         schema:
  *           type: string
- *           enum: [Normal, Abnormal, Borderline]
- *           example: Normal
- *         description: Filter by report status chip
+ *           enum: [NORMAL, ABNORMAL, BORDERLINE]
  *
  *       - in: query
  *         name: fromDate
  *         schema:
  *           type: string
  *           format: date
- *           example: 2026-02-01
- *         description: Start date filter
  *
  *       - in: query
  *         name: toDate
  *         schema:
  *           type: string
  *           format: date
- *           example: 2026-02-10
- *         description: End date filter
  *
  *     responses:
  *       200:
- *         description: Reports list for UI
+ *         description: List of lab reports
  *         content:
  *           application/json:
  *             example:
- *               count: 3
+ *               count: 2
  *               reports:
- *                 - reportId: 123456
- *                   bookingId: 21
- *                   status: Normal
- *                   testName: Prime Full Body Checkup
- *                   testsCount: 12
- *                   labName: Multi Specialty laboratory
- *                   date: 2026-02-12
+ *                 - reportId: 7
+ *                   bookingId: 4
+ *                   status: NORMAL
+ *                   packageName: Complete Blood Count (CBC)
+ *                   testName: Complete Blood Count (CBC)
+ *                   labName: Apollo Diagnostics
+ *                   date: 2026-02-11
  *
  *       400:
  *         description: userId is required
@@ -538,68 +536,66 @@ router.get("/categories/all", controller.getLabCategories);
 router.get("/reports", controller.getUserLabReports);
  
 /**
-* @swagger
-* tags:
-*   - name: Lab Reports
-*     description: Lab reports list, details & downloads
-*/
- 
-/**
-* @swagger
-* /api/labs/reports/{reportId}/details:
-*   get:
-*     tags: [Lab Reports]
-*     summary: Get detailed lab report (Detailed Report screen)
-*     description: >
-*       Returns complete lab report details including summary,
-*       sample collection information and downloadable PDF links.
-*       Uses reportId (not bookingId).
-*
-*     parameters:
-*       - in: path
-*         name: reportId
-*         required: true
-*         schema:
-*           type: integer
-*           example: 5
-*         description: Unique Lab Report ID
-*
-*     responses:
-*       200:
-*         description: Detailed report data for UI
-*         content:
-*           application/json:
-*             example:
-*               reportId: 5
-*               bookingId: 21
-*               packageName: Prime Full Body Checkup
-*               labName: Multi Specialty Laboratory
-*               collectedDate: 2026-02-09
-*               issuedDate: 2026-02-10
-*               samplesCollected:
-*                 - Blood Samples
-*                 - Urine Samples
-*               resultSummary: >
-*                 Your blood sugar level is higher than normal.
-*                 Reducing sugar intake and consulting a doctor is advised.
-*               reports:
-*                 - name: Report-1
-*                   url: https://cdn.app/reports/report-1.pdf
-*                 - name: Report-2
-*                   url: https://cdn.app/reports/report-2.pdf
-*
-*       400:
-*         description: reportId is required
-*
-*       404:
-*         description: Lab report not found
-*
-*       500:
-*         description: Server error
-*/
-
+ * @swagger
+ * /api/labs/reports/{reportId}/details:
+ *   get:
+ *     tags: [Lab Reports]
+ *     summary: Get detailed lab report
+ *     description: Returns complete lab report details.
+ *
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 7
+ *         description: Lab Report ID
+ *
+ *     responses:
+ *       200:
+ *         description: Detailed lab report
+ *         content:
+ *           application/json:
+ *             example:
+ *               reportId: 7
+ *               bookingId: 4
+ *               packageName: Complete Blood Count (CBC)
+ *               labName: Apollo Diagnostics
+ *               collectedDate: 2026-02-01
+ *               issuedDate: 2026-02-11
+ *               samplesCollected:
+ *                 - Blood Samples
+ *               resultSummary: All parameters normal.
+ *               reports:
+ *                 - name: Report-1
+ *                   url: report1.pdf
+ *
+ *       404:
+ *         description: Lab report not found
+ */
 router.get("/reports/:reportId/details", controller.getLabReportDetails);
 
+/**
+ * @swagger
+ * /api/labs/reports/last-30-days:
+ *   get:
+ *     tags: [Lab Reports]
+ *     summary: Get last 30 days lab tests for a user
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 21
+ *     responses:
+ *       200:
+ *         description: Last 30 days lab tests
+ */
+router.get("/reports/last-30-days", controller.getLast30DaysLabTests);
+ 
+ 
 /**
  * @swagger
  * /api/labs/reports/{reportId}/download:
@@ -614,7 +610,8 @@ router.get("/reports/:reportId/details", controller.getLabReportDetails);
  *         required: true
  *         schema:
  *           type: integer
- *           example: 123456
+ *           example: 5
+ *         description: Unique Lab Report ID
  *
  *     responses:
  *       200:
@@ -631,7 +628,6 @@ router.get("/reports/:reportId/details", controller.getLabReportDetails);
  *       500:
  *         description: Server error
  */
- 
 router.get("/reports/:reportId/download", controller.downloadLabReport);
  
  

@@ -22,6 +22,7 @@ model User {
   otpCode               String?
   otpExpiresAt          DateTime?
   refreshToken          String?
+  gender                Gender?           
   bloodGroup            BloodGroup?
   emContactName         String?
   emContactNumber       String?
@@ -200,7 +201,7 @@ model PatientProfile {
   fullName  String
   phone     String?
   age       Int?
-  gender    String?
+  gender    Gender?
   isSelf    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now())
@@ -318,7 +319,7 @@ model LabBooking {
   sampleDate     DateTime
   createdAt      DateTime         @default(now())
   collectedAt    DateTime?        @db.Timestamp(6)
-  reportedIssueAt DateTime? @db.Timestamp(6)
+  reportedIssueAt DateTime?        @db.Timestamp(6)
   lab            Lab              @relation(fields: [labId], references: [id])
   test           LabTest          @relation(fields: [labTestId], references: [id])
   user           User             @relation(fields: [userId], references: [id])

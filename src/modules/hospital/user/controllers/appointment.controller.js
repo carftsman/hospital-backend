@@ -116,10 +116,10 @@ export const getAvailableSlots = async (req, res) => {
 export const holdAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { slotId } = req.body;
+    const { slotId, bookingFor, reason, patient } = req.body;
 
-    if (!slotId) {
-      return res.status(400).json({ message: "slotId required" });
+    if (!slotId || !bookingFor) {
+      return res.status(400).json({ message: "slotId and bookingFor required" });
     }
 
     const slot = await prisma.timeSlot.findUnique({
@@ -131,13 +131,60 @@ export const holdAppointment = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
+    // Slot already booked check
     if (
       slot.booking &&
       (slot.booking.status === "CONFIRMED" ||
-        (slot.booking.status === "PENDING" &&
+        (slot.booking.status === "HOLD" &&
           slot.booking.expiresAt > new Date()))
     ) {
       return res.status(409).json({ message: "Slot already booked" });
+    }
+
+    let patientProfileId = null;
+
+    /* ============================================
+       HANDLE BOOKING FOR OTHER
+    ============================================ */
+    if (bookingFor === "OTHER") {
+      if (!patient?.fullName || !patient?.gender) {
+        return res.status(400).json({
+          message: "Patient fullName and gender required for OTHER booking"
+        });
+      }
+
+      const allowedGenders = ["MALE", "FEMALE", "OTHER"];
+      if (!allowedGenders.includes(patient.gender)) {
+        return res.status(400).json({ message: "Invalid gender value" });
+      }
+
+      const newPatient = await prisma.patientProfile.create({
+        data: {
+          userId,
+          fullName: patient.fullName,
+          phone: patient.phone,
+          email: patient.email,
+          dob: patient.dob ? new Date(patient.dob) : null,
+          gender: patient.gender
+        }
+      });
+
+      patientProfileId = newPatient.id;
+    }
+
+    /* ============================================
+       HANDLE BOOKING FOR SELF
+    ============================================ */
+    if (bookingFor === "SELF") {
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!user?.gender) {
+        return res.status(400).json({
+          message: "Please complete your profile with gender before booking"
+        });
+      }
     }
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -146,9 +193,10 @@ export const holdAppointment = async (req, res) => {
       where: { timeSlotId: slot.id },
       update: {
         userId,
-        status: "HOLD"
-,
-        expiresAt
+        status: "HOLD",
+        expiresAt,
+        reason,
+        patientProfileId
       },
       create: {
         timeSlotId: slot.id,
@@ -156,9 +204,10 @@ export const holdAppointment = async (req, res) => {
         doctorId: slot.doctorId,
         start: slot.start,
         end: slot.end,
-        status: "HOLD"
-,
-        expiresAt
+        status: "HOLD",
+        expiresAt,
+        reason,
+        patientProfileId
       }
     });
 
@@ -166,12 +215,12 @@ export const holdAppointment = async (req, res) => {
       bookingId: booking.id,
       expiresAt
     });
+
   } catch (e) {
     console.error("holdAppointment error:", e);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 /* ======================================================
    4️⃣ BOOKING SUMMARY

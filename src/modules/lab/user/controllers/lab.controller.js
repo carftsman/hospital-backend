@@ -305,8 +305,18 @@ export const searchLabs = async (req, res) => {
  */
 export const getLabCategories = async (req, res) => {
   try {
+    const { q } = req.query; // search text
+
     const categories = await prisma.labCategory.findMany({
-      distinct: ['name'],
+      where: q
+        ? {
+            name: {
+              contains: q,
+              mode: "insensitive" // case-insensitive search
+            }
+          }
+        : undefined,
+      distinct: ["name"],
       select: {
         id: true,
         name: true,
@@ -314,14 +324,14 @@ export const getLabCategories = async (req, res) => {
         imageUrl: true
       },
       orderBy: {
-        name: 'asc'
+        name: "asc"
       }
     });
- 
+
     return res.status(200).json({
       data: categories
     });
- 
+
   } catch (error) {
     console.error("getLabCategories error:", error);
     return res.status(500).json({
@@ -937,36 +947,22 @@ export const autoSuggestLabs = async (req, res) => {
   });
 };
  
-/**
- * ===============================
- * 📄 REPORTS LIST (UI MATCH)
- * Screen: Reports List
- * ===============================
- */
- 
-/**
- * ===============================
- * 📄 REPORTS LIST (UI MATCH)
- * Screen: Reports List
- * ===============================
- */
-// src/modules/lab/user/controllers/lab.controller.js
+
+
  
 export const getUserLabReports = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
-    const { reportStatus, fromDate, toDate } = req.query;
+    const { reportStatus, fromDate, toDate, packageName, testName, labName } = req.query;
  
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
  
-    // 🔁 Normalize UI chip → ENUM
     const normalizedStatus = reportStatus
-      ? reportStatus.toUpperCase() // Normal → NORMAL
+      ? reportStatus.toUpperCase()
       : undefined;
  
-    // 📅 Date handling (important)
     const from = fromDate ? new Date(fromDate) : undefined;
     const to = toDate
       ? new Date(new Date(toDate).setHours(23, 59, 59, 999))
@@ -976,7 +972,34 @@ export const getUserLabReports = async (req, res) => {
       where: {
         booking: {
           userId,
-          status: "COMPLETED" // 🔒 only completed bookings
+          status: "COMPLETED",
+ 
+          ...(labName && {
+            lab: {
+              name: {
+                contains: labName,
+                mode: "insensitive"
+              }
+            }
+          }),
+ 
+          ...(packageName && {
+            test: {
+              name: {
+                contains: packageName,
+                mode: "insensitive"
+              }
+            }
+          }),
+ 
+          ...(testName && {
+            test: {
+              name: {
+                contains: testName,
+                mode: "insensitive"
+              }
+            }
+          })
         },
  
         ...(normalizedStatus && {
@@ -996,8 +1019,8 @@ export const getUserLabReports = async (req, res) => {
       include: {
         booking: {
           include: {
-            lab: { select: { name: true } },
-            test: { select: { name: true } }
+            lab: true,
+            test: true
           }
         }
       },
@@ -1010,13 +1033,14 @@ export const getUserLabReports = async (req, res) => {
       reports: reports.map(r => ({
         reportId: r.id,
         bookingId: r.labBookingId,
-        status: r.reportStatus, // NORMAL | ABNORMAL | BORDERLINE
-        testName: r.booking.test.name,
-        testsCount: 12, // static (UI requirement)
-        labName: r.booking.lab.name,
+        status: r.reportStatus,
+        packageName: r.booking?.test?.name || null,
+        testName: r.booking?.test?.name || null,
+        labName: r.booking?.lab?.name || null,
         date: r.createdAt.toISOString().split("T")[0]
       }))
     });
+ 
   } catch (error) {
     console.error("getUserLabReports error:", error);
     res.status(500).json({ message: "Server error" });
@@ -1025,18 +1049,14 @@ export const getUserLabReports = async (req, res) => {
  
  
  
-/**
- * ===============================
- * 📄 REPORT DETAILS (UI MATCH)
- * Screen: Detailed Report
- * ===============================
- */
 export const getLabReportDetails = async (req, res) => {
   try {
     const reportId = Number(req.params.reportId);
  
     if (!reportId) {
-      return res.status(400).json({ message: "reportId is required" });
+      return res.status(400).json({
+        message: "reportId is required"
+      });
     }
  
     const report = await prisma.labReport.findUnique({
@@ -1044,38 +1064,102 @@ export const getLabReportDetails = async (req, res) => {
       include: {
         booking: {
           include: {
-            lab: { select: { name: true } },
-            test: { select: { name: true } }
+            lab: true,
+            test: true
           }
         }
       }
     });
  
     if (!report) {
-      return res.status(404).json({ message: "Lab report not found" });
+      return res.status(404).json({
+        message: "Lab report not found"
+      });
     }
  
     res.json({
       reportId: report.id,
       bookingId: report.labBookingId,
-      packageName: report.booking.test.name,
-      labName: report.booking.lab.name,
-      collectedDate: report.booking.collectedAt
+ 
+      packageName: report.booking?.test?.name || null,
+      testName: report.booking?.test?.name || null,
+      labName: report.booking?.lab?.name || null,
+ 
+      collectedDate: report.booking?.collectedAt
         ? report.booking.collectedAt.toISOString().split("T")[0]
         : null,
+ 
       issuedDate: report.createdAt.toISOString().split("T")[0],
+ 
       samplesCollected: ["Blood Samples", "Urine Samples"],
-      resultSummary:
-        report.summary ||
-        "Your blood sugar level is higher than normal. Reducing sugar intake and consulting a doctor is advised.",
-      reports: report.reportUrls.map((url, index) => ({
-        name: `Report-${index + 1}`,
-        url
-      }))
+ 
+      resultSummary: report.summary || "No summary available.",
+ 
+     reports: report.reportUrls?.length
+  ? [{
+      name: "Report",
+      url: report.reportUrls[0]
+    }]
+  : []
     });
  
   } catch (error) {
     console.error("getLabReportDetails error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+ 
+export const getLast30DaysLabTests = async (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
+ 
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+ 
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+ 
+    const bookings = await prisma.labBooking.findMany({
+      where: {
+        userId,
+        status: "COMPLETED",
+        createdAt: {
+          gte: thirtyDaysAgo
+        }
+      },
+      include: {
+        lab: true,
+        test: true
+      },
+      orderBy: { createdAt: "desc" }
+    });
+ 
+    // 🔥 Remove duplicates by testId
+    const uniqueTests = [];
+    const seen = new Set();
+ 
+    for (const booking of bookings) {
+      if (!seen.has(booking.labTestId)) {
+        seen.add(booking.labTestId);
+        uniqueTests.push(booking);
+      }
+    }
+ 
+    res.json({
+      userId,
+      last30DaysCount: uniqueTests.length,
+      tests: uniqueTests.map(b => ({
+        testId: b.test.id,
+        testName: b.test.name,
+        labName: b.lab.name,
+        price: b.test.price,
+        date: b.createdAt.toISOString().split("T")[0]
+      }))
+    });
+ 
+  } catch (error) {
+    console.error("getLast30DaysLabTests error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -1088,25 +1172,33 @@ export const downloadLabReport = async (req, res) => {
   try {
     const reportId = Number(req.params.reportId);
  
+    if (!reportId) {
+      return res.status(400).json({ message: "reportId is required" });
+    }
+ 
     const report = await prisma.labReport.findUnique({
       where: { id: reportId },
       select: { reportUrls: true }
     });
  
-    if (!report || !report.reportUrls?.length) {
+    if (
+      !report ||
+      !Array.isArray(report.reportUrls) ||
+      report.reportUrls.length === 0
+    ) {
       return res.status(404).json({ message: "Report file not found" });
     }
  
-    return res.redirect(report.reportUrls[0]);
+    const fileUrl = report.reportUrls[0];
+ 
+    res.setHeader("Content-Disposition", "attachment");
+    return res.redirect(fileUrl);
+ 
   } catch (error) {
     console.error("downloadLabReport error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
- 
  
 export const submitLabFeedback = async (req, res) => {
   try {

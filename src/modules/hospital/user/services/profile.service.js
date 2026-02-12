@@ -9,6 +9,7 @@ export const completeMedicalProfileService = async (userId, body) => {
     fullName,
     email,
     bloodGroup,
+    gender,
     emContactName,
     emContactNumber
   } = body;
@@ -21,10 +22,19 @@ export const completeMedicalProfileService = async (userId, body) => {
     bloodGroup = BloodGroupValue[bloodGroup];
   }
 
+  // Validate gender (if provided)
+  if (gender) {
+    const allowedGenders = ["MALE", "FEMALE", "OTHER"];
+    if (!allowedGenders.includes(gender)) {
+      throw new Error("INVALID_GENDER");
+    }
+  }
+
   const user = await updateUserProfile(userId, {
     fullName,
     email: email?.toLowerCase(),
     bloodGroup,
+    gender,
     emContactName,
     emContactNumber,
     // onboardingStage: "COMPLETED"
@@ -36,6 +46,7 @@ export const completeMedicalProfileService = async (userId, body) => {
     fullName: user.fullName,
     phone: user.phone,
     email: user.email,
+    gender: user.gender,
     bloodGroup: BloodGroupLabel[user.bloodGroup],
     emContactName: user.emContactName,
     emContactNumber: user.emContactNumber,
@@ -52,6 +63,7 @@ export const getProfileService = async (userId) => {
     return{
         ...user,
         bloodGroup: BloodGroupLabel[user.bloodGroup],
+        gender: user.gender,
         isOnboardingCompleted: user.isOnboardingCompleted
     }
 };

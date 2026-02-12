@@ -96,6 +96,42 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *       required: true
  *       content:
  *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - slotId
+ *               - bookingFor
+ *             properties:
+ *               slotId:
+ *                 type: integer
+ *                 example: 791
+ *               bookingFor:
+ *                 type: string
+ *                 enum: [SELF, OTHER]
+ *                 example: OTHER
+ *               reason:
+ *                 type: string
+ *                 example: Fever and cough
+ *               patient:
+ *                 type: object
+ *                 properties:
+ *                   fullName:
+ *                     type: string
+ *                     example: Riya Sharma
+ *                   phone:
+ *                     type: string
+ *                     example: "9876543210"
+ *                   email:
+ *                     type: string
+ *                     example: riya@gmail.com
+ *                   dob:
+ *                     type: string
+ *                     format: date
+ *                     example: 1998-06-12
+ *                   gender:
+ *                     type: string
+ *                     enum: [MALE, FEMALE, OTHER]
+ *                     example: FEMALE
  *           examples:
  *             SELF:
  *               value:
@@ -111,6 +147,7 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *                   phone: "9876543210"
  *                   email: "riya@gmail.com"
  *                   dob: "1998-06-12"
+ *                   gender: "FEMALE"
  *     responses:
  *       201:
  *         description: Slot held successfully

@@ -25,6 +25,7 @@ const router = express.Router();
  *             required:
  *               - fullName
  *               - bloodGroup
+ *               - gender
  *               - emContactName
  *               - emContactNumber
  *             properties:
@@ -34,6 +35,9 @@ const router = express.Router();
  *               email:
  *                 type: string
  *                 example: user@test.com
+ *               gender:
+ *                  type: string
+ *                  example: male/female/other
  *               bloodGroup:
  *                 type: string
  *                 example: O+ve
