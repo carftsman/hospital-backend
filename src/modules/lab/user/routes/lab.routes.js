@@ -525,7 +525,11 @@ router.get("/categories/all", controller.getLabCategories);
  *   get:
  *     tags: [Lab Reports]
  *     summary: Get user lab reports (Reports List screen)
- *     description: Returns completed lab reports with filtering options.
+ *     description: >
+ *       Returns completed lab reports for a user.
+ *       Supports combined search across lab name, test name,
+ *       and package name using a single search parameter.
+ *       Also supports report status and date filtering including last 30 days.
  *
  *     parameters:
  *       - in: query
@@ -534,28 +538,54 @@ router.get("/categories/all", controller.getLabCategories);
  *         schema:
  *           type: integer
  *           example: 21
+ *         description: User ID
+ *
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: Apollo
+ *         description: >
+ *           Single search field that matches:
+ *           - Lab name
+ *           - Test name
+ *           - Package name
  *
  *       - in: query
  *         name: reportStatus
  *         schema:
  *           type: string
  *           enum: [NORMAL, ABNORMAL, BORDERLINE]
+ *           example: NORMAL
+ *         description: Filter by report status
+ *
+ *       - in: query
+ *         name: timeRange
+ *         schema:
+ *           type: string
+ *           enum: [LAST_30_DAYS]
+ *           example: LAST_30_DAYS
+ *         description: Fetch reports from last 30 days
  *
  *       - in: query
  *         name: fromDate
  *         schema:
  *           type: string
  *           format: date
+ *           example: 2026-01-01
+ *         description: Custom start date (YYYY-MM-DD)
  *
  *       - in: query
  *         name: toDate
  *         schema:
  *           type: string
  *           format: date
+ *           example: 2026-02-01
+ *         description: Custom end date (YYYY-MM-DD)
  *
  *     responses:
  *       200:
- *         description: List of lab reports
+ *         description: List of user lab reports
  *         content:
  *           application/json:
  *             example:
@@ -563,10 +593,9 @@ router.get("/categories/all", controller.getLabCategories);
  *               reports:
  *                 - reportId: 7
  *                   bookingId: 4
- *                   status: NORMAL
- *                   packageName: Complete Blood Count (CBC)
- *                   testName: Complete Blood Count (CBC)
+ *                   testName: Complete Blood Count
  *                   labName: Apollo Diagnostics
+ *                   status: NORMAL
  *                   date: 2026-02-11
  *
  *       400:
@@ -575,7 +604,6 @@ router.get("/categories/all", controller.getLabCategories);
  *       500:
  *         description: Server error
  */
- 
 router.get("/reports", controller.getUserLabReports);
  
 /**

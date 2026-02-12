@@ -997,60 +997,85 @@ export const autoSuggestLabs = async (req, res) => {
  
 export const getUserLabReports = async (req, res) => {
   try {
-    const userId = Number(req.query.userId);
-    const { reportStatus, fromDate, toDate, packageName, testName, labName } = req.query;
- 
+    const {
+      userId,
+      search,
+      reportStatus,
+      fromDate,
+      toDate
+    } = req.query;
+
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
- 
-    const normalizedStatus = reportStatus
-      ? reportStatus.toUpperCase()
-      : undefined;
- 
+
     const from = fromDate ? new Date(fromDate) : undefined;
     const to = toDate
       ? new Date(new Date(toDate).setHours(23, 59, 59, 999))
       : undefined;
- 
+
+    let packageTestIds = [];
+
+    // 🔥 If search exists → check for package matches
+    if (search) {
+      const matchedPackages = await prisma.labPackage.findMany({
+        where: {
+          name: {
+            contains: search,
+            mode: "insensitive"
+          }
+        },
+        include: {
+          items: true
+        }
+      });
+
+      packageTestIds = matchedPackages.flatMap(pkg =>
+        pkg.items.map(item => item.labTestId)
+      );
+    }
+
     const reports = await prisma.labReport.findMany({
       where: {
         booking: {
-          userId,
+          userId: Number(userId),
           status: "COMPLETED",
- 
-          ...(labName && {
-            lab: {
-              name: {
-                contains: labName,
-                mode: "insensitive"
-              }
-            }
-          }),
- 
-          ...(packageName && {
-            test: {
-              name: {
-                contains: packageName,
-                mode: "insensitive"
-              }
-            }
-          }),
- 
-          ...(testName && {
-            test: {
-              name: {
-                contains: testName,
-                mode: "insensitive"
-              }
-            }
+
+          ...(search && {
+            OR: [
+              {
+                lab: {
+                  name: {
+                    contains: search,
+                    mode: "insensitive"
+                  }
+                }
+              },
+              {
+                test: {
+                  name: {
+                    contains: search,
+                    mode: "insensitive"
+                  }
+                }
+              },
+              ...(packageTestIds.length > 0
+                ? [
+                    {
+                      labTestId: {
+                        in: packageTestIds
+                      }
+                    }
+                  ]
+                : [])
+            ]
           })
         },
- 
-        ...(normalizedStatus && {
-          reportStatus: normalizedStatus
+
+        ...(reportStatus && {
+          reportStatus
         }),
- 
+
         ...(from || to
           ? {
               createdAt: {
@@ -1060,7 +1085,7 @@ export const getUserLabReports = async (req, res) => {
             }
           : {})
       },
- 
+
       include: {
         booking: {
           include: {
@@ -1069,29 +1094,27 @@ export const getUserLabReports = async (req, res) => {
           }
         }
       },
- 
+
       orderBy: { createdAt: "desc" }
     });
- 
-    res.json({
+
+    return res.json({
       count: reports.length,
       reports: reports.map(r => ({
         reportId: r.id,
         bookingId: r.labBookingId,
         status: r.reportStatus,
-        packageName: r.booking?.test?.name || null,
-        testName: r.booking?.test?.name || null,
-        labName: r.booking?.lab?.name || null,
+        testName: r.booking?.test?.name ?? null,
+        labName: r.booking?.lab?.name ?? null,
         date: r.createdAt.toISOString().split("T")[0]
       }))
     });
- 
+
   } catch (error) {
     console.error("getUserLabReports error:", error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
- 
  
  
 export const getLabReportDetails = async (req, res) => {
