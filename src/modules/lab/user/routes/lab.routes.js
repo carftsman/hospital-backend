@@ -450,23 +450,66 @@ router.get("/search", controller.searchLabs);
  
 /**
  * @swagger
+ * tags:
+ *   - name: Lab Categories
+ *     description: Categories screen APIs
+ */
+
+/**
+ * @swagger
  * /api/labs/categories/all:
  *   get:
  *     summary: Get all lab categories (Categories screen)
- *     tags: [Labs]
+ *     description: >
+ *       Returns lab categories grouped by section title.
+ *       Used for Categories screen in mobile app.
+ *
+ *     tags: [Lab Categories]
+ *
  *     parameters:
  *       - in: query
  *         name: q
+ *         required: false
  *         schema:
  *           type: string
- *         required: false
+ *           example: diabetes
  *         description: Search category by name
+ *
  *     responses:
  *       200:
- *         description: List of lab categories
+ *         description: Grouped lab categories
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sections:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       sectionTitle:
+ *                         type: string
+ *                         example: Overall Wellness & General Health
+ *                       categories:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                               example: 5
+ *                             name:
+ *                               type: string
+ *                               example: Full Body Checkups
+ *                             imageUrl:
+ *                               type: string
+ *                               example: https://res.cloudinary.com/sample.jpg
+ *
+ *       500:
+ *         description: Server error
  */
-router.get("/categories/all", controller.getLabCategories);
- 
+router.get("/categories/all", controller.getLabCategories); 
  
  
 /**
@@ -629,29 +672,7 @@ router.get("/reports/last-30-days", controller.getLast30DaysLabTests);
  *         description: Server error
  */
 router.get("/reports/:reportId/download", controller.downloadLabReport);
- 
- 
- 
-/**
- * @swagger
- * /api/labs/{labId}/categories:
- *   get:
- *     summary: Get Tests with lab id (Search Screen)
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *     responses:
- *       200:
- *         description: Categories for a lab
- */
-router.get("/:labId/categories", controller.getCategoriesByLab);
- 
- 
+  
 /**
  * @swagger
  * /api/labs/{labId}/tests/search:

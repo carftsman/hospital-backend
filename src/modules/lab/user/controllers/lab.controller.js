@@ -303,58 +303,103 @@ export const searchLabs = async (req, res) => {
  
   res.json(labs);
 };
- 
- 
- 
- 
- 
- 
- 
- 
-/**
- * 3️⃣ Lab Categories (GLOBAL)
- */
+ export const searchLabTests = async (req, res) => {
+  try {
+    const labId = Number(req.params.labId);
+    const { query } = req.query;
+
+    if (!labId || !query) {
+      return res.status(400).json({
+        message: "labId and query are required"
+      });
+    }
+
+    const tests = await prisma.labTest.findMany({
+      where: {
+        labId,
+        name: { contains: query, mode: "insensitive" }
+      }
+    });
+
+    res.json({
+      count: tests.length,
+      tests
+    });
+
+  } catch (error) {
+    console.error("searchLabTests error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 export const getLabCategories = async (req, res) => {
   try {
-    const { q } = req.query; // search text
- 
+    const { q } = req.query;
+
+    // 1️⃣ Get distinct categories (remove duplicates by name + group)
     const categories = await prisma.labCategory.findMany({
       where: q
         ? {
             name: {
               contains: q,
-              mode: "insensitive" // case-insensitive search
+              mode: "insensitive"
             }
           }
         : undefined,
-      distinct: ["name"],
       select: {
         id: true,
         name: true,
         group: true,
         imageUrl: true
       },
-      orderBy: {
-        name: "asc"
+      orderBy: [
+        { group: "asc" },
+        { name: "asc" }
+      ]
+    });
+
+    // 2️⃣ Remove duplicate names manually
+    const uniqueMap = new Map();
+
+    categories.forEach(cat => {
+      const key = `${cat.name}-${cat.group}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, cat);
       }
     });
- 
-    return res.status(200).json({
-      data: categories
+
+    const uniqueCategories = Array.from(uniqueMap.values());
+
+    // 3️⃣ Group by section title
+    const grouped = {};
+
+    uniqueCategories.forEach(cat => {
+      if (!grouped[cat.group]) {
+        grouped[cat.group] = [];
+      }
+
+      grouped[cat.group].push({
+        id: cat.id,
+        name: cat.name,
+        imageUrl: cat.imageUrl
+      });
     });
- 
+
+    // 4️⃣ Convert to sections format
+    const sections = Object.keys(grouped).map(groupName => ({
+      sectionTitle: groupName,
+      categories: grouped[groupName]
+    }));
+
+    res.status(200).json({
+      sections
+    });
+
   } catch (error) {
     console.error("getLabCategories error:", error);
-    return res.status(500).json({
-      message: "Failed to fetch lab categories"
-    });
+    res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
-/**
- * 4️⃣ Lab Details
- */
+
 export const getLabById = async (req, res) => {
   const labId = Number(req.params.labId);
  
@@ -420,19 +465,7 @@ export const getCategoriesByLab = async (req, res) => {
 /**
  * 7️⃣ Search Tests (NEW)
  */
-export const searchLabTests = async (req, res) => {
-  const labId = Number(req.params.labId);
-  const { query } = req.query;
- 
-  const tests = await prisma.labTest.findMany({
-    where: {
-      labId,
-      name: { contains: query, mode: "insensitive" },
-    },
-  });
- 
-  res.json(tests);
-};
+
  
 export const getLabDetailsById = async (req, res) => {
   try {
