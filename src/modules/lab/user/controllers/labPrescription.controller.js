@@ -51,40 +51,117 @@ export const uploadPrescription = async (req, res) => {
   }
 };
 
+//get lab prescription
+export const getUserPrescriptions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const prescriptions = await prisma.labPrescription.findMany({
+      where: {
+        userId,
+        labBookingId: null
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    if (!prescriptions.length) {
+      return res.json({
+        message: "No prescriptions found",
+        data: null
+      });
+    }
+
+    // Group by groupId
+    const groupedMap = {};
+
+    prescriptions.forEach((item) => {
+      const groupKey = item.groupId ?? `single-${item.id}`;
+
+      if (!groupedMap[groupKey]) {
+        groupedMap[groupKey] = {
+          groupId: groupKey,
+          createdAt: item.createdAt,
+          files: []
+        };
+      }
+
+      groupedMap[groupKey].files.push({
+        id: item.id,
+        fileUrl: item.fileUrl,
+        fileType: item.fileType,
+        status: item.status
+      });
+    });
+
+    const groupedArray = Object.values(groupedMap);
+
+    // 👇 Only latest group (already sorted by createdAt desc)
+    const latestGroup = groupedArray[0];
+
+    return res.json({
+      message: "Latest prescription fetched successfully",
+      data: latestGroup
+    });
+
+  } catch (error) {
+    console.error("getUserPrescriptions error:", error);
+    return res.status(500).json({
+      message: "Failed to fetch prescriptions"
+    });
+  }
+};
+
 /**
  * Attach prescription to lab booking (post-booking)
  */
 export const attachLabBooking = async (req, res) => {
   try {
     const userId = req.user.id;
-    const prescriptionId = Number(req.params.id);
-    const { labBookingId } = req.body;
+    const { groupId, labBookingId } = req.body;
 
-    if (!labBookingId) {
-      return res.status(400).json({ message: "labBookingId is required" });
+    if (!groupId || !labBookingId) {
+      return res.status(400).json({
+        message: "groupId and labBookingId are required"
+      });
     }
 
-    // Ensure prescription belongs to user
-    const prescription = await prisma.labPrescription.findFirst({
-      where: { id: prescriptionId, userId }
+    // Check if prescriptions exist for this user + group
+    const prescriptions = await prisma.labPrescription.findMany({
+      where: {
+        groupId,
+        userId,
+        labBookingId: null
+      }
     });
 
-    if (!prescription) {
-      return res.status(404).json({ message: "Prescription not found" });
+    if (prescriptions.length === 0) {
+      return res.status(404).json({
+        message: "Prescription group not found"
+      });
     }
 
-    const updated = await prisma.labPrescription.update({
-      where: { id: prescriptionId },
-      data: { labBookingId: Number(labBookingId) }
+    // Attach ALL files in group
+    await prisma.labPrescription.updateMany({
+      where: {
+        groupId,
+        userId
+      },
+      data: {
+        labBookingId: Number(labBookingId),
+        status: "SENT"
+      }
     });
 
     return res.json({
-      message: "Lab booking attached successfully",
-      data: updated
+      message: "Prescription group attached successfully"
     });
 
   } catch (error) {
     console.error("attachLabBooking error:", error);
-    return res.status(500).json({ message: "Failed to attach lab booking" });
+    return res.status(500).json({
+      message: "Failed to attach lab booking"
+    });
   }
 };

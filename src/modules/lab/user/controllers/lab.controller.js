@@ -95,11 +95,11 @@ export const getNearbyLabs = async (req, res) => {
 export const getLabPackageDetails = async (req, res) => {
   try {
     const packageId = Number(req.params.packageId);
-
-    if (!packageId) {
-      return res.status(400).json({ message: "packageId is required" });
+ 
+    if (!Number.isInteger(packageId) || packageId <= 0) {
+      return res.status(400).json({ message: "Invalid packageId" });
     }
-
+ 
     const pkg = await prisma.labPackage.findUnique({
       where: { id: packageId },
       include: {
@@ -122,23 +122,34 @@ export const getLabPackageDetails = async (req, res) => {
         }
       }
     });
-
+ 
     if (!pkg) {
       return res.status(404).json({ message: "Package not found" });
     }
-
+ 
     const tests = pkg.items.map(i => i.test);
-
+ 
     const originalPrice = tests.reduce((sum, t) => sum + t.price, 0);
     const finalPrice = pkg.finalPrice;
-
+ 
     res.json({
       packageId: pkg.id,
       packageName: pkg.name,
       labName: pkg.lab.name,
+ 
       testsCount: tests.length,
       tests: tests.map(t => t.name),
+ 
       reportTime: pkg.reportTime,
+ 
+      instructions: pkg.instructions
+        ? pkg.instructions.split("\n")   // if stored as text in DB
+        : [
+            "Requires 10–12 hours fasting",
+            "Avoid alcohol 24 hours before test",
+            "Inform doctor if on medication"
+          ],
+ 
       pricing: {
         originalPrice,
         finalPrice,
@@ -149,13 +160,13 @@ export const getLabPackageDetails = async (req, res) => {
         currency: "INR"
       }
     });
-
+ 
   } catch (error) {
     console.error("getLabPackageDetails error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
+ 
  
  
  
@@ -306,7 +317,7 @@ export const searchLabs = async (req, res) => {
 export const getLabCategories = async (req, res) => {
   try {
     const { q } = req.query; // search text
-
+ 
     const categories = await prisma.labCategory.findMany({
       where: q
         ? {
@@ -327,11 +338,11 @@ export const getLabCategories = async (req, res) => {
         name: "asc"
       }
     });
-
+ 
     return res.status(200).json({
       data: categories
     });
-
+ 
   } catch (error) {
     console.error("getLabCategories error:", error);
     return res.status(500).json({
@@ -370,11 +381,11 @@ export const getLabById = async (req, res) => {
 export const getCategoriesByLab = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
-
+ 
     if (!labId) {
       return res.status(400).json({ message: "Invalid labId" });
     }
-
+ 
     const categories = await prisma.labCategory.findMany({
       where: {
         labId: labId
@@ -386,19 +397,19 @@ export const getCategoriesByLab = async (req, res) => {
         imageUrl: true
       }
     });
-
+ 
     res.json({
       count: categories.length,
       data: categories
     });
-
+ 
   } catch (error) {
     console.error("getCategoriesByLab error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
+ 
+ 
  
  
 /**
@@ -426,69 +437,67 @@ export const searchLabTests = async (req, res) => {
 export const getLabDetailsById = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
-
-    if (!labId) {
+ 
+    if (!Number.isInteger(labId) || labId <= 0) {
       return res.status(400).json({ message: "Invalid labId" });
     }
-
+ 
     const lab = await prisma.lab.findUnique({
       where: { id: labId },
       include: {
         LabPackage: {
           include: {
-            _count: {
-              select: { items: true }
+            items: {
+              include: {
+                test: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
             }
           },
           orderBy: { createdAt: "desc" }
         }
       }
     });
-
+ 
     if (!lab) {
       return res.status(404).json({ message: "Lab not found" });
     }
-
+ 
     res.json({
       id: lab.id,
       name: lab.name,
       rating: lab.rating,
       city: lab.city,
       isOpen: lab.isOpen,
+ 
       packagesIncluded: lab.LabPackage.map(pkg => ({
+       
         packageId: pkg.id,
-        packageName: pkg.name,
-        originalPrice: pkg.originalPrice,
-        finalPrice: pkg.finalPrice,
-        discountPercent:
-          pkg.originalPrice > 0
-            ? Math.round(
-                ((pkg.originalPrice - pkg.finalPrice) / pkg.originalPrice) * 100
-              )
-            : 0,
-        reportTime: pkg.reportTime,
-        testsCount: pkg._count.items
+      packageName: pkg.name,
+        tests: pkg.items.map(item => item.test.name)
       }))
     });
-
+ 
   } catch (error) {
     console.error("getLabDetailsById error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
  
 export const getLabPackages = async (req, res) => {
   try {
     const { labId } = req.params;
     const { search, page = 1, limit = 10 } = req.query;
-
+ 
     if (!labId) {
       return res.status(400).json({ message: "labId is required" });
     }
-
+ 
     const skip = (Number(page) - 1) * Number(limit);
-
+ 
     const where = {
       labId: Number(labId),
       ...(search && {
@@ -498,10 +507,10 @@ export const getLabPackages = async (req, res) => {
         }
       })
     };
-
+ 
     // 🔥 Get total count separately (correct pagination)
     const totalCount = await prisma.labPackage.count({ where });
-
+ 
     const packages = await prisma.labPackage.findMany({
       where,
       include: {
@@ -513,7 +522,7 @@ export const getLabPackages = async (req, res) => {
       skip,
       take: Number(limit)
     });
-
+ 
     res.json({
       count: totalCount,   // ✅ correct total count
       page: Number(page),
@@ -534,13 +543,13 @@ export const getLabPackages = async (req, res) => {
         gender: p.gender
       }))
     });
-
+ 
   } catch (error) {
     console.error("getLabPackages error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
+ 
  
  
  
@@ -555,13 +564,13 @@ export const filterLabPackages = async (req, res) => {
       gender,
       sortBy = "price_asc"
     } = req.query;
-
+ 
     if (!labId) {
       return res.status(400).json({ message: "labId is required" });
     }
-
+ 
     const filters = [];
-
+ 
     // 💰 Price Filter
     if (minPrice || maxPrice) {
       filters.push({
@@ -571,7 +580,7 @@ export const filterLabPackages = async (req, res) => {
         }
       });
     }
-
+ 
     // 👶 Age Filter
     if (minAge || maxAge) {
       filters.push({
@@ -591,7 +600,7 @@ export const filterLabPackages = async (req, res) => {
         ]
       });
     }
-
+ 
     // 🚻 Gender Filter
     if (gender) {
       filters.push({
@@ -601,13 +610,13 @@ export const filterLabPackages = async (req, res) => {
         ]
       });
     }
-
+ 
     // 🔄 Sorting
     const orderBy =
       sortBy === "price_desc"
         ? { finalPrice: "desc" }
         : { finalPrice: "asc" };
-
+ 
     const packages = await prisma.labPackage.findMany({
       where: {
         labId: Number(labId),
@@ -618,7 +627,7 @@ export const filterLabPackages = async (req, res) => {
       },
       orderBy
     });
-
+ 
     res.json({
       count: packages.length,
       packages: packages.map(p => ({
@@ -637,13 +646,13 @@ export const filterLabPackages = async (req, res) => {
         gender: p.gender
       }))
     });
-
+ 
   } catch (error) {
     console.error("filterLabPackages error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
+ 
  
 /**
  * 9️⃣ Lab Slots
@@ -947,8 +956,8 @@ export const autoSuggestLabs = async (req, res) => {
   });
 };
  
-
-
+ 
+ 
  
 export const getUserLabReports = async (req, res) => {
   try {
@@ -1251,11 +1260,11 @@ export const getRecentLabTests = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
     const limit = Number(req.query.limit || 5);
-
+ 
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
-
+ 
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
@@ -1267,11 +1276,11 @@ export const getRecentLabTests = async (req, res) => {
       },
       orderBy: { createdAt: "desc" }
     });
-
+ 
     // 🧠 Remove duplicates by testId
     const unique = [];
     const seen = new Set();
-
+ 
     for (const b of bookings) {
       if (!seen.has(b.labTestId)) {
         seen.add(b.labTestId);
@@ -1279,7 +1288,7 @@ export const getRecentLabTests = async (req, res) => {
       }
       if (unique.length === limit) break;
     }
-
+ 
     res.json({
       count: unique.length,
       tests: unique.map(b => ({
@@ -1291,9 +1300,9 @@ export const getRecentLabTests = async (req, res) => {
         lastBookedOn: b.createdAt.toISOString().split("T")[0]
       }))
     });
-
+ 
   } catch (error) {
     console.error("getRecentLabTests error:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+}

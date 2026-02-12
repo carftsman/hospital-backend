@@ -176,7 +176,7 @@ export const fetchDoctorInfo = async (doctorId) => {
       },
 
       timeSlots: true,
-      DoctorAvailability: true,
+      availabilities: true,
     },
   });
 };

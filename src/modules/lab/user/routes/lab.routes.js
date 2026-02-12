@@ -424,7 +424,7 @@ router.get("/:labId/packages", controller.getLabPackages);
  *       500:
  *         description: Internal server error
  */
-
+ 
  
 router.get("/:labId/packages/filter", controller.filterLabPackages);
  
@@ -575,7 +575,7 @@ router.get("/reports", controller.getUserLabReports);
  *         description: Lab report not found
  */
 router.get("/reports/:reportId/details", controller.getLabReportDetails);
-
+ 
 /**
  * @swagger
  * /api/labs/reports/last-30-days:
@@ -708,9 +708,13 @@ router.get("/:labId/slots", controller.getLabSlots);
  * @swagger
  * /api/labs/{labId}/details:
  *   get:
- *     summary: Get lab details with packages
- *     description: Used for Lab Details screen (packages expandable)
+ *     summary: Get lab details with expandable packages
+ *     description: >
+ *       Returns lab basic information along with packages.
+ *       Each package contains only package name and list of included test names.
+ *       Used for Lab Details screen (expandable package list).
  *     tags: [Labs]
+ *
  *     parameters:
  *       - in: path
  *         name: labId
@@ -718,13 +722,65 @@ router.get("/:labId/slots", controller.getLabSlots);
  *         schema:
  *           type: integer
  *           example: 1
+ *         description: Unique Lab ID
+ *
  *     responses:
  *       200:
- *         description: Lab details with packages
+ *         description: Lab details with package test list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: Apollo Diagnostics
+ *                 rating:
+ *                   type: number
+ *                   example: 4.5
+ *                 city:
+ *                   type: string
+ *                   example: Hyderabad
+ *                 isOpen:
+ *                   type: boolean
+ *                   example: true
+ *                 packagesIncluded:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 4
+ *                       name:
+ *                         type: string
+ *                         example: General Checkup
+ *                       tests:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example:
+ *                           - Anemia
+ *                           - Infections
+ *                           - Inflammation
+ *                           - Blood disorders
+ *                           - Total Cholesterol
+ *                           - HDL (good cholesterol)
+ *                           - LDL (bad cholesterol)
+ *                           - Triglycerides
+ *                           - VLDL
+ *
  *       400:
- *         description: labId is required
+ *         description: Invalid labId
+ *
  *       404:
  *         description: Lab not found
+ *
+ *       500:
+ *         description: Server error
  */
 router.get("/:labId/details", controller.getLabDetailsById);
  
