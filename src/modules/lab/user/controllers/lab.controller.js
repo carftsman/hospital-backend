@@ -524,13 +524,13 @@ export const getLabPackages = async (req, res) => {
   try {
     const { labId } = req.params;
     const { search, page = 1, limit = 10 } = req.query;
- 
+
     if (!labId) {
       return res.status(400).json({ message: "labId is required" });
     }
- 
+
     const skip = (Number(page) - 1) * Number(limit);
- 
+
     const where = {
       labId: Number(labId),
       ...(search && {
@@ -540,10 +540,10 @@ export const getLabPackages = async (req, res) => {
         }
       })
     };
- 
+
     // 🔥 Get total count separately (correct pagination)
     const totalCount = await prisma.labPackage.count({ where });
- 
+
     const packages = await prisma.labPackage.findMany({
       where,
       include: {
@@ -555,9 +555,9 @@ export const getLabPackages = async (req, res) => {
       skip,
       take: Number(limit)
     });
- 
+
     res.json({
-      count: totalCount,   // ✅ correct total count
+      count: totalCount,
       page: Number(page),
       limit: Number(limit),
       packages: packages.map(p => ({
@@ -572,11 +572,14 @@ export const getLabPackages = async (req, res) => {
               )
             : 0,
         reportTime: p.reportTime,
-        testsCount: p._count.items,
+
+        // ✅ Updated Here
+        tests: `${p._count.items} Tests`,
+
         gender: p.gender
       }))
     });
- 
+
   } catch (error) {
     console.error("getLabPackages error:", error);
     res.status(500).json({ message: "Server error" });

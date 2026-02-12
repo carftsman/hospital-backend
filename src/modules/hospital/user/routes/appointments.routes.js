@@ -89,6 +89,9 @@ router.get("/slots", auth, controller.getAvailableSlots);
  * /api/appointments/hold:
  *   post:
  *     summary: Hold an appointment slot (Self or Other)
+ *     description: >
+ *       Temporarily holds a time slot for 10 minutes before confirmation.
+ *       If bookingFor is OTHER, patient details are required.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -114,6 +117,7 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *                 example: Fever and cough
  *               patient:
  *                 type: object
+ *                 description: Required only if bookingFor is OTHER
  *                 properties:
  *                   fullName:
  *                     type: string
@@ -134,28 +138,39 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *                     example: FEMALE
  *           examples:
  *             SELF:
+ *               summary: Booking for self
  *               value:
- *                 slotId: 101
+ *                 slotId: 791
  *                 bookingFor: SELF
+ *                 reason: Regular checkup
  *             OTHER:
+ *               summary: Booking for another patient
  *               value:
  *                 slotId: 791
  *                 bookingFor: OTHER
- *                 reason: "Fever and cough"
+ *                 reason: Fever and cough
  *                 patient:
- *                   fullName: "Riya Sharma"
+ *                   fullName: Riya Sharma
  *                   phone: "9876543210"
- *                   email: "riya@gmail.com"
+ *                   email: riya@gmail.com
  *                   dob: "1998-06-12"
- *                   gender: "FEMALE"
+ *                   gender: FEMALE
  *     responses:
  *       201:
- *         description: Slot held successfully
+ *         description: Slot held successfully (valid for 10 minutes)
  *         content:
  *           application/json:
  *             example:
  *               bookingId: 55
  *               expiresAt: "2026-01-26T10:40:00Z"
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Slot not found
+ *       409:
+ *         description: Slot already booked or currently on hold
  */
 router.post("/hold", auth, role("USER"), controller.holdAppointment);
 
@@ -462,4 +477,3 @@ router.get(
 );
 
 export default router;
- 
