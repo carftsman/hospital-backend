@@ -708,62 +708,79 @@ export const filterLabPackages = async (req, res) => {
 
 
  
- 
-/**
- * 9️⃣ Lab Slots
- */
-export const getLabSlots = async (req, res) => {
-  const { labId } = req.params;
-  const { date } = req.query;
- 
-  if (!labId || !date) {
-    return res.status(400).json({ message: "labId and date required" });
-  }
- 
-  // Static slots (can be DB later)
-  const slots = [
-    { id: 1, startTime: "09:00", endTime: "10:00", isBooked: false },
-    { id: 2, startTime: "10:00", endTime: "11:00", isBooked: false },
-    { id: 3, startTime: "11:00", endTime: "12:00", isBooked: true }
-  ];
- 
-  res.json({ labId: Number(labId), date, slots });
-};
- 
- 
-/**
- * 🔟 Book Lab Test
- */
-export const bookLabTest = async (req, res) => {
+export const confirmLabBooking = async (req, res) => {
   try {
-    const { userId, labId, labTestId, sampleDate } = req.body;
- 
-    if (!userId || !labId || !labTestId || !sampleDate) {
-      return res.status(400).json({
-        message: "userId, labId, labTestId and sampleDate are required"
-      });
+    const { bookingIds } = req.body;
+
+    if (!bookingIds || !bookingIds.length) {
+      return res.status(400).json({ message: "bookingIds required" });
     }
- 
-    const booking = await prisma.labBooking.create({
+
+    const bookings = await prisma.labBooking.findMany({
+      where: { id: { in: bookingIds } }
+    });
+
+    if (!bookings.length) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // check if expired
+    const expired = bookings.some(
+      b => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
+    );
+
+    if (expired) {
+      return res.status(409).json({ message: "Booking expired or invalid state" });
+    }
+
+    await prisma.labBooking.updateMany({
+      where: { id: { in: bookingIds } },
       data: {
-        userId: Number(userId),
-        labId: Number(labId),
-        labTestId: Number(labTestId),
-        sampleDate: new Date(sampleDate),
-        status: "PENDING" // ✅ VALID ENUM
+        status: "COMPLETED",
+        expiresAt: null
       }
     });
- 
-    res.status(201).json({
-      message: "Lab booking created",
-      booking
-    });
- 
+
+    return res.json({ message: "Booking confirmed successfully" });
+
   } catch (error) {
-    console.error("bookLabTest error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("confirmLabBooking error:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+
+
+// export const bookLabTest = async (req, res) => {
+//   try {
+//     const { userId, labId, labTestId, sampleDate } = req.body;
+ 
+//     if (!userId || !labId || !labTestId || !sampleDate) {
+//       return res.status(400).json({
+//         message: "userId, labId, labTestId and sampleDate are required"
+//       });
+//     }
+ 
+//     const booking = await prisma.labBooking.create({
+//       data: {
+//         userId: Number(userId),
+//         labId: Number(labId),
+//         labTestId: Number(labTestId),
+//         sampleDate: new Date(sampleDate),
+//         status: "PENDING" // ✅ VALID ENUM
+//       }
+//     });
+ 
+//     res.status(201).json({
+//       message: "Lab booking created",
+//       booking
+//     });
+ 
+//   } catch (error) {
+//     console.error("bookLabTest error:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
  
  
 /**

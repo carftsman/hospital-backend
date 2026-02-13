@@ -1,3 +1,4 @@
+import prisma from "../../../../prisma/client.js";
 import { updateUserProfile , getUserProflileById} from "../repositories/user.repository.js";
 import {
   BloodGroupLabel,
@@ -5,7 +6,7 @@ import {
 } from "../../../../utils/bloodGroup.mapper.js";
 
 export const completeMedicalProfileService = async (userId, body) => {
-  let {
+  const {
     fullName,
     email,
     bloodGroup,
@@ -13,45 +14,91 @@ export const completeMedicalProfileService = async (userId, body) => {
     emContactName,
     emContactNumber
   } = body;
-
-  //  Convert UI value (+ve/-ve) → DB enum
-  if (bloodGroup) {
+ 
+  // 1️⃣ Check user exists
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+ 
+  if (!existingUser) {
+    throw new Error("USER_NOT_FOUND");
+  }
+ 
+  // 2️⃣ Prepare update data safely
+  const updateData = {};
+ 
+  if (fullName !== undefined) {
+    updateData.fullName = fullName.trim();
+  }
+ 
+  // 3️⃣ Email validation + uniqueness
+  if (email !== undefined) {
+    const normalizedEmail = email.toLowerCase().trim();
+ 
+    const emailExists = await prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        NOT: { id: userId }
+      }
+    });
+ 
+    if (emailExists) {
+      throw new Error("EMAIL_ALREADY_EXISTS");
+    }
+ 
+    updateData.email = normalizedEmail;
+  }
+ 
+  // 4️⃣ Blood group validation
+  if (bloodGroup !== undefined) {
     if (!BloodGroupValue[bloodGroup]) {
       throw new Error("INVALID_BLOOD_GROUP");
     }
-    bloodGroup = BloodGroupValue[bloodGroup];
+    updateData.bloodGroup = BloodGroupValue[bloodGroup];
   }
-
-  // Validate gender (if provided)
-  if (gender) {
-    const allowedGenders = ["MALE", "FEMALE", "OTHER"];
-    if (!allowedGenders.includes(gender)) {
-      throw new Error("INVALID_GENDER");
-    }
+ 
+  // 5️⃣ Gender validation
+ if (gender !== undefined) {
+  const normalizedGender = gender.trim().toUpperCase();
+ 
+  const allowedGenders = ["MALE", "FEMALE", "OTHER"];
+ 
+  if (!allowedGenders.includes(normalizedGender)) {
+    throw new Error("INVALID_GENDER");
   }
-
-  const user = await updateUserProfile(userId, {
-    fullName,
-    email: email?.toLowerCase(),
-    bloodGroup,
-    gender,
-    emContactName,
-    emContactNumber,
-    // onboardingStage: "COMPLETED"
-    isOnboardingCompleted: true
+ 
+  updateData.gender = normalizedGender;
+}
+ 
+ 
+  if (emContactName !== undefined) {
+    updateData.emContactName = emContactName.trim();
+  }
+ 
+  if (emContactNumber !== undefined) {
+    updateData.emContactNumber = emContactNumber.trim();
+  }
+ 
+  // 6️⃣ Mark onboarding complete
+  updateData.isOnboardingCompleted = true;
+ 
+  // 7️⃣ Update user
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: updateData
   });
-
+ 
+  // 8️⃣ Clean response
   return {
-    id: user.id,
-    fullName: user.fullName,
-    phone: user.phone,
-    email: user.email,
-    gender: user.gender,
-    bloodGroup: BloodGroupLabel[user.bloodGroup],
-    emContactName: user.emContactName,
-    emContactNumber: user.emContactNumber,
-    // onboardingStage: user.onboardingStage
-    isOnboardingCompleted: user.isOnboardingCompleted
+    id: updatedUser.id,
+    fullName: updatedUser.fullName,
+    phone: updatedUser.phone,
+    email: updatedUser.email,
+    gender: updatedUser.gender,
+    bloodGroup: BloodGroupLabel[updatedUser.bloodGroup],
+    emContactName: updatedUser.emContactName,
+    emContactNumber: updatedUser.emContactNumber,
+    isOnboardingCompleted: updatedUser.isOnboardingCompleted
   };
 };
 

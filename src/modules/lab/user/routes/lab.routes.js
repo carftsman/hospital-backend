@@ -301,42 +301,7 @@ router.get("/packages/by-age", controller.getPackagesByAge);
  */
  
 router.get("/packages/:packageId", controller.getLabPackageDetails);
-/**
- * @swagger
- * /api/labs/{labId}/packages:
- *   get:
- *     summary: Get lab packages list (search for packages in specific labs)
- *     description: Used for Packages List screen
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *           example: Full Body
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           example: 10
- *     responses:
- *       200:
- *         description: Packages list
- */
- 
-router.get("/:labId/packages", controller.getLabPackages);
- 
+
 /**
  * @swagger
  * tags:
@@ -344,127 +309,7 @@ router.get("/:labId/packages", controller.getLabPackages);
  *     description: Lab related APIs including packages, tests and bookings
  */
 
-/**
- * @swagger
- * /api/labs/{labId}/packages/filter:
- *   get:
- *     summary: Filter lab packages
- *     description: >
- *       Returns filtered lab packages based on price range,
- *       age range, gender preference and sorting option.
- *       Used in the Filters bottom sheet of Packages screen.
- *
- *     tags: [Labs]
- *
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *         description: Lab ID
- *
- *       - in: query
- *         name: minPrice
- *         required: false
- *         schema:
- *           type: number
- *           example: 500
- *         description: Minimum package price
- *
- *       - in: query
- *         name: maxPrice
- *         required: false
- *         schema:
- *           type: number
- *           example: 3000
- *         description: Maximum package price
- *
- *       - in: query
- *         name: minAge
- *         required: false
- *         schema:
- *           type: number
- *           example: 20
- *         description: Minimum age supported by package
- *
- *       - in: query
- *         name: maxAge
- *         required: false
- *         schema:
- *           type: number
- *           example: 60
- *         description: Maximum age supported by package
- *
- *       - in: query
- *         name: gender
- *         required: false
- *         schema:
- *           type: string
- *           enum: [MALE, FEMALE, OTHER, ALL]
- *           example: MALE
- *         description: Gender-specific packages
- *
- *       - in: query
- *         name: sortBy
- *         required: false
- *         schema:
- *           type: string
- *           enum: [price_low, price_high]
- *           example: price_low
- *         description: Sort packages by price
- *
- *     responses:
- *       200:
- *         description: Successfully fetched filtered packages
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 count:
- *                   type: integer
- *                   example: 2
- *                 packages:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       packageId:
- *                         type: integer
- *                         example: 1
- *                       packageName:
- *                         type: string
- *                         example: Prime Full Body Checkup
- *                       originalPrice:
- *                         type: number
- *                         example: 3000
- *                       finalPrice:
- *                         type: number
- *                         example: 1999
- *                       discountPercent:
- *                         type: number
- *                         example: 33
- *                       testsCount:
- *                         type: number
- *                         example: 12
- *                       reportTime:
- *                         type: string
- *                         example: 24 Hours
- *                       gender:
- *                         type: string
- *                         enum: [MALE, FEMALE, OTHER, ALL]
- *                         example: ALL
- *
- *       400:
- *         description: labId is required
- *
- *       500:
- *         description: Internal server error
- */
 
-router.get("/:labId/packages/filter", controller.filterLabPackages);
  
  
 /**
@@ -739,138 +584,7 @@ router.get("/reports/last-30-days", controller.getLast30DaysLabTests);
  */
 router.get("/reports/:reportId/download", controller.downloadLabReport);
   
-/**
- * @swagger
- * /api/labs/{labId}/tests/search:
- *   get:
- *     summary: Search tests/packages inside a lab
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *       - in: query
- *         name: query
- *         required: true
- *         schema:
- *           type: string
- *           example: Blood
- *     responses:
- *       200:
- *         description: Matching lab tests
- */
-router.get("/:labId/tests/search", controller.searchLabTests);
- 
- 
- 
-/**
- * @swagger
- * /api/labs/{labId}/slots:
- *   get:
- *     summary: Get available lab slots for a date (Select Slot screen)
- *     tags: [Labs]
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *       - in: query
- *         name: date
- *         required: true
- *         schema:
- *           type: string
- *           example: "2026-02-10"
- *     responses:
- *       200:
- *         description: Available lab slots
- */
-router.get("/:labId/slots", controller.getLabSlots);
- 
- 
-/**
- * @swagger
- * /api/labs/{labId}/details:
- *   get:
- *     summary: Get lab details with expandable packages
- *     description: >
- *       Returns lab basic information along with packages.
- *       Each package contains only package name and list of included test names.
- *       Used for Lab Details screen (expandable package list).
- *     tags: [Labs]
- *
- *     parameters:
- *       - in: path
- *         name: labId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *         description: Unique Lab ID
- *
- *     responses:
- *       200:
- *         description: Lab details with package test list
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                   example: 1
- *                 name:
- *                   type: string
- *                   example: Apollo Diagnostics
- *                 rating:
- *                   type: number
- *                   example: 4.5
- *                 city:
- *                   type: string
- *                   example: Hyderabad
- *                 isOpen:
- *                   type: boolean
- *                   example: true
- *                 packagesIncluded:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 4
- *                       name:
- *                         type: string
- *                         example: General Checkup
- *                       tests:
- *                         type: array
- *                         items:
- *                           type: string
- *                         example:
- *                           - Anemia
- *                           - Infections
- *                           - Inflammation
- *                           - Blood disorders
- *                           - Total Cholesterol
- *                           - HDL (good cholesterol)
- *                           - LDL (bad cholesterol)
- *                           - Triglycerides
- *                           - VLDL
- *
- *       400:
- *         description: Invalid labId
- *
- *       404:
- *         description: Lab not found
- *
- *       500:
- *         description: Server error
- */
-router.get("/:labId/details", controller.getLabDetailsById);
- 
+
  
  /**
  * @swagger
@@ -946,13 +660,13 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  *                   lastBookedOn: 2026-02-10
  */
 router.get("/tests/recent", controller.getRecentLabTests);
- 
-/**
+
+ /**
  * @swagger
- * /api/labs/book:
+ * /api/labs/bookings/confirm:
  *   post:
- *     summary: Book a lab test (Book Test screen)
- *     tags: [Labs]
+ *     summary: Confirm lab booking after payment
+ *     tags: [Lab Slots]
  *     requestBody:
  *       required: true
  *       content:
@@ -960,29 +674,25 @@ router.get("/tests/recent", controller.getRecentLabTests);
  *           schema:
  *             type: object
  *             required:
- *               - userId
- *               - labId
- *               - labTestId
- *               - sampleDate
+ *               - bookingIds
  *             properties:
- *               userId:
- *                 type: integer
- *                 example: 24
- *               labId:
- *                 type: integer
- *                 example: 1
- *               labTestId:
- *                 type: integer
- *                 example: 5
- *               sampleDate:
- *                 type: string
- *                 format: date-time
+ *               bookingIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [31, 32]
  *     responses:
  *       200:
- *         description: Lab booking created
+ *         description: Booking confirmed successfully
+ *       404:
+ *         description: Booking not found
+ *       409:
+ *         description: Booking expired or invalid state
+ *       500:
+ *         description: Internal server error
  */
-router.post("/book", controller.bookLabTest);
- 
+router.post("/bookings/confirm", controller.confirmLabBooking);
+
  
 /**
  * @swagger
@@ -1064,6 +774,266 @@ router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
  */
  
 router.post("/feedback", controller.submitLabFeedback);
+/**
+ * @swagger
+ * /api/labs/{labId}/packages/filter:
+ *   get:
+ *     summary: Filter lab packages
+ *     description: >
+ *       Returns filtered lab packages based on price range,
+ *       age range, gender preference and sorting option.
+ *       Used in the Filters bottom sheet of Packages screen.
+ *
+ *     tags: [Labs]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Lab ID
+ *
+ *       - in: query
+ *         name: minPrice
+ *         required: false
+ *         schema:
+ *           type: number
+ *           example: 500
+ *         description: Minimum package price
+ *
+ *       - in: query
+ *         name: maxPrice
+ *         required: false
+ *         schema:
+ *           type: number
+ *           example: 3000
+ *         description: Maximum package price
+ *
+ *       - in: query
+ *         name: minAge
+ *         required: false
+ *         schema:
+ *           type: number
+ *           example: 20
+ *         description: Minimum age supported by package
+ *
+ *       - in: query
+ *         name: maxAge
+ *         required: false
+ *         schema:
+ *           type: number
+ *           example: 60
+ *         description: Maximum age supported by package
+ *
+ *       - in: query
+ *         name: gender
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [MALE, FEMALE, OTHER, ALL]
+ *           example: MALE
+ *         description: Gender-specific packages
+ *
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [price_low, price_high]
+ *           example: price_low
+ *         description: Sort packages by price
+ *
+ *     responses:
+ *       200:
+ *         description: Successfully fetched filtered packages
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   example: 2
+ *                 packages:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       packageId:
+ *                         type: integer
+ *                         example: 1
+ *                       packageName:
+ *                         type: string
+ *                         example: Prime Full Body Checkup
+ *                       originalPrice:
+ *                         type: number
+ *                         example: 3000
+ *                       finalPrice:
+ *                         type: number
+ *                         example: 1999
+ *                       discountPercent:
+ *                         type: number
+ *                         example: 33
+ *                       testsCount:
+ *                         type: number
+ *                         example: 12
+ *                       reportTime:
+ *                         type: string
+ *                         example: 24 Hours
+ *                       gender:
+ *                         type: string
+ *                         enum: [MALE, FEMALE, OTHER, ALL]
+ *                         example: ALL
+ *
+ *       400:
+ *         description: labId is required
+ *
+ *       500:
+ *         description: Internal server error
+ */
+
+router.get("/:labId/packages/filter", controller.filterLabPackages);
+/**
+ * @swagger
+ * /api/labs/{labId}/packages:
+ *   get:
+ *     summary: Get lab packages list (search for packages in specific labs)
+ *     description: Used for Packages List screen
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: Full Body
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     responses:
+ *       200:
+ *         description: Packages list
+ */
  
+router.get("/:labId/packages", controller.getLabPackages);
+ 
+ /**
+ * @swagger
+ * /api/labs/{labId}/tests/search:
+ *   get:
+ *     summary: Search tests/packages inside a lab
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: Blood
+ *     responses:
+ *       200:
+ *         description: Matching lab tests
+ */
+router.get("/:labId/tests/search", controller.searchLabTests);
+ 
+
+ /**
+ * @swagger
+ * /api/labs/{labId}/details:
+ *   get:
+ *     summary: Get lab details with expandable packages
+ *     description: >
+ *       Returns lab basic information along with packages.
+ *       Each package contains only package name and list of included test names.
+ *       Used for Lab Details screen (expandable package list).
+ *     tags: [Labs]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: labId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Unique Lab ID
+ *
+ *     responses:
+ *       200:
+ *         description: Lab details with package test list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 name:
+ *                   type: string
+ *                   example: Apollo Diagnostics
+ *                 rating:
+ *                   type: number
+ *                   example: 4.5
+ *                 city:
+ *                   type: string
+ *                   example: Hyderabad
+ *                 isOpen:
+ *                   type: boolean
+ *                   example: true
+ *                 packagesIncluded:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 4
+ *                       name:
+ *                         type: string
+ *                         example: General Checkup
+ *                       tests:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example:
+ *                           - Anemia
+ *                           - Infections
+ *                           - Inflammation
+ *                           - Blood disorders
+ *                           - Total Cholesterol
+ *                           - HDL (good cholesterol)
+ *                           - LDL (bad cholesterol)
+ *                           - Triglycerides
+ *                           - VLDL
+ *
+ *       400:
+ *         description: Invalid labId
+ *
+ *       404:
+ *         description: Lab not found
+ *
+ *       500:
+ *         description: Server error
+ */
+router.get("/:labId/details", controller.getLabDetailsById);
  
 export default router;

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import * as controller from "../controllers/labAddress.controller.js";
+import { authenticate as auth } from "../../../../middlewares/auth.middleware.js";
 
 const router = Router();
-
 /**
  * @swagger
  * tags:
@@ -180,13 +180,17 @@ router.get("/", controller.getAddresses);
  */
 router.delete("/:id", controller.deleteAddress);
 
-
 /**
  * @swagger
  * /api/labs/address/{id}/default:
  *   patch:
  *     summary: Set default address
+ *     description: >
+ *       Sets a specific address as the default address for the user.
+ *       It will automatically remove default flag from other addresses.
+ *
  *     tags: [Lab Address]
+ *
  *     parameters:
  *       - in: path
  *         name: id
@@ -194,9 +198,25 @@ router.delete("/:id", controller.deleteAddress);
  *         schema:
  *           type: integer
  *           example: 12
+ *         description: Address ID
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 21
+ *                 description: User ID who owns the address
+ *
  *     responses:
  *       200:
- *         description: Default address updated
+ *         description: Default address updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -205,7 +225,33 @@ router.delete("/:id", controller.deleteAddress);
  *                 message:
  *                   type: string
  *                   example: Default address updated
+ *
+ *       403:
+ *         description: Unauthorized access (address does not belong to user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized access
+ *
+ *       404:
+ *         description: Address not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Address not found
+ *
+ *       500:
+ *         description: Internal server error
  */
 router.patch("/:id/default", controller.setDefaultAddress);
+
 
 export default router;

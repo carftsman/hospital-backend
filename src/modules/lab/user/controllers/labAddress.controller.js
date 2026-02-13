@@ -89,28 +89,52 @@ export const deleteAddress = async (req, res) => {
 };
 
 
-/**
- * SET DEFAULT ADDRESS
- */
 export const setDefaultAddress = async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const userId = Number(req.body.userId); // ✅ for Swagger testing
 
-    const address = await prisma.labAddress.findUnique({ where: { id } });
+    if (!userId) {
+      return res.status(400).json({
+        message: "userId is required"
+      });
+    }
 
-    await prisma.labAddress.updateMany({
-      where: { userId: address.userId },
-      data: { isDefault: false }
+    const address = await prisma.labAddress.findUnique({
+      where: { id }
     });
 
-    await prisma.labAddress.update({
-      where: { id },
-      data: { isDefault: true }
+    if (!address) {
+      return res.status(404).json({
+        message: "Address not found"
+      });
+    }
+
+    if (address.userId !== userId) {
+      return res.status(403).json({
+        message: "Unauthorized access"
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.labAddress.updateMany({
+        where: { userId },
+        data: { isDefault: false }
+      }),
+      prisma.labAddress.update({
+        where: { id },
+        data: { isDefault: true }
+      })
+    ]);
+
+    return res.json({
+      message: "Default address updated"
     });
 
-    res.json({ message: "Default address updated" });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      message: "Internal server error"
+    });
   }
 };

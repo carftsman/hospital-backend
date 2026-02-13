@@ -168,49 +168,112 @@ export const clearLabCart = async (req, res) => {
 
 export const checkoutLabCart = async (req, res) => {
   try {
-    const { userId, sampleDate } = req.body;
+    const { userId, slotId, patientProfileId } = req.body;
 
-    if (!userId || !sampleDate) {
+    if (!userId || !slotId) {
       return res.status(400).json({
-        message: "userId and sampleDate are required",
+        message: "userId and slotId are required"
       });
     }
 
-    //Get cart items
-    const cartItems = await prisma.labCart.findMany({
-      where: { userId },
-    });
+    const result = await prisma.$transaction(async (tx) => {
 
-    if (!cartItems.length) {
-      return res.status(400).json({ message: "Cart is empty" });
-    }
+      // 1️⃣ Validate slot
+      const slot = await tx.labSlot.findUnique({
+        where: { id: Number(slotId) }
+      });
 
-    // Create bookings
-    const bookings = await prisma.$transaction(
-      cartItems.map(item =>
-        prisma.labBooking.create({
+      if (!slot) {
+        throw new Error("Slot not found");
+      }
+
+      // 2️⃣ Check slot availability
+      const existing = await tx.labBooking.findFirst({
+        where: {
+          slotId: Number(slotId),
+          OR: [
+            { status: "COMPLETED" },
+            {
+              status: "HOLD",
+              expiresAt: { gt: new Date() }
+            }
+          ]
+        }
+      });
+
+      if (existing) {
+        throw new Error("Slot already booked");
+      }
+
+      // 3️⃣ Get cart items
+      const cartItems = await tx.labCart.findMany({
+        where: { userId: Number(userId) }
+      });
+
+      if (!cartItems.length) {
+        throw new Error("Cart is empty");
+      }
+
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      const bookings = [];
+
+      // 4️⃣ Create bookings
+      for (const item of cartItems) {
+        const booking = await tx.labBooking.create({
           data: {
-            userId,
+            userId: Number(userId),
             labId: item.labId,
             labTestId: item.labTestId,
-            sampleDate: new Date(sampleDate),
-          },
-        })
-      )
-    );
+            slotId: Number(slotId),
+            sampleDate: slot.slotDate,
+            status: "HOLD",
+            expiresAt,
+            ...(patientProfileId && {
+              patientProfileId: Number(patientProfileId)
+            })
+          }
+        });
 
-    // Clear cart
-    await prisma.labCart.deleteMany({ where: { userId } });
+        bookings.push(booking);
+      }
 
-    res.json({
-      message: "Checkout successful",
-      bookings,
+      // 5️⃣ Clear cart
+      await tx.labCart.deleteMany({
+        where: { userId: Number(userId) }
+      });
+
+      return bookings;
     });
-  } catch (error) {
-    console.error("Checkout error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    return res.status(200).json({
+      message: "Slot held for 10 minutes",
+      bookingCount: result.length,
+      bookingIds: result.map(b => b.id),
+      expiresAt: result[0].expiresAt
+    });
+
+  } catch (err) {
+    console.error("checkoutLabCart error:", err);
+
+    if (err.message === "Slot not found") {
+      return res.status(404).json({ message: err.message });
+    }
+
+    if (
+      err.message === "Slot already booked" ||
+      err.message === "Cart is empty"
+    ) {
+      return res.status(409).json({ message: err.message });
+    }
+
+    return res.status(500).json({
+      message: "Internal server error"
+    });
   }
 };
+
+
 
 export const addPatientAndAttachToCart = async (req, res) => {
   try {

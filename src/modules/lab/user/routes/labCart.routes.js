@@ -160,13 +160,17 @@ router.post("/add-patient", controller.addPatientAndAttachToCart);
  */
 router.delete("/:id", controller.removeFromLabCart);
 
-
 /**
  * @swagger
  * /api/labs/cart/checkout:
  *   post:
- *     summary: Checkout lab cart and create bookings
+ *     summary: Checkout lab cart and hold selected slot
+ *     description: >
+ *       Creates lab bookings for all cart items and holds the selected slot
+ *       for 10 minutes. If slot is already booked, returns conflict error.
+ *
  *     tags: [Lab Cart]
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -175,26 +179,22 @@ router.delete("/:id", controller.removeFromLabCart);
  *             type: object
  *             required:
  *               - userId
- *               - patientProfileId
  *               - slotId
- *               - sampleDate
  *             properties:
  *               userId:
  *                 type: integer
  *                 example: 21
- *               patientProfileId:
- *                 type: integer
- *                 example: 5
  *               slotId:
  *                 type: integer
- *                 example: 12
- *               sampleDate:
- *                 type: string
- *                 format: date-time
- *                 example: "2026-02-12T09:00:00Z"
+ *                 example: 5
+ *               patientProfileId:
+ *                 type: integer
+ *                 example: 3
+ *                 description: Optional patient profile ID
+ *
  *     responses:
  *       200:
- *         description: Booking confirmed successfully
+ *         description: Slot held successfully
  *         content:
  *           application/json:
  *             schema:
@@ -202,12 +202,31 @@ router.delete("/:id", controller.removeFromLabCart);
  *               properties:
  *                 message:
  *                   type: string
- *                 bookings:
+ *                   example: Slot held for 10 minutes
+ *                 bookingCount:
+ *                   type: integer
+ *                   example: 2
+ *                 bookingIds:
  *                   type: array
  *                   items:
- *                     type: object
+ *                     type: integer
+ *                   example: [45, 46]
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *
+ *       400:
+ *         description: Missing required fields or empty cart
+ *
+ *       404:
+ *         description: Slot not found
+ *
+ *       409:
+ *         description: Slot already booked
+ *
+ *       500:
+ *         description: Internal server error
  */
 router.post("/checkout", controller.checkoutLabCart);
-
 
 export default router;
