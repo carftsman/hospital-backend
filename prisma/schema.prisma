@@ -405,20 +405,30 @@ model Reminder {
 }
 
 model LabPackage {
-  id            Int       @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   labId         Int
   name          String
   description   String?
   reportTime    String?
-  originalPrice Int       @default(0)
-  finalPrice    Int       @default(0)
+  originalPrice Int              @default(0)
+  finalPrice    Int              @default(0)
   minage        Int?
   maxage        Int?
-  gender        String? // ✅ CHANGE THIS
-  createdAt     DateTime? @default(now())
+  gender        LabPackageGender @default(MALE)
+  createdAt     DateTime         @default(now())
 
   lab   Lab              @relation(fields: [labId], references: [id])
   items LabPackageItem[]
+
+  @@index([labId])
+  @@index([gender])
+}
+
+enum LabPackageGender {
+  MALE
+  FEMALE
+  OTHER
+  ALL
 }
 
 model LabPackageItem {

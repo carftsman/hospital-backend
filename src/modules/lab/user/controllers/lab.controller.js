@@ -529,31 +529,38 @@ export const getLabPackages = async (req, res) => {
       return res.status(400).json({ message: "labId is required" });
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const where = {
-      labId: Number(labId),
-      ...(search && {
-        name: {
-          contains: search,
-          mode: "insensitive"
-        }
-      })
-    };
-
-    // 🔥 Get total count separately (correct pagination)
-    const totalCount = await prisma.labPackage.count({ where });
-
     const packages = await prisma.labPackage.findMany({
-      where,
+      where: {
+        labId: Number(labId),
+        ...(search && {
+          name: {
+            contains: search,
+            mode: "insensitive"
+          }
+        })
+      },
       include: {
-        _count: {
-          select: { items: true }
+        items: {
+          include: {
+            test: true
+          }
         }
       },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: Number(limit)
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
+      orderBy: { createdAt: "desc" }
+    });
+
+    const totalCount = await prisma.labPackage.count({
+      where: {
+        labId: Number(labId),
+        ...(search && {
+          name: {
+            contains: search,
+            mode: "insensitive"
+          }
+        })
+      }
     });
 
     res.json({
@@ -572,10 +579,8 @@ export const getLabPackages = async (req, res) => {
               )
             : 0,
         reportTime: p.reportTime,
-
-        // ✅ Updated Here
-        tests: `${p._count.items} Tests`,
-
+        tests: p.items.map(item => item.test.name),
+        testsCount: p.items.length,
         gender: p.gender
       }))
     });
@@ -585,10 +590,7 @@ export const getLabPackages = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
- 
+
 export const filterLabPackages = async (req, res) => {
   try {
     const { labId } = req.params;
@@ -598,15 +600,15 @@ export const filterLabPackages = async (req, res) => {
       minAge,
       maxAge,
       gender,
-      sortBy = "price_asc"
+      sortBy = "price_low"
     } = req.query;
- 
+
     if (!labId) {
       return res.status(400).json({ message: "labId is required" });
     }
- 
+
     const filters = [];
- 
+
     // 💰 Price Filter
     if (minPrice || maxPrice) {
       filters.push({
@@ -616,7 +618,7 @@ export const filterLabPackages = async (req, res) => {
         }
       });
     }
- 
+
     // 👶 Age Filter
     if (minAge || maxAge) {
       filters.push({
@@ -636,34 +638,48 @@ export const filterLabPackages = async (req, res) => {
         ]
       });
     }
- 
-    // 🚻 Gender Filter
+
+    // 🚻 Gender Filter (ENUM Safe)
     if (gender) {
-      filters.push({
-        OR: [
-          { gender: "ALL" },
-          { gender: gender.toUpperCase() }
-        ]
-      });
+      const genderValue = gender.toUpperCase();
+
+      if (genderValue === "ALL") {
+        filters.push({ gender: "ALL" });
+      } else {
+        filters.push({
+          OR: [
+            { gender: "ALL" },
+            { gender: genderValue }
+          ]
+        });
+      }
     }
- 
+
     // 🔄 Sorting
     const orderBy =
-      sortBy === "price_desc"
+      sortBy === "price_high"
         ? { finalPrice: "desc" }
         : { finalPrice: "asc" };
- 
+
     const packages = await prisma.labPackage.findMany({
       where: {
         labId: Number(labId),
         AND: filters
       },
       include: {
-        _count: { select: { items: true } }
+        items: {
+          include: {
+            test: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
       },
       orderBy
     });
- 
+
     res.json({
       count: packages.length,
       packages: packages.map(p => ({
@@ -677,17 +693,20 @@ export const filterLabPackages = async (req, res) => {
                 ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
               )
             : 0,
-        testsCount: p._count.items,
         reportTime: p.reportTime,
+        tests: p.items.map(item => item.test.name),
+        testsCount: p.items.length,
         gender: p.gender
       }))
     });
- 
+
   } catch (error) {
     console.error("filterLabPackages error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
  
  
 /**
