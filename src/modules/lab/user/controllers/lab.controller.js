@@ -1,96 +1,125 @@
 import prisma from "../../../../prisma/client.js";
- 
 export const getNearbyLabs = async (req, res) => {
   try {
     const lat = Number(req.query.latitude);
     const lon = Number(req.query.longitude);
- 
+
     if (Number.isNaN(lat) || Number.isNaN(lon)) {
       return res.status(400).json({ message: "Invalid coordinates" });
     }
- 
+
     const search = req.query.search;
     const sortBy = req.query.sortBy || "distance";
+
     const minRating = Number(req.query.minRating || 0);
     const maxRating = Number(req.query.maxRating || 5);
- 
+
+    const minFee = req.query.minFee ? Number(req.query.minFee) : null;
+    const maxFee = req.query.maxFee ? Number(req.query.maxFee) : null;
+
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 10);
     const skip = (page - 1) * limit;
- 
+
     let radius = Number(req.query.radius || 5);
     const MAX_RADIUS = 30;
     const MIN_RESULTS = 10;
- 
-    const R = 6371;
- 
+
+    const R = 6371; // earth radius km
     let finalLabs = [];
- 
-    // 🔁 Auto-expand radius until minimum labs found
+
+    // 🔁 Auto expand radius until enough labs found
     while (radius <= MAX_RADIUS && finalLabs.length < MIN_RESULTS) {
       const labs = await prisma.lab.findMany({
         where: {
           latitude: { not: null },
           longitude: { not: null },
           rating: { gte: minRating, lte: maxRating },
+
           ...(search && {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
               { city: { contains: search, mode: "insensitive" } }
             ]
           })
+        },
+        include: {
+          tests: {
+            select: { price: true }
+          }
         }
       });
- 
+
       finalLabs = labs
         .map(lab => {
+          // 📍 Distance calculation (Haversine)
           const dLat = ((lab.latitude - lat) * Math.PI) / 180;
           const dLon = ((lab.longitude - lon) * Math.PI) / 180;
- 
+
           const a =
             Math.sin(dLat / 2) ** 2 +
             Math.cos((lat * Math.PI) / 180) *
               Math.cos((lab.latitude * Math.PI) / 180) *
               Math.sin(dLon / 2) ** 2;
- 
+
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
- 
+          const distance = Number((R * c).toFixed(2));
+
+          // 💰 Min test price = fee
+          const minTestPrice = lab.tests.length
+            ? Math.min(...lab.tests.map(t => t.price))
+            : 0;
+
           return {
             id: lab.id,
             name: lab.name,
+            imageUrl: lab.imageUrl || null, // ✅ added
             rating: lab.rating,
             isOpen: lab.isOpen,
             city: lab.city,
-            distance: Number((R * c).toFixed(2))
+            distance,
+            startingFee: minTestPrice // ⭐ fee for UI
           };
         })
-        .filter(lab => lab.distance <= radius);
- 
-      radius += 5; // 🔼 expand radius
+        .filter(lab => {
+          // radius filter
+          if (lab.distance > radius) return false;
+
+          // fee range filter
+          if (minFee && lab.startingFee < minFee) return false;
+          if (maxFee && lab.startingFee > maxFee) return false;
+
+          return true;
+        });
+
+      radius += 5;
     }
- 
-    // 🧮 Sorting
+
+    // 🔄 Sorting
     if (sortBy === "rating") {
       finalLabs.sort((a, b) => b.rating - a.rating);
+    } else if (sortBy === "popularity") {
+      finalLabs.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
     } else {
       finalLabs.sort((a, b) => a.distance - b.distance);
     }
- 
+
     // 📄 Pagination
     const paginated = finalLabs.slice(skip, skip + limit);
- 
+
     res.json({
       count: finalLabs.length,
       page,
       limit,
       labs: paginated
     });
- 
+
   } catch (error) {
     console.error("getNearbyLabs error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
  
 export const getLabPackageDetails = async (req, res) => {
   try {

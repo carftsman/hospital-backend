@@ -20,7 +20,8 @@ router.use("/cart", labCartRoutes);
  *     summary: Get nearby labs with filters (List + Filter bottom sheet)
  *     description: >
  *       Returns nearby diagnostic labs based on user location.
- *       Supports search, sort, rating filter, distance slider and pagination.
+ *       Supports search, distance slider, rating filter, fee range filter,
+ *       sorting and pagination.
  *     tags: [Labs]
  *
  *     parameters:
@@ -47,15 +48,20 @@ router.use("/cart", labCartRoutes);
  *           example: 8
  *         description: Distance filter in KM (slider)
  *
- *      
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: Apollo
+ *         description: Search by lab name or city
  *
  *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: [distance, rating, popularity]
+ *           enum: [distance, rating, fee_low]
  *           example: distance
- *         description: Sort labs by distance, rating or popularity
+ *         description: Sort labs by distance, rating or lowest fee
  *
  *       - in: query
  *         name: minRating
@@ -70,6 +76,20 @@ router.use("/cart", labCartRoutes);
  *           type: number
  *           example: 5
  *         description: Maximum lab rating
+ *
+ *       - in: query
+ *         name: minFee
+ *         schema:
+ *           type: number
+ *           example: 100
+ *         description: Minimum consultation fee filter
+ *
+ *       - in: query
+ *         name: maxFee
+ *         schema:
+ *           type: number
+ *           example: 500
+ *         description: Maximum consultation fee filter
  *
  *       - in: query
  *         name: page
@@ -90,35 +110,19 @@ router.use("/cart", labCartRoutes);
  *         description: Filtered nearby labs
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 count:
- *                   type: integer
- *                   example: 3
- *                 labs:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 1
- *                       name:
- *                         type: string
- *                         example: ""
- *                       rating:
- *                         type: number
- *                         example: 4.5
- *                       isOpen:
- *                         type: boolean
- *                         example: true
- *                       distance:
- *                         type: number
- *                         example: 2.4
- *                       city:
- *                         type: string
- *                         example: Hyderabad
+ *             example:
+ *               count: 2
+ *               page: 1
+ *               limit: 10
+ *               labs:
+ *                 - id: 1
+ *                   name: Apollo Diagnostics
+ *                   rating: 4.5
+ *                   isOpen: true
+ *                   city: Hyderabad
+ *                   imageUrl: https://cdn.example.com/labs/apollo.png
+ *                   consultationFee: 299
+ *                   distance: 0
  *
  *       400:
  *         description: Invalid or missing coordinates
@@ -126,8 +130,8 @@ router.use("/cart", labCartRoutes);
  *       500:
  *         description: Internal server error
  */
- 
 router.get("/nearby", controller.getNearbyLabs);
+
 /**
  * @swagger
  * /api/labs/global-search:
