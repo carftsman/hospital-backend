@@ -440,12 +440,14 @@ enum BookingFor {
 
 enum LabBookingStatus {
   PENDING
+  HOLD
+  CONFIRMED
   SAMPLE_COLLECTED
   COMPLETED
   CANCELLED
-  HOLD
   EXPIRED
 }
+
 
 enum LabPackageGender {
   MALE

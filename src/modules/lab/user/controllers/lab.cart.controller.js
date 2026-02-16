@@ -1,9 +1,5 @@
 import prisma from "../../../../prisma/client.js";
 
-
-// =========================
-// ADD TO CART
-// =========================
 export const addToLabCart = async (req, res) => {
   try {
     const { userId, labId, labTestId } = req.body;
@@ -43,64 +39,49 @@ export const addToLabCart = async (req, res) => {
 };
 
 
-// =========================
-// GET CART (FULL UI DATA)
-// =========================
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
+    if (!userId) return res.status(400).json({ message: "userId required" });
 
-    if (!userId) {
-      return res.status(400).json({ message: "userId required" });
-    }
-
+    // 👤 User
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        fullName: true,
-        phone: true,
-      },
+      select: { id: true, fullName: true, phone: true },
     });
 
+    // 👨‍⚕️ Self profile
     const profile = await prisma.patientProfile.findFirst({
       where: { userId, isSelf: true },
-      select: {
-        id: true,
-        age: true,
-        gender: true,
-      },
+      select: { id: true, age: true, gender: true },
     });
 
+    // 🛒 Cart items
     const items = await prisma.labCart.findMany({
       where: { userId },
       include: {
-        lab: {
-          select: {
-            id: true,
-            name: true,
-            city: true,
-          },
-        },
-        test: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            reportTime: true,
-          },
-        },
-        patient: true,
+        lab: { select: { id: true, name: true, city: true } },
+        test: { select: { id: true, name: true, price: true } },
       },
       orderBy: { id: "desc" },
     });
 
+    // 📍 Addresses
+    const addresses = await prisma.labAddress.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    });
+
+    const defaultAddress = addresses.find(a => a.isDefault) || null;
+    const savedAddresses = addresses.filter(a => !a.isDefault);
+
+    // 💰 Bill
     const totalMRP = items.reduce(
-      (sum, item) => sum + item.test.price * item.quantity,
+      (sum, i) => sum + i.test.price * i.quantity,
       0
     );
 
-    const discount = 0;
+    const discount = Math.round(totalMRP * 0.1); // UI 10%
     const bookingFee = 10;
     const platformFee = 30;
     const homeCollection = 50;
@@ -110,20 +91,33 @@ export const getLabCart = async (req, res) => {
 
     res.json({
       user: {
-        ...user,
+        id: user?.id,
+        fullName: user?.fullName,
+        phone: user?.phone,
         age: profile?.age || null,
         gender: profile?.gender || null,
-        patientProfileId: profile?.id || null,
       },
+
       lab: items.length ? items[0].lab : null,
+
+      defaultAddress,
+      savedAddresses,
+
       count: items.length,
-      items,
+
+      items: items.map(i => ({
+        id: i.id,
+        name: i.test.name,
+        price: i.test.price,
+        quantity: i.quantity,
+      })),
+
       billSummary: {
         totalMRP,
         discount,
+        homeCollection,
         bookingFee,
         platformFee,
-        homeCollection,
         totalAmount,
       },
     });
@@ -134,36 +128,127 @@ export const getLabCart = async (req, res) => {
   }
 };
 
-
-// =========================
-// REMOVE ITEM
-// =========================
 export const removeFromLabCart = async (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    if (!id) {
-      return res.status(400).json({ message: "Invalid cart item id" });
+    const result = await prisma.labCart.deleteMany({ where: { id } });
+
+    if (!result.count) {
+      return res.status(404).json({ message: "Item not found" });
     }
 
-    await prisma.labCart.delete({ where: { id } });
-
     res.json({ message: "Removed from cart" });
-
-  } catch (error) {
-    console.error("removeFromLabCart error:", error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-
-// =========================
-// CLEAR CART
-// =========================
 export const clearLabCart = async (req, res) => {
   const userId = Number(req.query.userId);
   await prisma.labCart.deleteMany({ where: { userId } });
   res.json({ message: "Cart cleared" });
+};
+export const getBookingSummary = async (req, res) => {
+  try {
+    const { bookingIds } = req.query;
+
+    if (!bookingIds) {
+      return res.status(400).json({ message: "bookingIds required" });
+    }
+
+    const ids = bookingIds.split(",").map(Number);
+
+    const bookings = await prisma.labBooking.findMany({
+      where: { id: { in: ids } },
+      include: {
+        lab: true,
+        test: true,
+        user: true,
+        patient: true
+      }
+    });
+
+    if (!bookings.length) {
+      return res.status(404).json({ message: "Bookings not found" });
+    }
+
+    // 🔒 check expiry
+    const expired = bookings.some(
+      b => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
+    );
+
+    if (expired) {
+      return res.status(409).json({
+        message: "Booking expired. Please reselect slot"
+      });
+    }
+
+    const user = bookings[0].user;
+
+    // Default address
+    const address = await prisma.labAddress.findFirst({
+      where: { userId: user.id, isDefault: true }
+    });
+
+    // Tests list
+    const tests = bookings.map(b => ({
+      id: b.test.id,
+      name: b.test.name,
+      price: b.test.price,
+      reportTime: b.test.reportTime
+    }));
+
+    const lab = bookings[0].lab;
+
+    const patient = bookings[0].patient
+      ? {
+          name: bookings[0].patient.fullName,
+          age: bookings[0].patient.age,
+          gender: bookings[0].patient.gender
+        }
+      : null;
+
+    // 💰 Bill summary
+    const totalMRP = tests.reduce((sum, t) => sum + t.price, 0);
+    const discount = 0;
+    const bookingFee = 10;
+    const platformFee = 30;
+    const homeCollection = 50;
+
+    const totalAmount =
+      totalMRP - discount + bookingFee + platformFee + homeCollection;
+
+    return res.json({
+      bookingIds: ids,
+      expiresAt: bookings[0].expiresAt,
+
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        phone: user.phone
+      },
+
+      patient,
+      lab,
+      tests,
+      address,
+
+      billSummary: {
+        totalMRP,
+        discount,
+        bookingFee,
+        platformFee,
+        homeCollection,
+        totalAmount
+      }
+    });
+
+  } catch (err) {
+    console.error("getBookingSummary error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const checkoutLabCart = async (req, res) => {

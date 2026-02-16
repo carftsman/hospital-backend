@@ -235,7 +235,7 @@ export const getUserPastLabBookings = async (req, res) => {
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
-        status: { in: ["COMPLETED", "CANCELLED"] }
+        status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] }
       },
       include: {
         lab: true,     // ✅ correct
@@ -706,86 +706,67 @@ export const filterLabPackages = async (req, res) => {
   }
 };
 
-
- 
 export const confirmLabBooking = async (req, res) => {
   try {
     const { bookingIds } = req.body;
 
-    if (!bookingIds || !bookingIds.length) {
-      return res.status(400).json({ message: "bookingIds required" });
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({
+        message: "bookingIds array required"
+      });
     }
 
+    // 1️⃣ Fetch bookings
     const bookings = await prisma.labBooking.findMany({
       where: { id: { in: bookingIds } }
     });
 
     if (!bookings.length) {
-      return res.status(404).json({ message: "Booking not found" });
+      return res.status(404).json({
+        message: "Bookings not found"
+      });
     }
 
-    // check if expired
-    const expired = bookings.some(
-      b => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
-    );
+    // 2️⃣ Validate HOLD
+    const invalid = bookings.find(b => b.status !== "HOLD");
+    if (invalid) {
+      return res.status(409).json({
+        message: `Booking ${invalid.id} is not in HOLD state`
+      });
+    }
+
+    // 3️⃣ Expiry check
+    const now = new Date();
+    const expired = bookings.find(b => b.expiresAt && now > b.expiresAt);
 
     if (expired) {
-      return res.status(409).json({ message: "Booking expired or invalid state" });
+      return res.status(409).json({
+        message: `Booking ${expired.id} expired`
+      });
     }
 
+    // 4️⃣ Confirm
     await prisma.labBooking.updateMany({
       where: { id: { in: bookingIds } },
       data: {
-        status: "COMPLETED",
+        status: "CONFIRMED",   // ⭐ SAME AS HOSPITAL FLOW
         expiresAt: null
       }
     });
 
-    return res.json({ message: "Booking confirmed successfully" });
+    return res.json({
+      message: "Booking confirmed successfully",
+      bookingIds,
+      confirmedCount: bookingIds.length,
+      status: "CONFIRMED"
+    });
 
   } catch (error) {
     console.error("confirmLabBooking error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-
-
-// export const bookLabTest = async (req, res) => {
-//   try {
-//     const { userId, labId, labTestId, sampleDate } = req.body;
- 
-//     if (!userId || !labId || !labTestId || !sampleDate) {
-//       return res.status(400).json({
-//         message: "userId, labId, labTestId and sampleDate are required"
-//       });
-//     }
- 
-//     const booking = await prisma.labBooking.create({
-//       data: {
-//         userId: Number(userId),
-//         labId: Number(labId),
-//         labTestId: Number(labTestId),
-//         sampleDate: new Date(sampleDate),
-//         status: "PENDING" // ✅ VALID ENUM
-//       }
-//     });
- 
-//     res.status(201).json({
-//       message: "Lab booking created",
-//       booking
-//     });
- 
-//   } catch (error) {
-//     console.error("bookLabTest error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
- 
- 
-/**
- * 1️⃣1️⃣ My Bookings
- */
 export const getUserLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
  

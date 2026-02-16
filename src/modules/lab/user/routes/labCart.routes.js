@@ -13,42 +13,40 @@ const router = Router();
 
 /**
  * @swagger
- * /api/labs/cart/add:
+ * /api/labs/cart:
  *   post:
- *     summary: Add lab test to cart
+ *     summary: Add test to lab cart
  *     tags: [Lab Cart]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - userId
- *               - labId
- *               - labTestId
- *             properties:
- *               userId:
- *                 type: integer
- *                 example: 21
- *               labId:
- *                 type: integer
- *                 example: 1
- *               labTestId:
- *                 type: integer
- *                 example: 30
+ *           example:
+ *             userId: 12
+ *             labId: 2
+ *             labTestId: 10
  *     responses:
  *       200:
- *         description: Test added to cart successfully
+ *         description: Item added
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Added to cart
+ *               item:
+ *                 id: 3
+ *                 quantity: 1
+ *       409:
+ *         description: Different lab conflict
  */
-router.post("/add", controller.addToLabCart);
+
+router.post("/", controller.addToLabCart);
 
 
 /**
  * @swagger
  * /api/labs/cart:
  *   get:
- *     summary: Get user lab cart with bill summary
+ *     summary: Get lab cart (UI ready response)
  *     tags: [Lab Cart]
  *     parameters:
  *       - in: query
@@ -56,28 +54,50 @@ router.post("/add", controller.addToLabCart);
  *         required: true
  *         schema:
  *           type: integer
- *           example: 21
+ *         example: 12
  *     responses:
  *       200:
- *         description: Cart details fetched successfully
+ *         description: Cart data for mobile UI
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   type: object
- *                 lab:
- *                   type: object
- *                 count:
- *                   type: integer
- *                 items:
- *                   type: array
- *                   items:
- *                     type: object
- *                 billSummary:
- *                   type: object
+ *             example:
+ *               user:
+ *                 id: 12
+ *                 fullName: John Doe
+ *                 phone: "9876543210"
+ *                 age: 30
+ *                 gender: MALE
+ *               lab:
+ *                 id: 2
+ *                 name: Apollo Diagnostics
+ *                 city: Hyderabad
+ *               defaultAddress:
+ *                 id: 5
+ *                 fullName: John Doe
+ *                 mobile: "9876543210"
+ *                 house: Flat 302
+ *                 street: Madhapur
+ *                 city: Hyderabad
+ *                 state: Telangana
+ *                 pinCode: "500081"
+ *               savedAddresses:
+ *                 - id: 6
+ *                   city: Bangalore
+ *               count: 1
+ *               items:
+ *                 - id: 3
+ *                   name: Blood Test
+ *                   price: 400
+ *                   quantity: 1
+ *               billSummary:
+ *                 totalMRP: 400
+ *                 discount: 40
+ *                 homeCollection: 50
+ *                 bookingFee: 10
+ *                 platformFee: 30
+ *                 totalAmount: 450
  */
+
 router.get("/", controller.getLabCart);
 
 
@@ -85,7 +105,7 @@ router.get("/", controller.getLabCart);
  * @swagger
  * /api/labs/cart/clear:
  *   delete:
- *     summary: Clear entire lab cart
+ *     summary: Clear entire cart
  *     tags: [Lab Cart]
  *     parameters:
  *       - in: query
@@ -93,11 +113,12 @@ router.get("/", controller.getLabCart);
  *         required: true
  *         schema:
  *           type: integer
- *           example: 21
  *     responses:
  *       200:
- *         description: Cart cleared
+ *         example:
+ *           message: Cart cleared
  */
+
 router.delete("/clear", controller.clearLabCart);
 
 /**
@@ -140,12 +161,11 @@ router.delete("/clear", controller.clearLabCart);
  *         description: Patient created and attached
  */
 router.post("/add-patient", controller.addPatientAndAttachToCart);
-
 /**
  * @swagger
  * /api/labs/cart/{id}:
  *   delete:
- *     summary: Remove specific item from cart
+ *     summary: Remove item from cart
  *     tags: [Lab Cart]
  *     parameters:
  *       - in: path
@@ -153,80 +173,85 @@ router.post("/add-patient", controller.addPatientAndAttachToCart);
  *         required: true
  *         schema:
  *           type: integer
- *           example: 5
  *     responses:
  *       200:
- *         description: Cart item removed successfully
+ *         description: Removed
+ *         example:
+ *           message: Removed from cart
  */
+
 router.delete("/:id", controller.removeFromLabCart);
 
 /**
  * @swagger
  * /api/labs/cart/checkout:
  *   post:
- *     summary: Checkout lab cart and hold selected slot
+ *     summary: Checkout lab cart and hold slot
  *     description: >
- *       Creates lab bookings for all cart items and holds the selected slot
- *       for 10 minutes. If slot is already booked, returns conflict error.
- *
- *     tags: [Lab Cart]
+ *       Converts cart items into bookings and holds selected slot
+ *       for 10 minutes before payment confirmation.
+ *     tags: [Lab Checkout]
  *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - userId
- *               - slotId
- *             properties:
- *               userId:
- *                 type: integer
- *                 example: 21
- *               slotId:
- *                 type: integer
- *                 example: 5
- *               patientProfileId:
- *                 type: integer
- *                 example: 3
- *                 description: Optional patient profile ID
+ *           example:
+ *             userId: 12
+ *             slotId: 5
+ *             patientProfileId: 3
  *
  *     responses:
  *       200:
  *         description: Slot held successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Slot held for 10 minutes
- *                 bookingCount:
- *                   type: integer
- *                   example: 2
- *                 bookingIds:
- *                   type: array
- *                   items:
- *                     type: integer
- *                   example: [45, 46]
- *                 expiresAt:
- *                   type: string
- *                   format: date-time
+ *             example:
+ *               message: Slot held for 10 minutes
+ *               bookingCount: 2
+ *               bookingIds: [45, 46]
+ *               expiresAt: "2026-02-16T12:45:00.000Z"
  *
  *       400:
- *         description: Missing required fields or empty cart
+ *         description: Missing required fields
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: userId and slotId are required
  *
  *       404:
  *         description: Slot not found
  *
  *       409:
- *         description: Slot already booked
+ *         description: Slot already booked OR cart empty
  *
  *       500:
  *         description: Internal server error
  */
+
 router.post("/checkout", controller.checkoutLabCart);
+/**
+ * @swagger
+ * /api/labs/cart/summary:
+ *   get:
+ *     summary: Get booking summary before payment
+ *     description: Returns UI-ready payment summary using bookingIds
+ *     tags: [Lab Cart]
+ *     parameters:
+ *       - in: query
+ *         name: bookingIds
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: 41,42
+ *     responses:
+ *       200:
+ *         description: Booking summary fetched
+ *       404:
+ *         description: Bookings not found
+ *       409:
+ *         description: Booking expired
+ */
+router.get("/summary", controller.getBookingSummary);
 
 export default router;

@@ -627,70 +627,34 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  
 /**
  * @swagger
- * /api/labs/tests/recent:
- *   get:
- *     summary: Get recently viewed / booked lab tests
- *     description: >
- *       Used for "Recently Viewed Tests" section on Labs Home screen.
- *     tags: [Labs]
- *     parameters:
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 21
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           example: 5
- *     responses:
- *       200:
- *         description: Recent lab tests
- *         content:
- *           application/json:
- *             example:
- *               count: 2
- *               tests:
- *                 - testId: 3
- *                   testName: Thyroid Test
- *                   price: 300
- *                   labName: Apollo Diagnostics
- *                   lastBookedOn: 2026-02-10
- */
-router.get("/tests/recent", controller.getRecentLabTests);
-
- /**
- * @swagger
  * /api/labs/bookings/confirm:
  *   post:
- *     summary: Confirm lab booking after payment
- *     tags: [Lab Slots]
+ *     summary: Confirm lab bookings (No payment)
+ *     description: Instantly confirms HOLD bookings without payment integration
+ *     tags: [Lab Checkout]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - bookingIds
- *             properties:
- *               bookingIds:
- *                 type: array
- *                 items:
- *                   type: integer
- *                 example: [31, 32]
+ *           example:
+ *             bookingIds: [41, 42]
  *     responses:
  *       200:
- *         description: Booking confirmed successfully
+ *         description: Booking confirmed
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Booking confirmed successfully
+ *               confirmedCount: 2
+ *               bookingIds: [41, 42]
+ *       400:
+ *         description: Invalid input
  *       404:
- *         description: Booking not found
+ *         description: Bookings not found
  *       409:
  *         description: Booking expired or invalid state
- *       500:
- *         description: Internal server error
  */
+
 router.post("/bookings/confirm", controller.confirmLabBooking);
 
  
@@ -699,24 +663,23 @@ router.post("/bookings/confirm", controller.confirmLabBooking);
  * /api/labs/bookings/{bookingId}/cancel:
  *   post:
  *     summary: Cancel lab booking
- *     tags: [Labs]
+ *     tags: [Lab Checkout]
  *     parameters:
  *       - in: path
  *         name: bookingId
  *         required: true
  *         schema:
  *           type: integer
- *           example: 3
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 21
+ *         example: 45
  *     responses:
  *       200:
  *         description: Booking cancelled
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Booking cancelled
  */
+
 router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
  
 /**
