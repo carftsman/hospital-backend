@@ -1,5 +1,6 @@
 import prisma from "../../../../prisma/client.js";
 
+
 export const addToLabCart = async (req, res) => {
   try {
     const { userId, labId, labTestId } = req.body;
@@ -12,7 +13,11 @@ export const addToLabCart = async (req, res) => {
 
     const item = await prisma.labCart.upsert({
       where: {
-        userId_labTestId: { userId, labTestId },
+        userId_labId_labTestId: {
+          userId,
+          labId,
+          labTestId,
+        },
       },
       update: {
         quantity: { increment: 1 },
@@ -23,40 +28,45 @@ export const addToLabCart = async (req, res) => {
         labTestId,
       },
       include: {
-        test: true,
+        test: {
+          select: { id: true, name: true, price: true },
+        },
       },
     });
 
     res.json({
       message: "Added to cart",
-      item,
+      item: {
+        id: item.id,
+        labId: item.labId,
+        labTestId: item.labTestId,   // ✅ added
+        name: item.test.name,
+        price: item.test.price,
+        quantity: item.quantity,
+      },
     });
-
   } catch (error) {
-    console.error("addToLabCart error:", error);
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
-    if (!userId) return res.status(400).json({ message: "userId required" });
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
+    }
 
-    // 👤 User
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, fullName: true, phone: true },
     });
 
-    // 👨‍⚕️ Self profile
     const profile = await prisma.patientProfile.findFirst({
       where: { userId, isSelf: true },
-      select: { id: true, age: true, gender: true },
+      select: { age: true, gender: true },
     });
 
-    // 🛒 Cart items
     const items = await prisma.labCart.findMany({
       where: { userId },
       include: {
@@ -66,22 +76,12 @@ export const getLabCart = async (req, res) => {
       orderBy: { id: "desc" },
     });
 
-    // 📍 Addresses
-    const addresses = await prisma.labAddress.findMany({
-      where: { userId },
-      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
-    });
-
-    const defaultAddress = addresses.find(a => a.isDefault) || null;
-    const savedAddresses = addresses.filter(a => !a.isDefault);
-
-    // 💰 Bill
     const totalMRP = items.reduce(
       (sum, i) => sum + i.test.price * i.quantity,
       0
     );
 
-    const discount = Math.round(totalMRP * 0.1); // UI 10%
+    const discount = Math.round(totalMRP * 0.1);
     const bookingFee = 10;
     const platformFee = 30;
     const homeCollection = 50;
@@ -97,16 +97,13 @@ export const getLabCart = async (req, res) => {
         age: profile?.age || null,
         gender: profile?.gender || null,
       },
-
       lab: items.length ? items[0].lab : null,
-
-      defaultAddress,
-      savedAddresses,
-
       count: items.length,
 
       items: items.map(i => ({
         id: i.id,
+        labId: i.labId,
+        labTestId: i.labTestId,   // ✅ added
         name: i.test.name,
         price: i.test.price,
         quantity: i.quantity,
@@ -121,12 +118,12 @@ export const getLabCart = async (req, res) => {
         totalAmount,
       },
     });
-
   } catch (error) {
-    console.error("getLabCart error:", error);
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const removeFromLabCart = async (req, res) => {
   try {

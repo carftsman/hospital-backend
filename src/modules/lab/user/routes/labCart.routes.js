@@ -7,9 +7,8 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Lab Cart
- *   description: Lab test & booking cart APIs
+ *   description: Lab test cart APIs
  */
-
 
 /**
  * @swagger
@@ -27,18 +26,19 @@ const router = Router();
  *             labTestId: 10
  *     responses:
  *       200:
- *         description: Item added
+ *         description: Test added
  *         content:
  *           application/json:
  *             example:
  *               message: Added to cart
  *               item:
- *                 id: 3
+ *                 id: 12
+ *                 labId: 2
+ *                 labTestId: 10
+ *                 name: Vitamin D Test
+ *                 price: 1200
  *                 quantity: 1
- *       409:
- *         description: Different lab conflict
  */
-
 router.post("/", controller.addToLabCart);
 
 
@@ -46,7 +46,7 @@ router.post("/", controller.addToLabCart);
  * @swagger
  * /api/labs/cart:
  *   get:
- *     summary: Get lab cart (UI ready response)
+ *     summary: Get lab cart details
  *     tags: [Lab Cart]
  *     parameters:
  *       - in: query
@@ -54,50 +54,39 @@ router.post("/", controller.addToLabCart);
  *         required: true
  *         schema:
  *           type: integer
- *         example: 12
+ *           example: 12
  *     responses:
  *       200:
- *         description: Cart data for mobile UI
+ *         description: Cart data fetched
  *         content:
  *           application/json:
  *             example:
  *               user:
  *                 id: 12
  *                 fullName: John Doe
- *                 phone: "9876543210"
+ *                 phone: "9000000012"
  *                 age: 30
  *                 gender: MALE
  *               lab:
  *                 id: 2
- *                 name: Apollo Diagnostics
+ *                 name: Thyrocare
  *                 city: Hyderabad
- *               defaultAddress:
- *                 id: 5
- *                 fullName: John Doe
- *                 mobile: "9876543210"
- *                 house: Flat 302
- *                 street: Madhapur
- *                 city: Hyderabad
- *                 state: Telangana
- *                 pinCode: "500081"
- *               savedAddresses:
- *                 - id: 6
- *                   city: Bangalore
  *               count: 1
  *               items:
  *                 - id: 3
- *                   name: Blood Test
- *                   price: 400
+ *                   labId: 2
+ *                   labTestId: 10
+ *                   name: Vitamin D Test
+ *                   price: 1200
  *                   quantity: 1
  *               billSummary:
- *                 totalMRP: 400
- *                 discount: 40
+ *                 totalMRP: 1200
+ *                 discount: 120
  *                 homeCollection: 50
  *                 bookingFee: 10
  *                 platformFee: 30
- *                 totalAmount: 450
+ *                 totalAmount: 1170
  */
-
 router.get("/", controller.getLabCart);
 
 
