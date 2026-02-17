@@ -356,20 +356,26 @@ model LabFeedback {
 }
 
 model LabCart {
-  id               Int              @id @default(autoincrement())
-  userId           Int
-  labId            Int
-  labTestId        Int
+  id     Int @id @default(autoincrement())
+  userId Int
+  labId  Int
+
+  labTestId Int?
+  packageId Int?
+
   quantity         Int              @default(1)
-  createdAt        DateTime         @default(now()) @db.Timestamp(6)
+  createdAt        DateTime         @default(now())
   consultationType ConsultationType @default(LAB_VISIT)
   patientProfileId Int?
-  test             LabTest          @relation(fields: [labTestId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_labTest_fkey")
-  lab              Lab              @relation(fields: [labId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_lab_fkey")
-  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_user_fkey")
 
-@@unique([userId, labId, labTestId], map: "LabCart_user_lab_labTest_unique")
+  test           LabTest?        @relation(fields: [labTestId], references: [id])
+  package        LabPackage?     @relation(fields: [packageId], references: [id]) // ✅ works now
+  lab            Lab             @relation(fields: [labId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  PatientProfile PatientProfile? @relation(fields: [patientProfileId], references: [id])
+
+  @@unique([userId, labTestId])
+  @@unique([userId, packageId])
 }
 
 model LabPrescription {
@@ -413,15 +419,16 @@ model LabPackage {
   originalPrice Int              @default(0)
   finalPrice    Int              @default(0)
   createdAt     DateTime         @default(now())
-  minage        Int?
-  maxage        Int?
-  gender        LabPackageGender @default(MALE)
+
+  minage        Int?             // restore
+  maxage        Int?             // restore
+  gender        LabPackageGender // restore
+
   lab           Lab              @relation(fields: [labId], references: [id])
   items         LabPackageItem[]
-
-  @@index([labId])
-  @@index([gender])
+  cartItems     LabCart[]
 }
+
 
 model LabPackageItem {
   id        Int        @id @default(autoincrement())
@@ -447,7 +454,6 @@ enum LabBookingStatus {
   CANCELLED
   EXPIRED
 }
-
 
 enum LabPackageGender {
   MALE
