@@ -7,46 +7,49 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Lab Cart
- *   description: Lab test cart APIs
+ *   description: Lab package cart APIs
  */
 
 /**
  * @swagger
  * /api/labs/cart:
  *   post:
- *     summary: Add test to lab cart
+ *     summary: Add package to lab cart
+ *     description: Adds a package or increments quantity if already exists
  *     tags: [Lab Cart]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           example:
- *             userId: 12
+ *             userId: 21
  *             labId: 2
- *             labTestId: 10
+ *             packageId: 5
  *     responses:
  *       200:
- *         description: Test added
+ *         description: Package added
  *         content:
  *           application/json:
  *             example:
- *               message: Added to cart
+ *               message: Package added to cart
  *               item:
  *                 id: 12
  *                 labId: 2
- *                 labTestId: 10
- *                 name: Vitamin D Test
- *                 price: 1200
+ *                 packageId: 5
+ *                 name: Prime Full Body Checkup
+ *                 price: 999
  *                 quantity: 1
+ *                 testsCount: 12
+ *                 tests: ["CBC", "LFT", "KFT"]
  */
 router.post("/", controller.addToLabCart);
-
 
 /**
  * @swagger
  * /api/labs/cart:
  *   get:
- *     summary: Get lab cart details
+ *     summary: Get lab cart
+ *     description: Returns cart with package tests count and names
  *     tags: [Lab Cart]
  *     parameters:
  *       - in: query
@@ -54,38 +57,38 @@ router.post("/", controller.addToLabCart);
  *         required: true
  *         schema:
  *           type: integer
- *           example: 12
+ *           example: 21
  *     responses:
  *       200:
- *         description: Cart data fetched
+ *         description: Cart data
  *         content:
  *           application/json:
  *             example:
  *               user:
- *                 id: 12
- *                 fullName: John Doe
+ *                 id: 21
+ *                 fullName: Vicky
  *                 phone: "9000000012"
- *                 age: 30
- *                 gender: MALE
  *               lab:
  *                 id: 2
- *                 name: Thyrocare
+ *                 name: Apollo Diagnostics
  *                 city: Hyderabad
  *               count: 1
  *               items:
  *                 - id: 3
  *                   labId: 2
- *                   labTestId: 10
- *                   name: Vitamin D Test
- *                   price: 1200
+ *                   packageId: 5
+ *                   name: Prime Full Body Checkup
+ *                   price: 999
  *                   quantity: 1
+ *                   testsCount: 12
+ *                   tests: ["CBC", "Thyroid", "Vitamin D"]
  *               billSummary:
- *                 totalMRP: 1200
- *                 discount: 120
+ *                 totalMRP: 999
+ *                 discount: 100
  *                 homeCollection: 50
  *                 bookingFee: 10
  *                 platformFee: 30
- *                 totalAmount: 1170
+ *                 totalAmount: 989
  */
 router.get("/", controller.getLabCart);
 

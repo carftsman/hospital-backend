@@ -1,23 +1,21 @@
 import prisma from "../../../../prisma/client.js";
 
-
+/**
+ * ADD PACKAGE TO CART
+ */
 export const addToLabCart = async (req, res) => {
   try {
-    const { userId, labId, labTestId } = req.body;
+    const { userId, labId, packageId } = req.body;
 
-    if (!userId || !labId || !labTestId) {
+    if (!userId || !labId || !packageId) {
       return res.status(400).json({
-        message: "userId, labId and labTestId are required",
+        message: "userId, labId and packageId are required",
       });
     }
 
     const item = await prisma.labCart.upsert({
       where: {
-        userId_labId_labTestId: {
-          userId,
-          labId,
-          labTestId,
-        },
+        userId_packageId: { userId, packageId },
       },
       update: {
         quantity: { increment: 1 },
@@ -25,31 +23,47 @@ export const addToLabCart = async (req, res) => {
       create: {
         userId,
         labId,
-        labTestId,
+        packageId,
       },
       include: {
-        test: {
-          select: { id: true, name: true, price: true },
+        package: {
+          include: {
+            items: {
+              include: {
+                test: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
         },
       },
     });
 
     res.json({
-      message: "Added to cart",
+      message: "Package added to cart",
       item: {
         id: item.id,
         labId: item.labId,
-        labTestId: item.labTestId,   // ✅ added
-        name: item.test.name,
-        price: item.test.price,
+        packageId: item.packageId,
+        name: item.package.name,
+        price: item.package.finalPrice,
         quantity: item.quantity,
+
+        // ✅ NEW
+        testsCount: item.package.items.length,
+        tests: item.package.items.map(t => t.test.name),
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("addToLabCart:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * GET PACKAGE CART
+ */
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
@@ -57,27 +71,42 @@ export const getLabCart = async (req, res) => {
       return res.status(400).json({ message: "userId required" });
     }
 
+    // 👤 User
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, fullName: true, phone: true },
     });
 
+    // 🧍 Profile
     const profile = await prisma.patientProfile.findFirst({
       where: { userId, isSelf: true },
       select: { age: true, gender: true },
     });
 
+    // 🛒 Cart
     const items = await prisma.labCart.findMany({
       where: { userId },
       include: {
         lab: { select: { id: true, name: true, city: true } },
-        test: { select: { id: true, name: true, price: true } },
+        package: {
+          include: {
+            items: {
+              include: {
+                test: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { id: "desc" },
     });
 
-    const totalMRP = items.reduce(
-      (sum, i) => sum + i.test.price * i.quantity,
+    // ✅ REMOVE INVALID ROWS
+    const validItems = items.filter(i => i.package);
+
+    // 💰 BILLING
+    const totalMRP = validItems.reduce(
+      (sum, i) => sum + i.package.finalPrice * i.quantity,
       0
     );
 
@@ -97,16 +126,21 @@ export const getLabCart = async (req, res) => {
         age: profile?.age || null,
         gender: profile?.gender || null,
       },
-      lab: items.length ? items[0].lab : null,
-      count: items.length,
 
-      items: items.map(i => ({
+      lab: validItems.length ? validItems[0].lab : null,
+      count: validItems.length,
+
+      items: validItems.map(i => ({
         id: i.id,
         labId: i.labId,
-        labTestId: i.labTestId,   // ✅ added
-        name: i.test.name,
-        price: i.test.price,
+        packageId: i.packageId,
+        name: i.package.name,
+        price: i.package.finalPrice,
         quantity: i.quantity,
+
+        // ✅ TEST INFO
+        testsCount: i.package.items.length,
+        tests: i.package.items.map(t => t.test.name),
       })),
 
       billSummary: {
@@ -119,12 +153,10 @@ export const getLabCart = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("getLabCart:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
 export const removeFromLabCart = async (req, res) => {
   try {
     const id = Number(req.params.id);
