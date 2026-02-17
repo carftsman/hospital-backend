@@ -1,5 +1,6 @@
 import prisma from "../../../../prisma/client.js";
 
+
 export const addToLabCart = async (req, res) => {
   try {
     const { userId, labId, labTestId } = req.body;
@@ -33,16 +34,22 @@ export const addToLabCart = async (req, res) => {
       },
     });
 
-    res.json({ message: "Added to cart", item });
+    res.json({
+      message: "Added to cart",
+      item: {
+        id: item.id,
+        labId: item.labId,
+        labTestId: item.labTestId,   // ✅ added
+        name: item.test.name,
+        price: item.test.price,
+        quantity: item.quantity,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-/**
- * GET CART
- */
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
@@ -92,12 +99,16 @@ export const getLabCart = async (req, res) => {
       },
       lab: items.length ? items[0].lab : null,
       count: items.length,
+
       items: items.map(i => ({
         id: i.id,
+        labId: i.labId,
+        labTestId: i.labTestId,   // ✅ added
         name: i.test.name,
         price: i.test.price,
         quantity: i.quantity,
       })),
+
       billSummary: {
         totalMRP,
         discount,

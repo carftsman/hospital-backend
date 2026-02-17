@@ -2,13 +2,13 @@ import { Router } from "express";
 import * as controller from "../controllers/lab.cart.controller.js";
 
 const router = Router();
+
 /**
  * @swagger
  * tags:
  *   name: Lab Cart
  *   description: Lab test cart APIs
  */
-
 
 /**
  * @swagger
@@ -26,13 +26,17 @@ const router = Router();
  *             labTestId: 10
  *     responses:
  *       200:
- *         description: Test added to cart
+ *         description: Test added
  *         content:
  *           application/json:
  *             example:
  *               message: Added to cart
  *               item:
- *                 id: 1
+ *                 id: 12
+ *                 labId: 2
+ *                 labTestId: 10
+ *                 name: Vitamin D Test
+ *                 price: 1200
  *                 quantity: 1
  */
 router.post("/", controller.addToLabCart);
@@ -70,6 +74,8 @@ router.post("/", controller.addToLabCart);
  *               count: 1
  *               items:
  *                 - id: 3
+ *                   labId: 2
+ *                   labTestId: 10
  *                   name: Vitamin D Test
  *                   price: 1200
  *                   quantity: 1
@@ -82,7 +88,6 @@ router.post("/", controller.addToLabCart);
  *                 totalAmount: 1170
  */
 router.get("/", controller.getLabCart);
-
 
 
 /**
