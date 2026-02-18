@@ -255,119 +255,61 @@ export const getPackagesByAge = async (req, res) => {
  
  
 export const getUserPastLabBookings = async (req, res) => {
-  try {
-    const userId = Number(req.query.userId);
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
+  const userId = Number(req.query.userId);
 
-    const bookings = await prisma.labBooking.findMany({
-      where: {
-        userId,
-        status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] }
-      },
-      include: {
-        lab: true,
-        LabTest: true,
-        package: {
-          include: {
-            items: {
-              include: { test: true }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+  const bookings = await prisma.labBooking.findMany({
+    where: { userId, status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] } },
+    include: {
+  lab: true,
+  test: true,
+  package: {
+ include: { items: { include: { test: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
-    const formatted = bookings.map(b => {
-      let tests = [];
+  const formatted = bookings.map(b => ({
+    bookingId: b.id,
+    labName: b.lab?.name,
+    status: b.status,
+    tests: b.package
+      ? b.package.items.map(i => i.test.name)
+      : b.LabTest
+      ? [b.test?.name]
+      : [],
+    date: b.createdAt.toISOString().split("T")[0],
+  }));
 
-      if (b.package) {
-        tests = b.package.items.map(i => i.test.name);
-      } else if (b.LabTest) {
-        tests = [b.LabTest.name];
-      }
-
-      return {
-        bookingId: b.id,
-        labName: b.lab?.name,
-        status: b.status,
-        tests,
-        date: b.createdAt.toISOString().split("T")[0]
-      };
-    });
-
-    res.json({
-      type: "PAST",
-      count: formatted.length,
-      bookings: formatted
-    });
-
-  } catch (error) {
-    console.error("getUserPastLabBookings error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  res.json({ count: formatted.length, bookings: formatted });
 };
 
  
  
 export const getUserUpcomingLabBookings = async (req, res) => {
-  try {
-    const userId = Number(req.query.userId);
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
+  const userId = Number(req.query.userId);
 
-    const bookings = await prisma.labBooking.findMany({
-      where: {
-        userId,
-        status: { in: ["PENDING", "SAMPLE_COLLECTED", "CONFIRMED"] }
-      },
-      include: {
-        lab: true,
-        LabTest: true,
-        package: {
-          include: {
-            items: {
-              include: { test: true }
-            }
-          }
-        }
-      },
-      orderBy: { sampleDate: "asc" }
-    });
+  const bookings = await prisma.labBooking.findMany({
+    where: { userId, status: { in: ["PENDING", "CONFIRMED"] } },
+    include: {
+      lab: true,
+      test: true,
+      package: { include: { items: { include: { test: true } } } },
+    },
+  });
 
-    const formatted = bookings.map(b => {
-      let tests = [];
+  const formatted = bookings.map(b => ({
+    bookingId: b.id,
+    labName: b.lab?.name,
+    sampleDate: b.sampleDate,
+    tests: b.package
+      ? b.package.items.map(i => i.test.name)
+      : b.LabTest
+      ? [b.test?.name]
+      : [],
+  }));
 
-      if (b.package) {
-        tests = b.package.items.map(i => i.test.name);
-      } else if (b.LabTest) {
-        tests = [b.LabTest.name];
-      }
-
-      return {
-        bookingId: b.id,
-        labName: b.lab?.name,
-        status: b.status,
-        sampleDate: b.sampleDate,
-        tests
-      };
-    });
-
-    res.json({
-      type: "UPCOMING",
-      count: formatted.length,
-      bookings: formatted
-    });
-
-  } catch (error) {
-    console.error("getUserUpcomingLabBookings error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  res.json({ count: formatted.length, bookings: formatted });
 };
-
 
 export const searchLabs = async (req, res) => {
   const { query } = req.query;
@@ -1094,81 +1036,43 @@ export const autoSuggestLabs = async (req, res) => {
  
  
 export const getUserLabReports = async (req, res) => {
-  try {
-    const { userId, reportStatus, fromDate, toDate } = req.query;
+  const userId = Number(req.query.userId);
 
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
-    const from = fromDate ? new Date(fromDate) : undefined;
-    const to = toDate
-      ? new Date(new Date(toDate).setHours(23, 59, 59, 999))
-      : undefined;
-
-    const reports = await prisma.labReport.findMany({
-      where: {
-        booking: {
-          userId: Number(userId),
-          status: "COMPLETED"
-        },
-        ...(reportStatus && { reportStatus }),
-        ...(from || to
-          ? {
-              createdAt: {
-                ...(from && { gte: from }),
-                ...(to && { lte: to })
-              }
-            }
-          : {})
-      },
+  const reports = await prisma.labReport.findMany({
+  where: {
+    booking: {
+      userId,
+      status: "COMPLETED",
+    },
+  },
+  include: {
+    booking: {
       include: {
-        booking: {
+        lab: true,
+        test: true, // ✅ FIXED
+        package: {
           include: {
-            lab: true,
-            LabTest: true,
-            package: {
-              include: {
-                items: {
-                  include: { test: true }
-                }
-              }
-            }
-          }
-        }
+            items: { include: { test: true } },
+          },
+        },
       },
-      orderBy: { createdAt: "desc" }
-    });
+    },
+  },
+  orderBy: { createdAt: "desc" },
+});
 
-    const formatted = reports.map(r => {
-      let tests = [];
+  const formatted = reports.map(r => ({
+    reportId: r.id,
+    labName: r.booking.lab?.name,
+    tests: r.booking.package
+      ? r.booking.package.items.map(i => i.test.name)
+      : r.booking.LabTest
+      ? [r.booking.LabTest.name]
+      : [],
+    date: r.createdAt.toISOString().split("T")[0],
+  }));
 
-      if (r.booking.package) {
-        tests = r.booking.package.items.map(i => i.test.name);
-      } else if (r.booking.LabTest) {
-        tests = [r.booking.LabTest.name];
-      }
-
-      return {
-        reportId: r.id,
-        bookingId: r.labBookingId,
-        labName: r.booking.lab?.name,
-        tests,
-        status: r.reportStatus,
-        reportUrls: r.reportUrls,
-        date: r.createdAt.toISOString().split("T")[0]
-      };
-    });
-
-    res.json({
-      count: formatted.length,
-      reports: formatted
-    });
-
-  } catch (error) {
-    console.error("getUserLabReports error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  res.json({ count: formatted.length, reports: formatted });
 };
 
 export const getLabReportDetails = async (req, res) => {
@@ -1187,7 +1091,7 @@ export const getLabReportDetails = async (req, res) => {
         booking: {
           include: {
             lab: true,
-            LabTest: true, // ✅ FIXED
+            test: true, // ✅ FIXED
             package: {
               include: {
                 items: {
@@ -1342,49 +1246,60 @@ export const downloadLabReport = async (req, res) => {
 export const submitLabFeedback = async (req, res) => {
   try {
     const { bookingId, rating, comment } = req.body;
- 
+
     if (!bookingId || !rating) {
       return res.status(400).json({
-        message: "bookingId and rating are required"
+        message: "bookingId and rating are required",
       });
     }
- 
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({
-        message: "rating must be between 1 and 5"
-      });
-    }
- 
-    // prevent duplicate feedback for same booking
-    const existing = await prisma.labFeedback.findFirst({
-      where: { bookingId }
+
+    // 1️⃣ Check booking exists
+    const booking = await prisma.labBooking.findUnique({
+      where: { id: bookingId },
     });
- 
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found",
+      });
+    }
+
+    // 2️⃣ Allow feedback only after completion
+    if (booking.status !== "COMPLETED") {
+      return res.status(400).json({
+        message: "Feedback allowed only for completed bookings",
+      });
+    }
+
+    // 3️⃣ Prevent duplicate feedback
+    const existing = await prisma.labFeedback.findUnique({
+      where: { bookingId },
+    });
+
     if (existing) {
       return res.status(409).json({
-        message: "Feedback already submitted for this booking"
+        message: "Feedback already submitted",
       });
     }
- 
+
+    // 4️⃣ Create feedback
     await prisma.labFeedback.create({
       data: {
-        bookingId: Number(bookingId),
+        bookingId,
         rating,
-        comment
-      }
+        comment,
+      },
     });
- 
+
     res.json({
-      message: "Thank you for your feedback"
+      message: "Thank you for your feedback ❤️",
     });
- 
   } catch (error) {
     console.error("submitLabFeedback error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-// src/modules/lab/user/controllers/recentTests.controller.js
- 
+
  
 export const getRecentLabTests = async (req, res) => {
   try {

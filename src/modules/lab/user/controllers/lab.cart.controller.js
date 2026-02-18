@@ -13,47 +13,40 @@ export const addToLabCart = async (req, res) => {
       });
     }
 
-    const item = await prisma.labCart.upsert({
-      where: {
-        userId_packageId: { userId, packageId },
-      },
-      update: {
-        quantity: { increment: 1 },
-      },
-      create: {
-        userId,
-        labId,
-        packageId,
-      },
-      include: {
-        package: {
-          include: {
-            items: {
-              include: {
-                test: {
-                  select: { name: true },
-                },
-              },
+    const existing = await prisma.labCart.findFirst({
+      where: { userId, packageId },
+    });
+
+    let item;
+
+    if (existing) {
+      item = await prisma.labCart.update({
+        where: { id: existing.id },
+        data: { quantity: { increment: 1 } },
+        include: {
+          package: {
+            include: {
+              items: { include: { test: { select: { name: true } } } },
             },
           },
         },
-      },
-    });
+      });
+    } else {
+      item = await prisma.labCart.create({
+        data: { userId, labId, packageId },
+        include: {
+          package: {
+            include: {
+              items: { include: { test: { select: { name: true } } } },
+            },
+          },
+        },
+      });
+    }
 
     res.json({
       message: "Package added to cart",
-      item: {
-        id: item.id,
-        labId: item.labId,
-        packageId: item.packageId,
-        name: item.package.name,
-        price: item.package.finalPrice,
-        quantity: item.quantity,
-
-        // ✅ NEW
-        testsCount: item.package.items.length,
-        tests: item.package.items.map(t => t.test.name),
-      },
+      item,
     });
   } catch (error) {
     console.error("addToLabCart:", error);
@@ -61,95 +54,51 @@ export const addToLabCart = async (req, res) => {
   }
 };
 
-/**
- * GET PACKAGE CART
- */
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
-    if (!userId) {
-      return res.status(400).json({ message: "userId required" });
-    }
+    if (!userId) return res.status(400).json({ message: "userId required" });
 
-    // 👤 User
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, fullName: true, phone: true },
-    });
-
-    // 🧍 Profile
-    const profile = await prisma.patientProfile.findFirst({
-      where: { userId, isSelf: true },
-      select: { age: true, gender: true },
-    });
-
-    // 🛒 Cart
     const items = await prisma.labCart.findMany({
       where: { userId },
       include: {
-        lab: { select: { id: true, name: true, city: true } },
+        lab: true,
         package: {
           include: {
-            items: {
-              include: {
-                test: { select: { name: true } },
-              },
-            },
+            items: { include: { test: true } },
           },
         },
       },
       orderBy: { id: "desc" },
     });
 
-    // ✅ REMOVE INVALID ROWS
-    const validItems = items.filter(i => i.package);
+    const valid = items.filter(i => i.package);
 
-    // 💰 BILLING
-    const totalMRP = validItems.reduce(
+    const totalMRP = valid.reduce(
       (sum, i) => sum + i.package.finalPrice * i.quantity,
       0
     );
 
-    const discount = Math.round(totalMRP * 0.1);
     const bookingFee = 10;
     const platformFee = 30;
     const homeCollection = 50;
 
-    const totalAmount =
-      totalMRP - discount + bookingFee + platformFee + homeCollection;
-
     res.json({
-      user: {
-        id: user?.id,
-        fullName: user?.fullName,
-        phone: user?.phone,
-        age: profile?.age || null,
-        gender: profile?.gender || null,
-      },
-
-      lab: validItems.length ? validItems[0].lab : null,
-      count: validItems.length,
-
-      items: validItems.map(i => ({
+      lab: valid[0]?.lab || null,
+      count: valid.length,
+      items: valid.map(i => ({
         id: i.id,
-        labId: i.labId,
-        packageId: i.packageId,
         name: i.package.name,
         price: i.package.finalPrice,
         quantity: i.quantity,
-
-        // ✅ TEST INFO
-        testsCount: i.package.items.length,
         tests: i.package.items.map(t => t.test.name),
       })),
-
       billSummary: {
         totalMRP,
-        discount,
-        homeCollection,
         bookingFee,
         platformFee,
-        totalAmount,
+        homeCollection,
+        totalAmount: totalMRP + bookingFee + platformFee + homeCollection,
       },
     });
   } catch (error) {
@@ -157,28 +106,81 @@ export const getLabCart = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * REMOVE CART ITEM
+ */
 export const removeFromLabCart = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    const result = await prisma.labCart.deleteMany({ where: { id } });
-
-    if (!result.count) {
-      return res.status(404).json({ message: "Item not found" });
-    }
-
-    res.json({ message: "Removed from cart" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
+  const id = Number(req.params.id);
+  await prisma.labCart.delete({ where: { id } });
+  res.json({ message: "Removed from cart" });
 };
 
+/**
+ * CLEAR CART
+ */
 export const clearLabCart = async (req, res) => {
   const userId = Number(req.query.userId);
   await prisma.labCart.deleteMany({ where: { userId } });
   res.json({ message: "Cart cleared" });
 };
+
+export const checkoutLabCart = async (req, res) => {
+  try {
+    const { userId, slotId, patientProfileId } = req.body;
+
+    if (!userId || !slotId)
+      return res.status(400).json({ message: "userId and slotId required" });
+
+    const result = await prisma.$transaction(async tx => {
+      const slot = await tx.labSlot.findUnique({
+        where: { id: Number(slotId) },
+      });
+      if (!slot) throw new Error("Slot not found");
+
+      const cart = await tx.labCart.findMany({ where: { userId } });
+      if (!cart.length) throw new Error("Cart empty");
+
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const bookings = [];
+
+      for (const item of cart) {
+        const booking = await tx.labBooking.create({
+          data: {
+            userId,
+            packageId: item.packageId,
+            slotId,
+            sampleDate: slot.slotDate,
+            status: "HOLD",
+            expiresAt,
+            patientProfileId: patientProfileId || null,
+
+            // ✅ THIS IS THE FIX
+            lab: {
+              connect: { id: item.labId },
+            },
+          },
+        });
+
+        bookings.push(booking);
+      }
+
+      await tx.labCart.deleteMany({ where: { userId } });
+
+      return bookings;
+    });
+
+    res.json({
+      message: "Slot held",
+      bookingIds: result.map(b => b.id),
+      expiresAt: result[0]?.expiresAt,
+    });
+  } catch (err) {
+    console.error("checkout error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getBookingSummary = async (req, res) => {
   try {
     const { bookingIds } = req.query;
@@ -259,72 +261,6 @@ export const getBookingSummary = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-export const checkoutLabCart = async (req, res) => {
-  try {
-    const { userId, slotId, patientProfileId } = req.body;
-
-    if (!userId || !slotId) {
-      return res.status(400).json({
-        message: "userId and slotId are required",
-      });
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      // 1️⃣ Validate slot
-      const slot = await tx.labSlot.findUnique({
-        where: { id: Number(slotId) },
-      });
-      if (!slot) throw new Error("Slot not found");
-
-      // 2️⃣ Get cart
-      const cartItems = await tx.labCart.findMany({
-        where: { userId: Number(userId) },
-      });
-
-      if (!cartItems.length) throw new Error("Cart is empty");
-
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      const bookings = [];
-
-      // 3️⃣ Create bookings (PACKAGE BASED)
-      for (const item of cartItems) {
-        const booking = await tx.labBooking.create({
-          data: {
-            userId: Number(userId),
-            labId: item.labId,
-            packageId: item.packageId, // ✅ PACKAGE
-            slotId: Number(slotId),
-            sampleDate: slot.slotDate,
-            status: "HOLD",
-            expiresAt,
-            patientProfileId: item.patientProfileId || null,
-          },
-        });
-
-        bookings.push(booking);
-      }
-
-      // 4️⃣ Clear cart
-      await tx.labCart.deleteMany({
-        where: { userId: Number(userId) },
-      });
-
-      return bookings;
-    });
-
-    return res.json({
-      message: "Slot held for 10 minutes",
-      bookingCount: result.length,
-      bookingIds: result.map((b) => b.id),
-      expiresAt: result[0]?.expiresAt,
-    });
-  } catch (err) {
-    console.error("checkout error:", err);
-    res.status(500).json({ message: err.message || "Server error" });
-  }
-};
-
 
 
 export const addPatientAndAttachToCart = async (req, res) => {
