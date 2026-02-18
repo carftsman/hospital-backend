@@ -234,6 +234,7 @@ model Lab {
   slotDuration  Int             @default(60)
   openTime      DateTime?       @db.Time(0)
   closeTime     DateTime?       @db.Time(0)
+  startingFee   Int?
   bookings      LabBooking[]
   LabCart       LabCart[]
   LabPackage    LabPackage[]
