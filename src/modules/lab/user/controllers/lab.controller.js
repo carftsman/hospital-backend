@@ -260,63 +260,115 @@ export const getUserPastLabBookings = async (req, res) => {
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
- 
+
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
         status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] }
       },
       include: {
-        lab: true,     // ✅ correct
-        test: true     // ✅ correct
+        lab: true,
+        LabTest: true,
+        package: {
+          include: {
+            items: {
+              include: { test: true }
+            }
+          }
+        }
       },
       orderBy: { createdAt: "desc" }
     });
- 
+
+    const formatted = bookings.map(b => {
+      let tests = [];
+
+      if (b.package) {
+        tests = b.package.items.map(i => i.test.name);
+      } else if (b.LabTest) {
+        tests = [b.LabTest.name];
+      }
+
+      return {
+        bookingId: b.id,
+        labName: b.lab?.name,
+        status: b.status,
+        tests,
+        date: b.createdAt.toISOString().split("T")[0]
+      };
+    });
+
     res.json({
       type: "PAST",
-      count: bookings.length,
-      bookings
+      count: formatted.length,
+      bookings: formatted
     });
+
   } catch (error) {
     console.error("getUserPastLabBookings error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
  
  
 export const getUserUpcomingLabBookings = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
- 
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
-        status: { in: ["PENDING", "SAMPLE_COLLECTED"] }
+        status: { in: ["PENDING", "SAMPLE_COLLECTED", "CONFIRMED"] }
       },
       include: {
         lab: true,
-        test: true
+        LabTest: true,
+        package: {
+          include: {
+            items: {
+              include: { test: true }
+            }
+          }
+        }
       },
       orderBy: { sampleDate: "asc" }
     });
- 
+
+    const formatted = bookings.map(b => {
+      let tests = [];
+
+      if (b.package) {
+        tests = b.package.items.map(i => i.test.name);
+      } else if (b.LabTest) {
+        tests = [b.LabTest.name];
+      }
+
+      return {
+        bookingId: b.id,
+        labName: b.lab?.name,
+        status: b.status,
+        sampleDate: b.sampleDate,
+        tests
+      };
+    });
+
     res.json({
       type: "UPCOMING",
-      count: bookings.length,
-      bookings
+      count: formatted.length,
+      bookings: formatted
     });
+
   } catch (error) {
     console.error("getUserUpcomingLabBookings error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
-/**
- * 2️⃣ Search Labs (NEW)
- */
+
+
 export const searchLabs = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.json([]);
@@ -1043,13 +1095,7 @@ export const autoSuggestLabs = async (req, res) => {
  
 export const getUserLabReports = async (req, res) => {
   try {
-    const {
-      userId,
-      search,
-      reportStatus,
-      fromDate,
-      toDate
-    } = req.query;
+    const { userId, reportStatus, fromDate, toDate } = req.query;
 
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
@@ -1060,68 +1106,13 @@ export const getUserLabReports = async (req, res) => {
       ? new Date(new Date(toDate).setHours(23, 59, 59, 999))
       : undefined;
 
-    let packageTestIds = [];
-
-    // 🔥 If search exists → check for package matches
-    if (search) {
-      const matchedPackages = await prisma.labPackage.findMany({
-        where: {
-          name: {
-            contains: search,
-            mode: "insensitive"
-          }
-        },
-        include: {
-          items: true
-        }
-      });
-
-      packageTestIds = matchedPackages.flatMap(pkg =>
-        pkg.items.map(item => item.labTestId)
-      );
-    }
-
     const reports = await prisma.labReport.findMany({
       where: {
         booking: {
           userId: Number(userId),
-          status: "COMPLETED",
-
-          ...(search && {
-            OR: [
-              {
-                lab: {
-                  name: {
-                    contains: search,
-                    mode: "insensitive"
-                  }
-                }
-              },
-              {
-                test: {
-                  name: {
-                    contains: search,
-                    mode: "insensitive"
-                  }
-                }
-              },
-              ...(packageTestIds.length > 0
-                ? [
-                    {
-                      labTestId: {
-                        in: packageTestIds
-                      }
-                    }
-                  ]
-                : [])
-            ]
-          })
+          status: "COMPLETED"
         },
-
-        ...(reportStatus && {
-          reportStatus
-        }),
-
+        ...(reportStatus && { reportStatus }),
         ...(from || to
           ? {
               createdAt: {
@@ -1131,98 +1122,132 @@ export const getUserLabReports = async (req, res) => {
             }
           : {})
       },
-
       include: {
         booking: {
           include: {
             lab: true,
-            test: true
+            LabTest: true,
+            package: {
+              include: {
+                items: {
+                  include: { test: true }
+                }
+              }
+            }
           }
         }
       },
-
       orderBy: { createdAt: "desc" }
     });
 
-    return res.json({
-      count: reports.length,
-      reports: reports.map(r => ({
+    const formatted = reports.map(r => {
+      let tests = [];
+
+      if (r.booking.package) {
+        tests = r.booking.package.items.map(i => i.test.name);
+      } else if (r.booking.LabTest) {
+        tests = [r.booking.LabTest.name];
+      }
+
+      return {
         reportId: r.id,
         bookingId: r.labBookingId,
+        labName: r.booking.lab?.name,
+        tests,
         status: r.reportStatus,
-        testName: r.booking?.test?.name ?? null,
-        labName: r.booking?.lab?.name ?? null,
+        reportUrls: r.reportUrls,
         date: r.createdAt.toISOString().split("T")[0]
-      }))
+      };
+    });
+
+    res.json({
+      count: formatted.length,
+      reports: formatted
     });
 
   } catch (error) {
     console.error("getUserLabReports error:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
+
 export const getLabReportDetails = async (req, res) => {
   try {
     const reportId = Number(req.params.reportId);
- 
+
     if (!reportId) {
       return res.status(400).json({
         message: "reportId is required"
       });
     }
- 
+
     const report = await prisma.labReport.findUnique({
       where: { id: reportId },
       include: {
         booking: {
           include: {
             lab: true,
-            test: true
+            LabTest: true, // ✅ FIXED
+            package: {
+              include: {
+                items: {
+                  include: {
+                    test: true
+                  }
+                }
+              }
+            }
           }
         }
       }
     });
- 
+
     if (!report) {
       return res.status(404).json({
         message: "Lab report not found"
       });
     }
- 
+
+    const booking = report.booking;
+
+    // 🧠 Extract tests (hybrid safe)
+    let tests = [];
+
+    if (booking.package) {
+      tests = booking.package.items.map(i => i.test.name);
+    } else if (booking.LabTest) {
+      tests = [booking.LabTest.name];
+    }
+
     res.json({
       reportId: report.id,
       bookingId: report.labBookingId,
- 
-      packageName: report.booking?.test?.name || null,
-      testName: report.booking?.test?.name || null,
-      labName: report.booking?.lab?.name || null,
- 
-      collectedDate: report.booking?.collectedAt
-        ? report.booking.collectedAt.toISOString().split("T")[0]
+
+      labName: booking.lab?.name,
+      tests,
+
+      collectedDate: booking.collectedAt
+        ? booking.collectedAt.toISOString().split("T")[0]
         : null,
- 
+
       issuedDate: report.createdAt.toISOString().split("T")[0],
- 
-      samplesCollected: ["Blood Samples", "Urine Samples"],
- 
+
       resultSummary: report.summary || "No summary available.",
- 
-     reports: report.reportUrls?.length
-  ? [{
-      name: "Report",
-      url: report.reportUrls[0]
-    }]
-  : []
+
+      reports: report.reportUrls?.length
+        ? report.reportUrls.map(url => ({
+            name: "Report",
+            url
+          }))
+        : []
     });
- 
+
   } catch (error) {
     console.error("getLabReportDetails error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
+
 export const getLast30DaysLabTests = async (req, res) => {
   try {
     const userId = Number(req.query.userId);

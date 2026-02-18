@@ -193,89 +193,69 @@ export const getBookingSummary = async (req, res) => {
       where: { id: { in: ids } },
       include: {
         lab: true,
-        test: true,
+        package: {
+          include: {
+            items: {
+              include: {
+                test: true,
+              },
+            },
+          },
+        },
         user: true,
-        patient: true
-      }
+        patient: true,
+      },
     });
 
     if (!bookings.length) {
       return res.status(404).json({ message: "Bookings not found" });
     }
 
-    // 🔒 check expiry
     const expired = bookings.some(
-      b => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
+      (b) => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
     );
 
     if (expired) {
       return res.status(409).json({
-        message: "Booking expired. Please reselect slot"
+        message: "Booking expired. Please reselect slot",
       });
     }
 
     const user = bookings[0].user;
-
-    // Default address
-    const address = await prisma.labAddress.findFirst({
-      where: { userId: user.id, isDefault: true }
-    });
-
-    // Tests list
-    const tests = bookings.map(b => ({
-      id: b.test.id,
-      name: b.test.name,
-      price: b.test.price,
-      reportTime: b.test.reportTime
-    }));
-
     const lab = bookings[0].lab;
 
-    const patient = bookings[0].patient
-      ? {
-          name: bookings[0].patient.fullName,
-          age: bookings[0].patient.age,
-          gender: bookings[0].patient.gender
-        }
-      : null;
+    const packages = bookings.map((b) => ({
+      id: b.package?.id,
+      name: b.package?.name,
+      price: b.package?.finalPrice,
+      tests: b.package?.items.map((i) => i.test.name),
+    }));
 
-    // 💰 Bill summary
-    const totalMRP = tests.reduce((sum, t) => sum + t.price, 0);
-    const discount = 0;
+    const totalMRP = packages.reduce((sum, p) => sum + (p.price || 0), 0);
+
     const bookingFee = 10;
     const platformFee = 30;
     const homeCollection = 50;
 
     const totalAmount =
-      totalMRP - discount + bookingFee + platformFee + homeCollection;
+      totalMRP + bookingFee + platformFee + homeCollection;
 
     return res.json({
       bookingIds: ids,
       expiresAt: bookings[0].expiresAt,
-
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        phone: user.phone
-      },
-
-      patient,
+      user,
       lab,
-      tests,
-      address,
-
+      packages,
       billSummary: {
         totalMRP,
-        discount,
         bookingFee,
         platformFee,
         homeCollection,
-        totalAmount
-      }
+        totalAmount,
+      },
     });
-
   } catch (err) {
-    console.error("getBookingSummary error:", err);
+    console.error("summary error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -286,104 +266,62 @@ export const checkoutLabCart = async (req, res) => {
 
     if (!userId || !slotId) {
       return res.status(400).json({
-        message: "userId and slotId are required"
+        message: "userId and slotId are required",
       });
     }
 
     const result = await prisma.$transaction(async (tx) => {
-
       // 1️⃣ Validate slot
       const slot = await tx.labSlot.findUnique({
-        where: { id: Number(slotId) }
+        where: { id: Number(slotId) },
       });
+      if (!slot) throw new Error("Slot not found");
 
-      if (!slot) {
-        throw new Error("Slot not found");
-      }
-
-      // 2️⃣ Check slot availability
-      const existing = await tx.labBooking.findFirst({
-        where: {
-          slotId: Number(slotId),
-          OR: [
-            { status: "COMPLETED" },
-            {
-              status: "HOLD",
-              expiresAt: { gt: new Date() }
-            }
-          ]
-        }
-      });
-
-      if (existing) {
-        throw new Error("Slot already booked");
-      }
-
-      // 3️⃣ Get cart items
+      // 2️⃣ Get cart
       const cartItems = await tx.labCart.findMany({
-        where: { userId: Number(userId) }
+        where: { userId: Number(userId) },
       });
 
-      if (!cartItems.length) {
-        throw new Error("Cart is empty");
-      }
+      if (!cartItems.length) throw new Error("Cart is empty");
 
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
       const bookings = [];
 
-      // 4️⃣ Create bookings
+      // 3️⃣ Create bookings (PACKAGE BASED)
       for (const item of cartItems) {
         const booking = await tx.labBooking.create({
           data: {
             userId: Number(userId),
             labId: item.labId,
-            labTestId: item.labTestId,
+            packageId: item.packageId, // ✅ PACKAGE
             slotId: Number(slotId),
             sampleDate: slot.slotDate,
             status: "HOLD",
             expiresAt,
-            ...(patientProfileId && {
-              patientProfileId: Number(patientProfileId)
-            })
-          }
+            patientProfileId: item.patientProfileId || null,
+          },
         });
 
         bookings.push(booking);
       }
 
-      // 5️⃣ Clear cart
+      // 4️⃣ Clear cart
       await tx.labCart.deleteMany({
-        where: { userId: Number(userId) }
+        where: { userId: Number(userId) },
       });
 
       return bookings;
     });
 
-    return res.status(200).json({
+    return res.json({
       message: "Slot held for 10 minutes",
       bookingCount: result.length,
-      bookingIds: result.map(b => b.id),
-      expiresAt: result[0].expiresAt
+      bookingIds: result.map((b) => b.id),
+      expiresAt: result[0]?.expiresAt,
     });
-
   } catch (err) {
-    console.error("checkoutLabCart error:", err);
-
-    if (err.message === "Slot not found") {
-      return res.status(404).json({ message: err.message });
-    }
-
-    if (
-      err.message === "Slot already booked" ||
-      err.message === "Cart is empty"
-    ) {
-      return res.status(409).json({ message: err.message });
-    }
-
-    return res.status(500).json({
-      message: "Internal server error"
-    });
+    console.error("checkout error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
