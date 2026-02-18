@@ -1,4 +1,4 @@
-import { completeMedicalProfileService , getProfileService } from "../services/profile.service.js";
+import { completeMedicalProfileService , getProfileService,editProfileService } from "../services/profile.service.js";
 
 export const completeMedicalProfile = async (req, res) => {
   try {
@@ -29,4 +29,21 @@ export const getProfile = async (req, res) => {
     }
         return res.status(500).json({ message: err.message });
     }           
+};
+
+
+export const editProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await editProfileService(userId, req.body);
+
+    return res.json({
+      message: "Profile edited successfully",
+      user
+    });
+
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
 };

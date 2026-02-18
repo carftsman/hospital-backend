@@ -1,6 +1,7 @@
 // src/server.js
 import app from "./app.js";
 import dotenv from "dotenv";
+import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
 
 import { expireHoldBookings } from "./jobs/expireHoldBookings.job.js";
 import { releaseExpiredBookings } from "./jobs/releaseExpiredBookings.job.js";
@@ -38,6 +39,9 @@ async function startJobs() {
   runExpireJob();
   runReleaseJob();
 }
+
+app.use("/api-docs", swaggerUiServe, swaggerUiSetup);
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

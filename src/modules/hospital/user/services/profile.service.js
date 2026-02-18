@@ -111,3 +111,72 @@ export const getProfileService = async (userId) => {
         isOnboardingCompleted: user.isOnboardingCompleted
     }
 };
+
+
+
+export const editProfileService = async (userId, body) => {
+  // 1️⃣ Check if user exists
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+
+  if (!existingUser) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  // 2️⃣ Prepare update data safely
+  const updateData = {};
+
+  if (body.fullName !== undefined) updateData.fullName = body.fullName.trim();
+  if (body.phone !== undefined) updateData.phone = body.phone.trim();
+
+  if (body.email !== undefined) {
+    const normalizedEmail = body.email.toLowerCase().trim();
+
+    // ✅ Check if email already exists
+    const emailExists = await prisma.user.findFirst({
+      where: {
+        email: normalizedEmail,
+        NOT: { id: userId }
+      }
+    });
+
+    if (emailExists) throw new Error("EMAIL_ALREADY_EXISTS");
+    updateData.email = normalizedEmail;
+  }
+
+  if (body.gender !== undefined) {
+    const normalizedGender = body.gender.trim().toUpperCase();
+    const allowedGenders = ["MALE", "FEMALE", "OTHER"];
+    if (!allowedGenders.includes(normalizedGender)) throw new Error("INVALID_GENDER");
+    updateData.gender = normalizedGender;
+  }
+
+  if (body.emContactName !== undefined) updateData.emContactName = body.emContactName.trim();
+  if (body.emContactNumber !== undefined) updateData.emContactNumber = body.emContactNumber.trim();
+
+  // ✅ Handle DateOfBirth
+  if (body.DateOfBirth !== undefined) {
+    const dob = new Date(body.DateOfBirth);
+    if (isNaN(dob.getTime())) throw new Error("INVALID_DATE_OF_BIRTH");
+    updateData.DateOfBirth = dob;
+  }
+
+  // 3️⃣ Update user in DB
+  const updatedUser = await updateUserProfile(userId, updateData);
+
+  // 4️⃣ Return only the fields you need
+  return {
+    fullName: updatedUser.fullName,
+    phone: updatedUser.phone,
+    email: updatedUser.email,
+    gender: updatedUser.gender,
+    emContactName: updatedUser.emContactName,
+    emContactNumber: updatedUser.emContactNumber,
+    DateOfBirth: updatedUser.DateOfBirth
+      ? updatedUser.DateOfBirth.toISOString().split("T")[0] // YYYY-MM-DD
+      : null
+  };
+};
+
+

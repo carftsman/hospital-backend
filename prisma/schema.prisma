@@ -28,6 +28,7 @@ model User {
   fullName              String?
   isOnboardingCompleted Boolean           @default(false)
   gender                String?           @default("MALE")
+  DateOfBirth           DateTime?         @db.Date
   bookings              Booking[]
   labAddresses          LabAddress[]
   labBookings           LabBooking[]
@@ -216,29 +217,29 @@ model PatientProfile {
 }
 
 model Lab {
-  id           Int           @id @default(autoincrement())
-  name         String
-  imageUrl     String?
-  description  String?
-  phone        String?
-  address      String?
-  city         String?
-  state        String?
-  latitude     Float?
-  longitude    Float?
-  isOpen       Boolean       @default(true)
-  rating       Float         @default(0)
-  createdAt    DateTime      @default(now())
-  popularity   Int           @default(0)
-  slotDuration Int           @default(60)
-  openTime     DateTime?     @db.Time(0)
-  closeTime    DateTime?     @db.Time(0)
-  bookings     LabBooking[]
-  LabCart      LabCart[]
-  LabPackage   LabPackage[]
-  slots        LabSlot[]
-  tests        LabTest[]
-  categories   LabCategory[] @relation("LabCategories")
+  id            Int             @id @default(autoincrement())
+  name          String
+  imageUrl      String?
+  description   String?
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  latitude      Float?
+  longitude     Float?
+  isOpen        Boolean         @default(true)
+  rating        Float           @default(0)
+  createdAt     DateTime        @default(now())
+  popularity    Int             @default(0)
+  slotDuration  Int             @default(60)
+  openTime      DateTime?       @db.Time(0)
+  closeTime     DateTime?       @db.Time(0)
+  bookings      LabBooking[]
+  LabCart       LabCart[]
+  LabPackage    LabPackage[]
+  slots         LabSlot[]
+  tests         LabTest[]
+  LabCategories LabCategories[]
 }
 
 model LabCategory {
@@ -250,7 +251,6 @@ model LabCategory {
   group     String?
   imageUrl  String?
   tests     LabTest[]
-  labs      Lab[]     @relation("LabCategories")
 }
 
 model LabTest {
@@ -266,11 +266,11 @@ model LabTest {
   minAge         Int?
   maxAge         Int?
   imageUrl       String?
+  bookings       LabBooking[]
   LabCart        LabCart[]
   LabPackageItem LabPackageItem[]
   category       LabCategory      @relation(fields: [categoryId], references: [id])
   lab            Lab              @relation(fields: [labId], references: [id])
-  LabBooking     LabBooking[]
 
   @@unique([labId, categoryId, name])
 }
@@ -310,36 +310,29 @@ model LabSlot {
 }
 
 model LabBooking {
-  id     Int @id @default(autoincrement())
-  userId Int
-  labId  Int
-
-  labTestId Int?
-  packageId Int?
-
-  status     LabBookingStatus @default(PENDING)
-  sampleDate DateTime
-  createdAt  DateTime         @default(now())
-
-  collectedAt     DateTime?
-  reportedIssueAt DateTime?
-
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  labId            Int
+  labTestId        Int
+  status           LabBookingStatus @default(PENDING)
+  sampleDate       DateTime
+  createdAt        DateTime         @default(now())
+  collectedAt      DateTime?
+  reportedIssueAt  DateTime?
   expiresAt        DateTime?
   slotId           Int?
   patientProfileId Int?
+  lab              Lab              @relation(fields: [labId], references: [id])
+  test             LabTest          @relation(fields: [labTestId], references: [id])
+  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  slot             LabSlot?         @relation(fields: [slotId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
+  feedback         LabFeedback?
+  report           LabReport?
 
-  lab     Lab         @relation(fields: [labId], references: [id])
-  package LabPackage? @relation(fields: [packageId], references: [id])
-
-  // ✅ ADD THIS
-  LabTest LabTest? @relation(fields: [labTestId], references: [id])
-
-  patient PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  slot    LabSlot?        @relation(fields: [slotId], references: [id])
-  user    User            @relation(fields: [userId], references: [id])
-
-  report   LabReport?
-  feedback LabFeedback?
+  @@index([userId])
+  @@index([labId])
+  @@index([slotId])
 }
 
 model LabReport {
@@ -366,20 +359,17 @@ model LabCart {
   id               Int              @id @default(autoincrement())
   userId           Int
   labId            Int
-  labTestId        Int?
+  labTestId        Int
   quantity         Int              @default(1)
-  createdAt        DateTime         @default(now())
+  createdAt        DateTime         @default(now()) @db.Timestamp(6)
   consultationType ConsultationType @default(LAB_VISIT)
   patientProfileId Int?
-  packageId        Int?
-  lab              Lab              @relation(fields: [labId], references: [id])
-  LabTest          LabTest?         @relation(fields: [labTestId], references: [id])
-  package          LabPackage?      @relation(fields: [packageId], references: [id])
-  PatientProfile   PatientProfile?  @relation(fields: [patientProfileId], references: [id])
-  user             User             @relation(fields: [userId], references: [id])
+  test             LabTest          @relation(fields: [labTestId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_labTest_fkey")
+  lab              Lab              @relation(fields: [labId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_lab_fkey")
+  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LabCart_user_fkey")
 
-  @@unique([userId, packageId])
-  @@unique([userId, labTestId])
+  @@unique([userId, labId, labTestId], map: "LabCart_user_lab_labTest_unique")
 }
 
 model LabPrescription {
@@ -425,11 +415,12 @@ model LabPackage {
   createdAt     DateTime         @default(now())
   minage        Int?
   maxage        Int?
-  gender        LabPackageGender
-  cartItems     LabCart[]
-  bookings      LabBooking[] // ✅ ADD THIS
+  gender        LabPackageGender @default(MALE)
   lab           Lab              @relation(fields: [labId], references: [id])
   items         LabPackageItem[]
+
+  @@index([labId])
+  @@index([gender])
 }
 
 model LabPackageItem {
@@ -442,6 +433,16 @@ model LabPackageItem {
   @@unique([packageId, labTestId])
 }
 
+model LabCategories {
+  A   Int
+  B   Int
+  Lab Lab @relation(fields: [A], references: [id], onDelete: Cascade)
+
+  @@unique([A, B], map: "_LabCategories_AB_unique")
+  @@index([B], map: "_LabCategories_B_index")
+  @@map("_LabCategories")
+}
+
 enum BookingFor {
   SELF
   OTHER
@@ -449,12 +450,12 @@ enum BookingFor {
 
 enum LabBookingStatus {
   PENDING
+  HOLD
+  CONFIRMED
   SAMPLE_COLLECTED
   COMPLETED
   CANCELLED
-  HOLD
   EXPIRED
-  CONFIRMED
 }
 
 enum LabPackageGender {
