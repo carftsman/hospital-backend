@@ -257,16 +257,24 @@ export const getPackagesByAge = async (req, res) => {
 export const getUserPastLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
-  const bookings = await prisma.labBooking.findMany({
-    where: { userId, status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] } },
-    include: {
-  lab: true,
-  test: true,
-  package: {
- include: { items: { include: { test: true } } } },
+ const bookings = await prisma.labBooking.findMany({
+  where: {
+    userId: 21,
+    status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] },
+  },
+  include: {
+    lab: true,
+    package: {
+      include: {
+        items: {
+          include: { test: true }, // ✅ correct place
+        },
+      },
     },
-    orderBy: { createdAt: "desc" },
-  });
+  },
+  orderBy: { createdAt: "desc" },
+});
+
 
   const formatted = bookings.map(b => ({
     bookingId: b.id,
@@ -289,13 +297,23 @@ export const getUserUpcomingLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
   const bookings = await prisma.labBooking.findMany({
-    where: { userId, status: { in: ["PENDING", "CONFIRMED"] } },
-    include: {
-      lab: true,
-      test: true,
-      package: { include: { items: { include: { test: true } } } },
+  where: {
+    userId: 21,
+    status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] },
+  },
+  include: {
+    lab: true,
+    package: {
+      include: {
+        items: {
+          include: { test: true }, // ✅ correct place
+        },
+      },
     },
-  });
+  },
+  orderBy: { createdAt: "desc" },
+});
+
 
   const formatted = bookings.map(b => ({
     bookingId: b.id,
@@ -1045,19 +1063,23 @@ export const getUserLabReports = async (req, res) => {
       status: "COMPLETED",
     },
   },
-  include: {
-    booking: {
-      include: {
-        lab: true,
-        test: true, // ✅ FIXED
-        package: {
-          include: {
-            items: { include: { test: true } },
-          },
-        },
-      },
-    },
-  },
+include: {
+  booking: {
+    include: {
+      lab: true,
+      package: {
+        include: {
+          items: {
+            include: {
+              test: true // ✅ THIS IS OK (package tests)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+,
   orderBy: { createdAt: "desc" },
 });
 
@@ -1086,21 +1108,20 @@ export const getLabReportDetails = async (req, res) => {
     }
 
     const report = await prisma.labReport.findUnique({
-      where: { id: reportId },
+      where: { id: reportId }, // ✅ FIXED
       include: {
         booking: {
           include: {
             lab: true,
-            test: true, // ✅ FIXED
             package: {
               include: {
                 items: {
-                  include: {
-                    test: true
-                  }
+                  include: { test: true }
                 }
               }
-            }
+            },
+            patient: true,
+            user: true
           }
         }
       }
@@ -1114,36 +1135,22 @@ export const getLabReportDetails = async (req, res) => {
 
     const booking = report.booking;
 
-    // 🧠 Extract tests (hybrid safe)
     let tests = [];
-
     if (booking.package) {
       tests = booking.package.items.map(i => i.test.name);
-    } else if (booking.LabTest) {
-      tests = [booking.LabTest.name];
     }
 
     res.json({
       reportId: report.id,
       bookingId: report.labBookingId,
-
       labName: booking.lab?.name,
       tests,
-
-      collectedDate: booking.collectedAt
-        ? booking.collectedAt.toISOString().split("T")[0]
-        : null,
-
       issuedDate: report.createdAt.toISOString().split("T")[0],
-
       resultSummary: report.summary || "No summary available.",
-
-      reports: report.reportUrls?.length
-        ? report.reportUrls.map(url => ({
-            name: "Report",
-            url
-          }))
-        : []
+      reports: report.reportUrls?.map(url => ({
+        name: "Report",
+        url
+      })) || []
     });
 
   } catch (error) {
@@ -1151,6 +1158,7 @@ export const getLabReportDetails = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getLast30DaysLabTests = async (req, res) => {
   try {

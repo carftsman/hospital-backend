@@ -146,21 +146,17 @@ export const checkoutLabCart = async (req, res) => {
 
       for (const item of cart) {
         const booking = await tx.labBooking.create({
-          data: {
-            userId,
-            packageId: item.packageId,
-            slotId,
-            sampleDate: slot.slotDate,
-            status: "HOLD",
-            expiresAt,
-            patientProfileId: patientProfileId || null,
-
-            // ✅ THIS IS THE FIX
-            lab: {
-              connect: { id: item.labId },
-            },
-          },
-        });
+  data: {
+    userId: Number(userId),
+    labId: Number(item.labId),
+    packageId: Number(item.packageId), // ✅ package booking
+    slotId: Number(slotId),
+    sampleDate: slot.slotDate,
+    status: "HOLD",
+    expiresAt,
+    patientProfileId: patientProfileId || null,
+  },
+});
 
         bookings.push(booking);
       }

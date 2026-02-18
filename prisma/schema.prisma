@@ -266,23 +266,24 @@ model LabCategory {
 }
 
 model LabTest {
-  id             Int              @id @default(autoincrement())
-  labId          Int
-  categoryId     Int
-  name           String
-  description    String?
-  price          Int
-  reportTime     String
-  isAvailable    Boolean          @default(true)
-  createdAt      DateTime         @default(now())
-  minAge         Int?
-  maxAge         Int?
-  imageUrl       String?
-  bookings       LabBooking[]
+  id          Int      @id @default(autoincrement())
+  labId       Int
+  categoryId  Int
+  name        String
+  description String?
+  price       Int
+  reportTime  String
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  minAge      Int?
+  maxAge      Int?
+  imageUrl    String?
+
   LabCart        LabCart[]
   LabPackageItem LabPackageItem[]
-  category       LabCategory      @relation(fields: [categoryId], references: [id])
-  lab            Lab              @relation(fields: [labId], references: [id])
+
+  category LabCategory @relation(fields: [categoryId], references: [id])
+  lab      Lab         @relation(fields: [labId], references: [id])
 
   @@unique([labId, categoryId, name])
 }
@@ -322,33 +323,29 @@ model LabSlot {
 }
 
 model LabBooking {
-  id        Int  @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
   userId    Int
   labId     Int
-  labTestId Int
-  packageId Int? // ✅ ADD THIS
+  packageId Int?
 
   status           LabBookingStatus @default(PENDING)
   sampleDate       DateTime
   createdAt        DateTime         @default(now())
-  collectedAt      DateTime?
-  reportedIssueAt  DateTime?
   expiresAt        DateTime?
   slotId           Int?
   patientProfileId Int?
-  lab              Lab              @relation(fields: [labId], references: [id])
-  test             LabTest          @relation(fields: [labTestId], references: [id])
-  package          LabPackage?      @relation(fields: [packageId], references: [id])
 
-  patient  PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  slot     LabSlot?        @relation(fields: [slotId], references: [id])
-  user     User            @relation(fields: [userId], references: [id])
-  feedback LabFeedback?
-  report   LabReport?
+  // RELATIONS
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lab         Lab             @relation(fields: [labId], references: [id])
+  package     LabPackage?     @relation(fields: [packageId], references: [id])
+  slot        LabSlot?        @relation(fields: [slotId], references: [id])
+  patient     PatientProfile? @relation(fields: [patientProfileId], references: [id])
+  LabReport   LabReport?
+  LabFeedback LabFeedback?
 
   @@index([userId])
-  @@index([labId])
-  @@index([slotId])
 }
 
 model LabReport {
