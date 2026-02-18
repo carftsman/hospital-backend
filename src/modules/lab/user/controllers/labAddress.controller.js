@@ -3,7 +3,6 @@ import prisma from "../../../../prisma/client.js";
 /**
  * CREATE ADDRESS
  */
-
 export const createAddress = async (req, res) => {
   try {
     const {
@@ -24,6 +23,9 @@ export const createAddress = async (req, res) => {
       });
     }
 
+    // Auto default for first address
+    const count = await prisma.labAddress.count({ where: { userId } });
+
     const address = await prisma.labAddress.create({
       data: {
         userId,
@@ -34,21 +36,27 @@ export const createAddress = async (req, res) => {
         landmark,
         city,
         state,
-        pinCode
+        pinCode,
+        isDefault: count === 0
       }
     });
 
     res.json({
-      message: "Address created successfully",
+      message: count === 0
+        ? "Address created and set as default"
+        : "Address created successfully",
       address
     });
 
   } catch (error) {
-    console.error("createAddress error:", error);
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
 
+/**
+ * GET ADDRESSES
+ */
 export const getAddresses = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
@@ -68,14 +76,12 @@ export const getAddresses = async (req, res) => {
   }
 };
 
-export const deleteAddress = async (req, res) => {
+/**
+ * EDIT ADDRESS (NO UNAUTHORIZED NOW)
+ */
+export const editAddress = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const userId = Number(req.body.userId); // for swagger testing
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
 
     const address = await prisma.labAddress.findUnique({
       where: { id }
@@ -85,48 +91,91 @@ export const deleteAddress = async (req, res) => {
       return res.status(404).json({ message: "Address not found" });
     }
 
-    if (address.userId !== userId) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
+    const {
+      fullName,
+      mobile,
+      house,
+      street,
+      landmark,
+      city,
+      state,
+      pinCode
+    } = req.body;
 
-    const wasDefault = address.isDefault;
+    const updated = await prisma.labAddress.update({
+      where: { id },
+      data: {
+        ...(fullName && { fullName }),
+        ...(mobile && { mobile }),
+        ...(house && { house }),
+        ...(street && { street }),
+        ...(landmark && { landmark }),
+        ...(city && { city }),
+        ...(state && { state }),
+        ...(pinCode && { pinCode }),
+      }
+    });
 
-    await prisma.labAddress.delete({
+    res.json({
+      message: "Address updated successfully",
+      address: updated
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * DELETE ADDRESS
+ */
+export const deleteAddress = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    const address = await prisma.labAddress.findUnique({
       where: { id }
     });
 
-    // ✅ Auto assign new default if deleted one was default
+    if (!address) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+
+    const wasDefault = address.isDefault;
+    const userId = address.userId;
+
+    await prisma.labAddress.delete({ where: { id } });
+
+    // Reassign default if needed
     if (wasDefault) {
-      const nextAddress = await prisma.labAddress.findFirst({
+      const next = await prisma.labAddress.findFirst({
         where: { userId },
         orderBy: { createdAt: "asc" }
       });
 
-      if (nextAddress) {
+      if (next) {
         await prisma.labAddress.update({
-          where: { id: nextAddress.id },
+          where: { id: next.id },
           data: { isDefault: true }
         });
       }
     }
 
-    return res.json({ message: "Address deleted successfully" });
+    res.json({ message: "Address deleted successfully" });
 
   } catch (error) {
-    console.error("deleteAddress error:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-
+/**
+ * SET DEFAULT ADDRESS
+ */
 export const setDefaultAddress = async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const userId = Number(req.body.userId);
-
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
 
     const address = await prisma.labAddress.findUnique({
       where: { id }
@@ -136,14 +185,7 @@ export const setDefaultAddress = async (req, res) => {
       return res.status(404).json({ message: "Address not found" });
     }
 
-    if (address.userId !== userId) {
-      return res.status(403).json({ message: "Unauthorized access" });
-    }
-
-    // already default
-    if (address.isDefault) {
-      return res.json({ message: "Address already default" });
-    }
+    const userId = address.userId;
 
     await prisma.$transaction([
       prisma.labAddress.updateMany({
@@ -156,10 +198,10 @@ export const setDefaultAddress = async (req, res) => {
       })
     ]);
 
-    return res.json({ message: "Default address updated" });
+    res.json({ message: "Default address updated" });
 
-  } catch (err) {
-    console.error("setDefaultAddress error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -115,7 +115,6 @@ router.post("/", controller.createAddress);
 
 router.get("/", controller.getAddresses);
 
-
 /**
  * @swagger
  * /api/labs/address/{id}:
@@ -161,6 +160,39 @@ router.delete("/:id", controller.deleteAddress);
  */
 
 router.patch("/default/:id", controller.setDefaultAddress);
+
+/**
+ * @swagger
+ * /api/labs/address/{id}:
+ *   patch:
+ *     summary: Edit address
+ *     tags: [Lab Address]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             userId: 12
+ *             fullName: John Updated
+ *             mobile: "9999999999"
+ *             house: Flat 505
+ *             street: Jubilee Hills
+ *             landmark: Near Temple
+ *             city: Hyderabad
+ *             state: Telangana
+ *             pinCode: "500033"
+ *     responses:
+ *       200:
+ *         description: Address updated
+ */
+router.patch("/:id", controller.editAddress);
+
 
 
 export default router;
