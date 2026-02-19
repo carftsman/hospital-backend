@@ -1,8 +1,5 @@
 import prisma from "../../../../prisma/client.js";
 
-/**
- * ADD PACKAGE TO CART
- */
 export const addToLabCart = async (req, res) => {
   try {
     const { userId, labId, packageId } = req.body;
@@ -26,7 +23,7 @@ export const addToLabCart = async (req, res) => {
         include: {
           package: {
             include: {
-              items: { include: { test: { select: { name: true } } } },
+              items: { include: { test: true } },
             },
           },
         },
@@ -37,16 +34,24 @@ export const addToLabCart = async (req, res) => {
         include: {
           package: {
             include: {
-              items: { include: { test: { select: { name: true } } } },
+              items: { include: { test: true } },
             },
           },
         },
       });
     }
 
+    // ✅ CLEAN RESPONSE (NO testId)
     res.json({
       message: "Package added to cart",
-      item,
+      item: {
+        id: item.id,
+        name: item.package.name,
+        price: item.package.finalPrice,
+        quantity: item.quantity,
+        testsCount: item.package.items.length,
+        tests: item.package.items.map(t => t.test.name),
+      },
     });
   } catch (error) {
     console.error("addToLabCart:", error);
@@ -58,6 +63,17 @@ export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
     if (!userId) return res.status(400).json({ message: "userId required" });
+
+    // ✅ USER DETAILS
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        phone: true,
+        gender: true,
+      },
+    });
 
     const items = await prisma.labCart.findMany({
       where: { userId },
@@ -72,10 +88,26 @@ export const getLabCart = async (req, res) => {
       orderBy: { id: "desc" },
     });
 
-    const valid = items.filter(i => i.package);
+    if (!items.length) {
+      return res.json({
+        user,
+        count: 0,
+        items: [],
+      });
+    }
 
-    const totalMRP = valid.reduce(
-      (sum, i) => sum + i.package.finalPrice * i.quantity,
+    const lab = items[0].lab;
+
+    const formatted = items.map(i => ({
+      id: i.id,
+      name: i.package.name,
+      price: i.package.finalPrice,
+      quantity: i.quantity,
+      tests: i.package.items.map(t => t.test.name),
+    }));
+
+    const totalMRP = formatted.reduce(
+      (sum, i) => sum + i.price * i.quantity,
       0
     );
 
@@ -84,15 +116,10 @@ export const getLabCart = async (req, res) => {
     const homeCollection = 50;
 
     res.json({
-      lab: valid[0]?.lab || null,
-      count: valid.length,
-      items: valid.map(i => ({
-        id: i.id,
-        name: i.package.name,
-        price: i.package.finalPrice,
-        quantity: i.quantity,
-        tests: i.package.items.map(t => t.test.name),
-      })),
+      user, // ✅ added
+      lab,
+      count: formatted.length,
+      items: formatted,
       billSummary: {
         totalMRP,
         bookingFee,
@@ -107,9 +134,6 @@ export const getLabCart = async (req, res) => {
   }
 };
 
-/**
- * REMOVE CART ITEM
- */
 export const removeFromLabCart = async (req, res) => {
   const id = Number(req.params.id);
   await prisma.labCart.delete({ where: { id } });

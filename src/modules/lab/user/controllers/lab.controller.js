@@ -124,11 +124,7 @@ export const getNearbyLabs = async (req, res) => {
 export const getLabPackageDetails = async (req, res) => {
   try {
     const packageId = Number(req.params.packageId);
- 
-    if (!Number.isInteger(packageId) || packageId <= 0) {
-      return res.status(400).json({ message: "Invalid packageId" });
-    }
- 
+
     const pkg = await prisma.labPackage.findUnique({
       where: { id: packageId },
       include: {
@@ -136,51 +132,65 @@ export const getLabPackageDetails = async (req, res) => {
           include: {
             test: {
               select: {
-                id: true,
                 name: true,
-                price: true
+                category: {
+                  select: { name: true }
+                }
               }
             }
           }
         },
         lab: {
-          select: {
-            id: true,
-            name: true
-          }
+          select: { name: true }
         }
       }
     });
- 
+
     if (!pkg) {
       return res.status(404).json({ message: "Package not found" });
     }
- 
+
+    // 🧠 Group by category (for accordion UI)
+    const grouped = {};
+
+    pkg.items.forEach(i => {
+      const cat = i.test.category?.name || "Other";
+
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(i.test.name);
+    });
+
+    const sections = Object.keys(grouped).map(title => ({
+      title,
+      tests: grouped[title]
+    }));
+
     const tests = pkg.items.map(i => i.test);
- 
-    const originalPrice = tests.reduce((sum, t) => sum + t.price, 0);
+
+    const originalPrice = tests.reduce((s, t) => s + (t.price || 0), 0);
     const finalPrice = pkg.finalPrice;
- 
+
     res.json({
       packageId: pkg.id,
       packageName: pkg.name,
       labName: pkg.lab.name,
- 
+      imageUrl: pkg.imageUrl || null,
+
       testsCount: tests.length,
-      tests: tests.map(t => t.name),
- 
-      reportTime: pkg.reportTime,
- 
+      reportTime: pkg.reportTime || "10 Hrs",
+
+      sections,
+
       instructions: pkg.instructions
-        ? pkg.instructions.split("\n")   // if stored as text in DB
+        ? pkg.instructions.split("\n")
         : [
             "Requires 10–12 hours fasting",
-            "Avoid alcohol 24 hours before test",
-            "Inform doctor if on medication"
+            "Only water allowed",
+            "Avoid alcohol 24 hours before test"
           ],
- 
+
       pricing: {
-        originalPrice,
+        mrp: originalPrice,
         finalPrice,
         discountPercent:
           originalPrice > 0
@@ -189,92 +199,109 @@ export const getLabPackageDetails = async (req, res) => {
         currency: "INR"
       }
     });
- 
+
   } catch (error) {
-    console.error("getLabPackageDetails error:", error);
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
- 
-/**
- * 📦 Get Lab Packages by Age
- * Screen: Labs → Age Selection → Packages
- */
- 
+
 export const getPackagesByAge = async (req, res) => {
   try {
     const age = Number(req.query.age);
     const labId = Number(req.query.labId);
- 
+    const gender = req.query.gender?.toUpperCase(); // optional
+
     if (!age || !labId) {
       return res.status(400).json({
-        message: "age and labId are required"
+        message: "age and labId are required",
       });
     }
- 
-    const packages = await prisma.labTest.findMany({
+
+    const packages = await prisma.labPackage.findMany({
       where: {
         labId,
-        isAvailable: true,
+
+        // AGE FILTER
         AND: [
           {
             OR: [
-              { minAge: null },
-              { minAge: { lte: age } }
-            ]
+              { minage: null },
+              { minage: { lte: age } },
+            ],
           },
           {
             OR: [
-              { maxAge: null },
-              { maxAge: { gte: age } }
-            ]
-          }
-        ]
+              { maxage: null },
+              { maxage: { gte: age } },
+            ],
+          },
+        ],
+
+        // GENDER FILTER (optional)
+        ...(gender && {
+          OR: [
+            { gender: "ALL" },
+            { gender },
+          ],
+        }),
       },
-      orderBy: {
-        price: "asc"
-      }
+      include: {
+        items: {
+          include: {
+            test: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+      orderBy: { finalPrice: "asc" },
     });
- 
+
     res.json({
       age,
       labId,
       count: packages.length,
-      packages
+      packages: packages.map(p => ({
+        packageId: p.id,
+        packageName: p.name,
+        finalPrice: p.finalPrice,
+        reportTime: p.reportTime,
+        gender: p.gender,
+        minAge: p.minage,
+        maxAge: p.maxage,
+        tests: p.items.map(i => i.test.name),
+        testsCount: p.items.length,
+      })),
     });
+
   } catch (error) {
     console.error("getPackagesByAge error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
+
  
 export const getUserPastLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
- const bookings = await prisma.labBooking.findMany({
-  where: {
-    userId: 21,
-    status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] },
-  },
-  include: {
-    lab: true,
-    package: {
-      include: {
-        items: {
-          include: { test: true }, // ✅ correct place
+  const bookings = await prisma.labBooking.findMany({
+    where: {
+      userId,
+      status: { in: ["COMPLETED", "CANCELLED"] },
+    },
+    include: {
+      lab: true,
+      package: {
+        include: {
+          items: {
+            include: { test: true },
+          },
         },
       },
     },
-  },
-  orderBy: { createdAt: "desc" },
-});
-
+    orderBy: { createdAt: "desc" },
+  });
 
   const formatted = bookings.map(b => ({
     bookingId: b.id,
@@ -282,8 +309,6 @@ export const getUserPastLabBookings = async (req, res) => {
     status: b.status,
     tests: b.package
       ? b.package.items.map(i => i.test.name)
-      : b.LabTest
-      ? [b.test?.name]
       : [],
     date: b.createdAt.toISOString().split("T")[0],
   }));
@@ -291,29 +316,26 @@ export const getUserPastLabBookings = async (req, res) => {
   res.json({ count: formatted.length, bookings: formatted });
 };
 
- 
- 
 export const getUserUpcomingLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
   const bookings = await prisma.labBooking.findMany({
-  where: {
-    userId: 21,
-    status: { in: ["COMPLETED", "CONFIRMED", "CANCELLED"] },
-  },
-  include: {
-    lab: true,
-    package: {
-      include: {
-        items: {
-          include: { test: true }, // ✅ correct place
+    where: {
+      userId,
+      status: { in: ["HOLD", "CONFIRMED"] },
+    },
+    include: {
+      lab: true,
+      package: {
+        include: {
+          items: {
+            include: { test: true },
+          },
         },
       },
     },
-  },
-  orderBy: { createdAt: "desc" },
-});
-
+    orderBy: { sampleDate: "asc" },
+  });
 
   const formatted = bookings.map(b => ({
     bookingId: b.id,
@@ -321,8 +343,6 @@ export const getUserUpcomingLabBookings = async (req, res) => {
     sampleDate: b.sampleDate,
     tests: b.package
       ? b.package.items.map(i => i.test.name)
-      : b.LabTest
-      ? [b.test?.name]
       : [],
   }));
 
@@ -613,16 +633,30 @@ export const getLabPackages = async (req, res) => {
         packageName: p.name,
         originalPrice: p.originalPrice,
         finalPrice: p.finalPrice,
+
         discountPercent:
           p.originalPrice > 0
             ? Math.round(
                 ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
               )
             : 0,
+
         reportTime: p.reportTime,
+
+        // ✅ AGE ADDED
+        minAge: p.minage,
+        maxAge: p.maxage,
+
+        // Optional UI friendly
+        ageRange:
+          p.minage && p.maxage
+            ? `${p.minage}-${p.maxage}`
+            : "All Ages",
+
+        gender: p.gender,
+
         tests: p.items.map(item => item.test.name),
-        testsCount: p.items.length,
-        gender: p.gender
+        testsCount: p.items.length
       }))
     });
 
@@ -644,13 +678,9 @@ export const filterLabPackages = async (req, res) => {
       sortBy = "price_low"
     } = req.query;
 
-    if (!labId) {
-      return res.status(400).json({ message: "labId is required" });
-    }
-
     const filters = [];
 
-    // 💰 Price Filter
+    // 💰 Price
     if (minPrice || maxPrice) {
       filters.push({
         finalPrice: {
@@ -660,7 +690,7 @@ export const filterLabPackages = async (req, res) => {
       });
     }
 
-    // 👶 Age Filter
+    // 👶 Age overlap logic
     if (minAge || maxAge) {
       filters.push({
         AND: [
@@ -680,20 +710,12 @@ export const filterLabPackages = async (req, res) => {
       });
     }
 
-    // 🚻 Gender Filter (ENUM Safe)
+    // 🚻 Gender
     if (gender) {
-      const genderValue = gender.toUpperCase();
-
-      if (genderValue === "ALL") {
-        filters.push({ gender: "ALL" });
-      } else {
-        filters.push({
-          OR: [
-            { gender: "ALL" },
-            { gender: genderValue }
-          ]
-        });
-      }
+      const g = gender.toUpperCase();
+      filters.push({
+        OR: [{ gender: "ALL" }, { gender: g }]
+      });
     }
 
     // 🔄 Sorting
@@ -703,19 +725,10 @@ export const filterLabPackages = async (req, res) => {
         : { finalPrice: "asc" };
 
     const packages = await prisma.labPackage.findMany({
-      where: {
-        labId: Number(labId),
-        AND: filters
-      },
+      where: { labId: Number(labId), AND: filters },
       include: {
         items: {
-          include: {
-            test: {
-              select: {
-                name: true
-              }
-            }
-          }
+          include: { test: { select: { name: true } } }
         }
       },
       orderBy
@@ -735,17 +748,20 @@ export const filterLabPackages = async (req, res) => {
               )
             : 0,
         reportTime: p.reportTime,
-        tests: p.items.map(item => item.test.name),
+        tests: p.items.map(i => i.test.name),
         testsCount: p.items.length,
-        gender: p.gender
+        gender: p.gender,
+        minAge: p.minage,
+        maxAge: p.maxage
       }))
     });
 
-  } catch (error) {
-    console.error("filterLabPackages error:", error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const confirmLabBooking = async (req, res) => {
   try {
@@ -1051,110 +1067,144 @@ export const autoSuggestLabs = async (req, res) => {
 };
  
  
- 
- 
 export const getUserLabReports = async (req, res) => {
-  const userId = Number(req.query.userId);
-
-  const reports = await prisma.labReport.findMany({
-  where: {
-    booking: {
-      userId,
-      status: "COMPLETED",
-    },
-  },
-include: {
-  booking: {
-    include: {
-      lab: true,
-      package: {
-        include: {
-          items: {
-            include: {
-              test: true // ✅ THIS IS OK (package tests)
-            }
-          }
-        }
-      }
-    }
-  }
-}
-,
-  orderBy: { createdAt: "desc" },
-});
-
-  const formatted = reports.map(r => ({
-    reportId: r.id,
-    labName: r.booking.lab?.name,
-    tests: r.booking.package
-      ? r.booking.package.items.map(i => i.test.name)
-      : r.booking.LabTest
-      ? [r.booking.LabTest.name]
-      : [],
-    date: r.createdAt.toISOString().split("T")[0],
-  }));
-
-  res.json({ count: formatted.length, reports: formatted });
-};
-
-export const getLabReportDetails = async (req, res) => {
   try {
-    const reportId = Number(req.params.reportId);
+    const userId = Number(req.query.userId);
+    const search = req.query.search?.toLowerCase();
+    const reportStatus = req.query.reportStatus;
+    const timeRange = req.query.timeRange;
+    const fromDate = req.query.fromDate;
+    const toDate = req.query.toDate;
 
-    if (!reportId) {
-      return res.status(400).json({
-        message: "reportId is required"
-      });
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
     }
 
-    const report = await prisma.labReport.findUnique({
-      where: { id: reportId }, // ✅ FIXED
+    // 📅 Date Filters
+    let dateFilter = {};
+    if (timeRange === "LAST_30_DAYS") {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      dateFilter = { gte: d };
+    } else if (fromDate || toDate) {
+      dateFilter = {
+        ...(fromDate && { gte: new Date(fromDate) }),
+        ...(toDate && { lte: new Date(toDate) })
+      };
+    }
+
+    const reports = await prisma.labReport.findMany({
+      where: {
+        ...(reportStatus && { reportStatus }),
+        ...(Object.keys(dateFilter).length && {
+          createdAt: dateFilter
+        }),
+        booking: {
+          userId,
+          status: "COMPLETED"
+        }
+      },
       include: {
         booking: {
           include: {
             lab: true,
             package: {
               include: {
-                items: {
-                  include: { test: true }
-                }
+                items: { include: { test: true } }
               }
-            },
-            patient: true,
-            user: true
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    // 🔎 Search filter (lab + test + package)
+    let filtered = reports;
+    if (search) {
+      filtered = reports.filter(r => {
+        const lab = r.booking.lab?.name?.toLowerCase() || "";
+        const pkg = r.booking.package?.name?.toLowerCase() || "";
+        const tests = r.booking.package?.items
+          ?.map(i => i.test.name.toLowerCase())
+          .join(" ");
+
+        return lab.includes(search) || pkg.includes(search) || tests?.includes(search);
+      });
+    }
+
+    const formatted = filtered.map(r => {
+      const tests = r.booking.package
+        ? r.booking.package.items.map(i => i.test.name)
+        : [];
+
+      return {
+        reportId: r.id,
+        bookingId: r.labBookingId,
+        labName: r.booking.lab?.name,
+        testName: r.booking.package?.name || tests[0],
+        testsCount: tests.length,
+        status: r.reportStatus,
+        date: r.createdAt.toISOString().split("T")[0]
+      };
+    });
+
+    res.json({ count: formatted.length, reports: formatted });
+
+  } catch (err) {
+    console.error("getUserLabReports:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getLabReportDetails = async (req, res) => {
+  try {
+    const reportId = Number(req.params.reportId);
+    if (!reportId) {
+      return res.status(400).json({ message: "reportId required" });
+    }
+
+    const report = await prisma.labReport.findUnique({
+      where: { id: reportId },
+      include: {
+        booking: {
+          include: {
+            lab: true,
+            package: {
+              include: {
+                items: { include: { test: true } }
+              }
+            }
           }
         }
       }
     });
 
     if (!report) {
-      return res.status(404).json({
-        message: "Lab report not found"
-      });
+      return res.status(404).json({ message: "Report not found" });
     }
 
-    const booking = report.booking;
-
-    let tests = [];
-    if (booking.package) {
-      tests = booking.package.items.map(i => i.test.name);
-    }
+    const tests = report.booking.package
+      ? report.booking.package.items.map(i => i.test.name)
+      : [];
 
     res.json({
       reportId: report.id,
       bookingId: report.labBookingId,
-      labName: booking.lab?.name,
+      labName: report.booking.lab?.name,
       tests,
+      collectedDate: report.collectedAt,
       issuedDate: report.createdAt.toISOString().split("T")[0],
-      resultSummary: report.summary || "No summary available.",
-      reports: report.reportUrls?.map(url => ({
+      resultSummary: report.summary || "No summary available",
+      status: report.reportStatus,
+      reports: report.reportUrls.map(url => ({
         name: "Report",
         url
-      })) || []
+      }))
     });
 
-  } catch (error) {
-    console.error("getLabReportDetails error:", error);
+  } catch (err) {
+    console.error("getLabReportDetails:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -1214,43 +1264,28 @@ export const getLast30DaysLabTests = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-/**
- * ===============================
- * 📥 DOWNLOAD REPORT
- * ===============================
- */
 export const downloadLabReport = async (req, res) => {
   try {
     const reportId = Number(req.params.reportId);
- 
-    if (!reportId) {
-      return res.status(400).json({ message: "reportId is required" });
-    }
- 
+
     const report = await prisma.labReport.findUnique({
       where: { id: reportId },
       select: { reportUrls: true }
     });
- 
-    if (
-      !report ||
-      !Array.isArray(report.reportUrls) ||
-      report.reportUrls.length === 0
-    ) {
-      return res.status(404).json({ message: "Report file not found" });
+
+    if (!report?.reportUrls?.length) {
+      return res.status(404).json({ message: "File not found" });
     }
- 
-    const fileUrl = report.reportUrls[0];
- 
+
     res.setHeader("Content-Disposition", "attachment");
-    return res.redirect(fileUrl);
- 
-  } catch (error) {
-    console.error("downloadLabReport error:", error);
+    return res.redirect(report.reportUrls[0]);
+
+  } catch (err) {
+    console.error("downloadLabReport:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
+
 export const submitLabFeedback = async (req, res) => {
   try {
     const { bookingId, rating, comment } = req.body;
