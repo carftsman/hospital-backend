@@ -92,6 +92,51 @@ router.post("/", controller.addToLabCart);
  */
 router.get("/", controller.getLabCart);
 
+/**
+ * @swagger
+ * /api/labs/cart/summary:
+ *   get:
+ *     summary: Get cart summary (editable preview)
+ *     description: Returns lab cart summary with patient, address, packages and bill
+ *     tags: [Lab Cart]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 21
+ *     responses:
+ *       200:
+ *         description: Cart summary
+ *         content:
+ *           application/json:
+ *             example:
+ *               userId: 21
+ *               consultationType: LAB_VISIT
+ *               patient:
+ *                 fullName: Vicky
+ *                 age: 30
+ *                 gender: Male
+ *               address:
+ *                 id: 5
+ *                 city: Hyderabad
+ *               lab:
+ *                 id: 2
+ *                 name: Apollo Diagnostics
+ *               packages:
+ *                 - packageId: 5
+ *                   name: Prime Full Body Checkup
+ *                   price: 999
+ *                   tests: ["CBC", "LFT", "KFT"]
+ *               billSummary:
+ *                 totalMRP: 999
+ *                 bookingFee: 10
+ *                 platformFee: 30
+ *                 homeCollection: 0
+ *                 totalAmount: 1039
+ */
+router.get("/summary", controller.getCartSummary);
 
 /**
  * @swagger
@@ -112,13 +157,22 @@ router.get("/", controller.getLabCart);
  */
 
 router.delete("/clear", controller.clearLabCart);
-
 /**
  * @swagger
- * /api/labs/cart/add-patient:
+ * /api/labs/cart/{cartId}/add-patient:
  *   post:
- *     summary: Create patient and attach to cart
+ *     summary: Add patient to specific package
+ *     description: Assigns a patient to a single cart package (multi-patient booking)
  *     tags: [Lab Cart]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: cartId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 12
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -126,33 +180,34 @@ router.delete("/clear", controller.clearLabCart);
  *           schema:
  *             type: object
  *             required:
- *               - userId
  *               - fullName
- *               - consultationType
  *             properties:
- *               userId:
- *                 type: integer
- *                 example: 21
  *               fullName:
  *                 type: string
- *                 example: John Doe
+ *                 example: Father
  *               age:
  *                 type: integer
- *                 example: 30
+ *                 example: 60
  *               gender:
  *                 type: string
  *                 example: Male
  *               phone:
  *                 type: string
- *                 example: 8383983838
- *               consultationType:
- *                 type: string
- *                 enum: [LAB_VISIT, SAMPLE_COLLECTION]
+ *                 example: 9876543210
+ *
  *     responses:
  *       200:
- *         description: Patient created and attached
+ *         description: Patient added to package
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Patient added to package
+ *               patient:
+ *                 id: 5
+ *                 fullName: Father
  */
-router.post("/add-patient", controller.addPatientAndAttachToCart);
+router.post("/:cartId/add-patient", controller.addPatientToCartItem);
+
 /**
  * @swagger
  * /api/labs/cart/{id}:
@@ -165,85 +220,16 @@ router.post("/add-patient", controller.addPatientAndAttachToCart);
  *         required: true
  *         schema:
  *           type: integer
+ *           example: 12
  *     responses:
  *       200:
- *         description: Removed
- *         example:
- *           message: Removed from cart
+ *         description: Item removed
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Removed from cart
  */
-
 router.delete("/:id", controller.removeFromLabCart);
 
-/**
- * @swagger
- * /api/labs/cart/checkout:
- *   post:
- *     summary: Checkout lab cart and hold slot
- *     description: >
- *       Converts cart items into bookings and holds selected slot
- *       for 10 minutes before payment confirmation.
- *     tags: [Lab Checkout]
- *
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           example:
- *             userId: 12
- *             slotId: 5
- *             patientProfileId: 3
- *
- *     responses:
- *       200:
- *         description: Slot held successfully
- *         content:
- *           application/json:
- *             example:
- *               message: Slot held for 10 minutes
- *               bookingCount: 2
- *               bookingIds: [45, 46]
- *               expiresAt: "2026-02-16T12:45:00.000Z"
- *
- *       400:
- *         description: Missing required fields
- *         content:
- *           application/json:
- *             example:
- *               message: userId and slotId are required
- *
- *       404:
- *         description: Slot not found
- *
- *       409:
- *         description: Slot already booked OR cart empty
- *
- *       500:
- *         description: Internal server error
- */
-
-router.post("/checkout", controller.checkoutLabCart);
-/**
- * @swagger
- * /api/labs/cart/summary:
- *   get:
- *     summary: Get booking summary before payment
- *     description: Returns UI-ready payment summary using bookingIds
- *     tags: [Lab Cart]
- *     parameters:
- *       - in: query
- *         name: bookingIds
- *         required: true
- *         schema:
- *           type: string
- *           example: 41,42
- *     responses:
- *       200:
- *         description: Booking summary fetched
- *       404:
- *         description: Bookings not found
- *       409:
- *         description: Booking expired
- */
-router.get("/summary", controller.getBookingSummary);
 
 export default router;

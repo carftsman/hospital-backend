@@ -1,32 +1,35 @@
 import prisma from "../../../../prisma/client.js";
  
-/**
- * UPLOAD lab report (Lab Admin)
- */
 export const uploadLabReport = async (req, res) => {
-  const { bookingId, reportUrls } = req.body;
+  const { labBookingId, reportUrls, summary, reportStatus } = req.body;
 
-  if (!bookingId || !Array.isArray(reportUrls)) {
-    return res.status(400).json({
-      message: "bookingId and reportUrls[] required",
-    });
+  if (!labBookingId || !reportUrls) {
+    return res.status(400).json({ message: "labBookingId and reportUrls required" });
   }
 
   const report = await prisma.labReport.upsert({
-    where: { bookingId },
+    where: { labBookingId },
     update: {
       reportUrls,
-      reportStatus: "READY",
+      summary,
+      reportStatus
     },
     create: {
-      bookingId,
+      labBookingId,
       reportUrls,
-      reportStatus: "READY",
-    },
+      summary,
+      reportStatus
+    }
+  });
+
+  // ✅ Mark booking completed
+  await prisma.labBooking.update({
+    where: { id: labBookingId },
+    data: { status: "COMPLETED" }
   });
 
   res.json({
-    message: "Lab report uploaded successfully",
-    report,
+    message: "Report uploaded & booking marked COMPLETED",
+    report
   });
 };

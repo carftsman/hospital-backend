@@ -6,16 +6,18 @@ const router = Router();
 /**
  * @swagger
  * tags:
- *   name: Lab Admin
- *   description: Lab admin report upload APIs
+ *   - name: Lab Admin Reports
+ *     description: Lab admin report upload APIs
  */
- 
+
 /**
  * @swagger
  * /api/lab-admin/reports/upload:
  *   post:
  *     summary: Upload lab report
- *     tags: [Lab Admin]
+ *     description: Upload PDF reports and mark booking as COMPLETED
+ *     tags: [Lab Admin Reports]
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -24,21 +26,43 @@ const router = Router();
  *             type: object
  *             required:
  *               - labBookingId
- *               - reportUrl
+ *               - reportUrls
  *             properties:
  *               labBookingId:
  *                 type: integer
  *                 example: 3
- *               reportUrl:
+ *               reportUrls:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example:
+ *                   - https://cdn.lab.com/report1.pdf
+ *                   - https://cdn.lab.com/report2.pdf
+ *               summary:
  *                 type: string
- *                 example: https://cdn.example.com/report.pdf
+ *                 example: All parameters are within normal range
+ *               reportStatus:
+ *                 type: string
+ *                 enum: [NORMAL, BORDERLINE, ABNORMAL]
+ *                 example: NORMAL
+ *
  *     responses:
  *       200:
  *         description: Report uploaded successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Report uploaded & booking marked COMPLETED
+ *               report:
+ *                 id: 13
+ *                 labBookingId: 3
+ *                 reportStatus: NORMAL
+ *
  *       400:
- *         description: Missing fields
- *       409:
- *         description: Report already exists
+ *         description: Missing required fields
+ *
+ *       500:
+ *         description: Server error
  */
 router.post("/reports/upload", controller.uploadLabReport);
  

@@ -410,13 +410,12 @@ router.get("/categories/all", controller.getLabCategories);
  * @swagger
  * /api/labs/reports:
  *   get:
- *     tags: [Lab Reports]
- *     summary: Get user lab reports (Reports List screen)
+ *     summary: Get user lab reports
  *     description: >
  *       Returns completed lab reports for a user.
- *       Supports combined search across lab name, test name,
- *       and package name using a single search parameter.
- *       Also supports report status and date filtering including last 30 days.
+ *       Supports search, report status filtering,
+ *       last 30 days filter and custom date range.
+ *     tags: [Lab Reports]
  *
  *     parameters:
  *       - in: query
@@ -425,34 +424,25 @@ router.get("/categories/all", controller.getLabCategories);
  *         schema:
  *           type: integer
  *           example: 21
- *         description: User ID
  *
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
  *           example: Apollo
- *         description: >
- *           Single search field that matches:
- *           - Lab name
- *           - Test name
- *           - Package name
+ *         description: Search by lab name, package or test name
  *
  *       - in: query
  *         name: reportStatus
  *         schema:
  *           type: string
  *           enum: [NORMAL, ABNORMAL, BORDERLINE]
- *           example: NORMAL
- *         description: Filter by report status
  *
  *       - in: query
  *         name: timeRange
  *         schema:
  *           type: string
  *           enum: [LAST_30_DAYS]
- *           example: LAST_30_DAYS
- *         description: Fetch reports from last 30 days
  *
  *       - in: query
  *         name: fromDate
@@ -460,7 +450,6 @@ router.get("/categories/all", controller.getLabCategories);
  *           type: string
  *           format: date
  *           example: 2026-01-01
- *         description: Custom start date (YYYY-MM-DD)
  *
  *       - in: query
  *         name: toDate
@@ -468,11 +457,10 @@ router.get("/categories/all", controller.getLabCategories);
  *           type: string
  *           format: date
  *           example: 2026-02-01
- *         description: Custom end date (YYYY-MM-DD)
  *
  *     responses:
  *       200:
- *         description: List of user lab reports
+ *         description: Reports fetched successfully
  *         content:
  *           application/json:
  *             example:
@@ -480,16 +468,13 @@ router.get("/categories/all", controller.getLabCategories);
  *               reports:
  *                 - reportId: 7
  *                   bookingId: 4
- *                   testName: Complete Blood Count
  *                   labName: Apollo Diagnostics
+ *                   testName: Complete Blood Count
+ *                   testsCount: 5
  *                   status: NORMAL
  *                   date: 2026-02-11
- *
  *       400:
- *         description: userId is required
- *
- *       500:
- *         description: Server error
+ *         description: userId required
  */
 router.get("/reports", controller.getUserLabReports);
  
@@ -497,9 +482,9 @@ router.get("/reports", controller.getUserLabReports);
  * @swagger
  * /api/labs/reports/{reportId}/details:
  *   get:
- *     tags: [Lab Reports]
  *     summary: Get detailed lab report
- *     description: Returns complete lab report details.
+ *     description: Returns full report details including PDFs
+ *     tags: [Lab Reports]
  *
  *     parameters:
  *       - in: path
@@ -508,29 +493,28 @@ router.get("/reports", controller.getUserLabReports);
  *         schema:
  *           type: integer
  *           example: 7
- *         description: Lab Report ID
  *
  *     responses:
  *       200:
- *         description: Detailed lab report
+ *         description: Detailed report
  *         content:
  *           application/json:
  *             example:
  *               reportId: 7
  *               bookingId: 4
- *               packageName: Complete Blood Count (CBC)
  *               labName: Apollo Diagnostics
+ *               tests:
+ *                 - CBC
+ *                 - Thyroid Profile
  *               collectedDate: 2026-02-01
  *               issuedDate: 2026-02-11
- *               samplesCollected:
- *                 - Blood Samples
- *               resultSummary: All parameters normal.
+ *               resultSummary: All parameters normal
+ *               status: NORMAL
  *               reports:
  *                 - name: Report-1
- *                   url: report1.pdf
- *
+ *                   url: https://cdn.lab.com/report1.pdf
  *       404:
- *         description: Lab report not found
+ *         description: Report not found
  */
 router.get("/reports/:reportId/details", controller.getLabReportDetails);
  
@@ -628,20 +612,20 @@ router.get("/bookings/past", controller.getUserPastLabBookings);
  */
 router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  
- 
 /**
  * @swagger
  * /api/labs/bookings/confirm:
  *   post:
- *     summary: Confirm lab bookings (No payment)
- *     description: Instantly confirms HOLD bookings without payment integration
+ *     summary: Confirm lab booking (Direct confirm - No HOLD)
+ *     description: Creates confirmed booking directly when user clicks Pay (no payment gateway)
  *     tags: [Lab Checkout]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           example:
- *             bookingIds: [41, 42]
+ *             userId: 1
+ *             slotId: 45
  *     responses:
  *       200:
  *         description: Booking confirmed
@@ -649,14 +633,8 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  *           application/json:
  *             example:
  *               message: Booking confirmed successfully
- *               confirmedCount: 2
- *               bookingIds: [41, 42]
- *       400:
- *         description: Invalid input
- *       404:
- *         description: Bookings not found
- *       409:
- *         description: Booking expired or invalid state
+ *               bookingIds: [101, 102]
+ *               status: CONFIRMED
  */
 
 router.post("/bookings/confirm", controller.confirmLabBooking);
@@ -741,6 +719,55 @@ router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
  */
  
 router.post("/feedback", controller.submitLabFeedback);
+/**
+ * @swagger
+ * tags:
+ *   - name: Lab Feedback
+ *     description: Submit and check lab feedback status
+ */
+
+/**
+ * @swagger
+ * /api/labs/feedback/{bookingId}:
+ *   get:
+ *     summary: Check feedback status for a lab booking
+ *     description: >
+ *       Returns whether feedback has already been submitted for a booking.
+ *       Used to prevent duplicate feedback submission in the app.
+ *       Ideal for "Rate Your Experience" screen.
+ *
+ *     tags: [Lab Feedback]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 21
+ *         description: Lab booking ID
+ *
+ *     responses:
+ *       200:
+ *         description: Feedback status fetched
+ *         content:
+ *           application/json:
+ *             example:
+ *               hasFeedback: true
+ *               feedback:
+ *                 id: 5
+ *                 bookingId: 21
+ *                 rating: 4
+ *                 comment: Reports were delivered on time
+ *                 createdAt: 2026-02-20T07:45:22.000Z
+ *
+ *       404:
+ *         description: Booking not found
+ *
+ *       500:
+ *         description: Server error
+ */
+router.get("/feedback/:bookingId", controller.checkFeedbackStatus);
 /**
  * @swagger
  * /api/labs/{labId}/packages/filter:

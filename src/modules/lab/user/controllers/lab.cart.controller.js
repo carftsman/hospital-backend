@@ -6,134 +6,162 @@ export const addToLabCart = async (req, res) => {
 
     if (!userId || !labId || !packageId) {
       return res.status(400).json({
-        message: "userId, labId and packageId are required",
+        message: "userId, labId and packageId required",
       });
     }
 
-    const existing = await prisma.labCart.findFirst({
+    // Single lab rule
+    const existingCart = await prisma.labCart.findFirst({ where: { userId } });
+    if (existingCart && existingCart.labId !== labId) {
+      return res.status(409).json({
+        message: "Cart contains items from another lab. Clear cart first."
+      });
+    }
+
+    // Prevent duplicates
+    let item = await prisma.labCart.findFirst({
       where: { userId, packageId },
+      include: {
+        package: {
+          include: { items: { include: { test: true } } }
+        }
+      }
     });
 
-    let item;
-
-    if (existing) {
-      item = await prisma.labCart.update({
-        where: { id: existing.id },
-        data: { quantity: { increment: 1 } },
-        include: {
-          package: {
-            include: {
-              items: { include: { test: true } },
-            },
-          },
-        },
-      });
-    } else {
+    if (!item) {
       item = await prisma.labCart.create({
         data: { userId, labId, packageId },
         include: {
           package: {
-            include: {
-              items: { include: { test: true } },
-            },
-          },
-        },
+            include: { items: { include: { test: true } } }
+          }
+        }
       });
     }
 
-    // ✅ CLEAN RESPONSE (NO testId)
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, fullName: true, phone: true }
+    });
+
+    const tests = item.package.items.map(i => i.test.name);
+
     res.json({
       message: "Package added to cart",
+      user,
       item: {
         id: item.id,
+        labId: item.labId,
+        packageId: item.packageId,
         name: item.package.name,
         price: item.package.finalPrice,
         quantity: item.quantity,
-        testsCount: item.package.items.length,
-        tests: item.package.items.map(t => t.test.name),
-      },
+        testsCount: tests.length,
+        tests
+      }
     });
-  } catch (error) {
-    console.error("addToLabCart:", error);
+
+  } catch (err) {
+    console.error("addToCart error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 export const getLabCart = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
-    if (!userId) return res.status(400).json({ message: "userId required" });
 
-    // ✅ USER DETAILS
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        fullName: true,
-        phone: true,
-        gender: true,
-      },
-    });
+  where: { id: userId },
+  select: {
+    id: true,
+    fullName: true,
+    phone: true
+  }
+});
 
-    const items = await prisma.labCart.findMany({
+    const cart = await prisma.labCart.findMany({
       where: { userId },
       include: {
         lab: true,
         package: {
-          include: {
-            items: { include: { test: true } },
-          },
+          include: { items: { include: { test: true } } }
         },
-      },
-      orderBy: { id: "desc" },
+        patient: true
+      }
     });
 
-    if (!items.length) {
+    if (!cart.length) {
       return res.json({
         user,
-        count: 0,
         items: [],
+        billSummary: null
       });
     }
 
-    const lab = items[0].lab;
+    const lab = cart[0]?.lab || null;
+    const consultationType = cart[0]?.consultationType || "LAB_VISIT";
 
-    const formatted = items.map(i => ({
-      id: i.id,
-      name: i.package.name,
-      price: i.package.finalPrice,
-      quantity: i.quantity,
-      tests: i.package.items.map(t => t.test.name),
-    }));
+   const items = cart.map(i => {
+  const pkg = i.package;
 
-    const totalMRP = formatted.reduce(
-      (sum, i) => sum + i.price * i.quantity,
-      0
-    );
+  const patient = i.patient || {
+    fullName: user.fullName,
+    age: null,
+    gender: null,
+    phone: user.phone,
+    isSelf: true
+  };
 
+  return {
+    id: i.id,
+    packageId: i.packageId,
+    name: pkg?.name,
+    price: pkg?.finalPrice,
+    testsCount: pkg?.items?.length || 0,
+    tests: pkg?.items?.map(t => t.test.name) || [],
+    patient // 👈 per package patient
+  };
+});
+
+const totalMRP = items.reduce((sum, i) => sum + (i.price || 0), 0);
     const bookingFee = 10;
     const platformFee = 30;
-    const homeCollection = 50;
+    const homeCollection =
+      consultationType === "SAMPLE_COLLECTION" ? 50 : 0;
 
-    res.json({
-      user, // ✅ added
-      lab,
-      count: formatted.length,
-      items: formatted,
-      billSummary: {
-        totalMRP,
-        bookingFee,
-        platformFee,
-        homeCollection,
-        totalAmount: totalMRP + bookingFee + platformFee + homeCollection,
-      },
-    });
-  } catch (error) {
-    console.error("getLabCart:", error);
+    const totalAmount =
+      totalMRP + bookingFee + platformFee + homeCollection;
+const patientBill = {};
+
+items.forEach(item => {
+  const name = item.patient.fullName;
+
+  if (!patientBill[name]) patientBill[name] = 0;
+  patientBill[name] += item.price;
+});
+   res.json({
+  user,
+  consultationType,
+  lab,
+  items,
+
+  patientBill, // ✅ ADD THIS
+
+  billSummary: {
+    totalMRP,
+    bookingFee,
+    platformFee,
+    homeCollection,
+    totalAmount
+  }
+});
+
+  } catch (err) {
+    console.error("getCart error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 export const removeFromLabCart = async (req, res) => {
   const id = Number(req.params.id);
   await prisma.labCart.delete({ where: { id } });
@@ -148,124 +176,61 @@ export const clearLabCart = async (req, res) => {
   await prisma.labCart.deleteMany({ where: { userId } });
   res.json({ message: "Cart cleared" });
 };
-
-export const checkoutLabCart = async (req, res) => {
+export const getCartSummary = async (req, res) => {
   try {
-    const { userId, slotId, patientProfileId } = req.body;
+    const userId = Number(req.query.userId);
 
-    if (!userId || !slotId)
-      return res.status(400).json({ message: "userId and slotId required" });
-
-    const result = await prisma.$transaction(async tx => {
-      const slot = await tx.labSlot.findUnique({
-        where: { id: Number(slotId) },
-      });
-      if (!slot) throw new Error("Slot not found");
-
-      const cart = await tx.labCart.findMany({ where: { userId } });
-      if (!cart.length) throw new Error("Cart empty");
-
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      const bookings = [];
-
-      for (const item of cart) {
-        const booking = await tx.labBooking.create({
-  data: {
-    userId: Number(userId),
-    labId: Number(item.labId),
-    packageId: Number(item.packageId), // ✅ package booking
-    slotId: Number(slotId),
-    sampleDate: slot.slotDate,
-    status: "HOLD",
-    expiresAt,
-    patientProfileId: patientProfileId || null,
-  },
-});
-
-        bookings.push(booking);
-      }
-
-      await tx.labCart.deleteMany({ where: { userId } });
-
-      return bookings;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, phone: true }
     });
 
-    res.json({
-      message: "Slot held",
-      bookingIds: result.map(b => b.id),
-      expiresAt: result[0]?.expiresAt,
-    });
-  } catch (err) {
-    console.error("checkout error:", err);
-    res.status(500).json({ message: err.message });
-  }
-};
-
-export const getBookingSummary = async (req, res) => {
-  try {
-    const { bookingIds } = req.query;
-
-    if (!bookingIds) {
-      return res.status(400).json({ message: "bookingIds required" });
-    }
-
-    const ids = bookingIds.split(",").map(Number);
-
-    const bookings = await prisma.labBooking.findMany({
-      where: { id: { in: ids } },
+    const cart = await prisma.labCart.findMany({
+      where: { userId },
       include: {
         lab: true,
-        package: {
-          include: {
-            items: {
-              include: {
-                test: true,
-              },
-            },
-          },
-        },
-        user: true,
-        patient: true,
-      },
+        package: true,
+        patient: true
+      }
     });
 
-    if (!bookings.length) {
-      return res.status(404).json({ message: "Bookings not found" });
+    if (!cart.length) {
+      return res.status(400).json({ message: "Cart empty" });
     }
 
-    const expired = bookings.some(
-      (b) => b.status !== "HOLD" || (b.expiresAt && new Date() > b.expiresAt)
-    );
+    const lab = cart[0].lab;
+    const consultationType = cart[0].consultationType;
 
-    if (expired) {
-      return res.status(409).json({
-        message: "Booking expired. Please reselect slot",
-      });
-    }
+    const address = await prisma.labAddress.findFirst({
+      where: { userId, isDefault: true }
+    });
 
-    const user = bookings[0].user;
-    const lab = bookings[0].lab;
-
-    const packages = bookings.map((b) => ({
-      id: b.package?.id,
-      name: b.package?.name,
-      price: b.package?.finalPrice,
-      tests: b.package?.items.map((i) => i.test.name),
+    const packages = cart.map(c => ({
+      cartId: c.id,
+      packageId: c.packageId,
+      name: c.package.name,
+      price: c.package.finalPrice,
+      patient: c.patient || {
+        fullName: user.fullName,
+        phone: user.phone,
+        isSelf: true
+      }
     }));
 
-    const totalMRP = packages.reduce((sum, p) => sum + (p.price || 0), 0);
+    const totalMRP = packages.reduce((s, p) => s + p.price, 0);
 
     const bookingFee = 10;
     const platformFee = 30;
-    const homeCollection = 50;
+    const homeCollection =
+      consultationType === "SAMPLE_COLLECTION" ? 50 : 0;
 
     const totalAmount =
       totalMRP + bookingFee + platformFee + homeCollection;
 
-    return res.json({
-      bookingIds: ids,
-      expiresAt: bookings[0].expiresAt,
+    res.json({
       user,
+      consultationType,
+      address,
       lab,
       packages,
       billSummary: {
@@ -273,68 +238,48 @@ export const getBookingSummary = async (req, res) => {
         bookingFee,
         platformFee,
         homeCollection,
-        totalAmount,
-      },
+        totalAmount
+      }
     });
   } catch (err) {
-    console.error("summary error:", err);
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
-export const addPatientAndAttachToCart = async (req, res) => {
+export const addPatientToCartItem = async (req, res) => {
   try {
-    const {
-      userId,
-      fullName,
-      age,
-      gender,
-      phone,
-      consultationType,
-    } = req.body;
+    const cartId = Number(req.params.cartId);
+    const { fullName, age, gender, phone } = req.body;
 
-    if (!userId || !fullName || !consultationType) {
-      return res.status(400).json({
-        message: "userId, fullName and consultationType are required",
-      });
-    }
-
-    // 1️⃣ Check cart exists
-    const cartItems = await prisma.labCart.findMany({
-      where: { userId },
+    const cartItem = await prisma.labCart.findUnique({
+      where: { id: cartId }
     });
 
-    if (!cartItems.length) {
-      return res.status(400).json({ message: "Cart is empty" });
+    if (!cartItem) {
+      return res.status(404).json({ message: "Cart item not found" });
     }
 
-    // 2️⃣ Create Patient Profile
     const patient = await prisma.patientProfile.create({
       data: {
-        userId,
+        userId: cartItem.userId,
         fullName,
-        age: age ? Number(age) : null,
+        age,
         gender,
-        phone,
-      },
+        phone
+      }
     });
 
-    // 3️⃣ Attach patient + consultation to cart
-    await prisma.labCart.updateMany({
-      where: { userId },
-      data: {
-        patientProfileId: patient.id,
-        consultationType,
-      },
+    await prisma.labCart.update({
+      where: { id: cartId },
+      data: { patientProfileId: patient.id }
     });
 
     res.json({
-      message: "Patient created and attached successfully",
-      patient,
+      message: "Patient added to package",
+      patient
     });
-  } catch (error) {
-    console.error("addPatientAndAttachToCart error:", error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
