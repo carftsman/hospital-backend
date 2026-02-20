@@ -1029,5 +1029,85 @@ router.get("/:labId/tests/search", controller.searchLabTests);
  *         description: Server error
  */
 router.get("/:labId/details", controller.getLabDetailsById);
- 
+/**
+ * @swagger
+ * tags:
+ *   - name: Recent Views
+ *     description: Recently viewed lab packages
+ */
+
+/**
+ * @swagger
+ * /api/labs/recent-view:
+ *   post:
+ *     summary: Save recent viewed package
+ *     tags: [Recent Views]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             userId: 1
+ *             labId: 2
+ *             packageId: 5
+ *     responses:
+ *       200:
+ *         description: Saved
+ */
+
+
+router.post("/recent-view", controller.addRecentView);
+/**
+ * @swagger
+ * /api/labs/recent-view:
+ *   get:
+ *     summary: Get recently viewed packages
+ *     tags: [Recent Views]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: List
+ */
+router.get("/recent-view", controller.getRecentViews);
+ /**
+* @swagger
+* /api/labs/tests/recent:
+*   get:
+*     summary: Get recently viewed / booked lab tests
+*     description: >
+*       Used for "Recently Viewed Tests" section on Labs Home screen.
+*     tags: [Labs]
+*     parameters:
+*       - in: query
+*         name: userId
+*         required: true
+*         schema:
+*           type: integer
+*           example: 21
+*       - in: query
+*         name: limit
+*         schema:
+*           type: integer
+*           example: 5
+*     responses:
+*       200:
+*         description: Recent lab tests
+*         content:
+*           application/json:
+*             example:
+*               count: 2
+*               tests:
+*                 - testId: 3
+*                   testName: Thyroid Test
+*                   price: 300
+*                   labName: Apollo Diagnostics
+*                   lastBookedOn: 2026-02-10
+*/
+router.get("/tests/recent", controller.getRecentLabTests);
 export default router;

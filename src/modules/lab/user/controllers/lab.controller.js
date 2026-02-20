@@ -1217,14 +1217,25 @@ export const getLabReportDetails = async (req, res) => {
     const tests =
       report.booking.package?.items?.map(i => i.test.name) || [];
 
+    // ✅ ADD TEST NAME
+    const testName =
+      report.booking.package?.name || tests[0] || "Lab Test";
+
     res.json({
       reportId: report.id,
-      bookingId: report.bookingId,
+      bookingId: report.labBookingId,
+
+      // ✅ NEW FIELD
+      testName,
+
       labName: report.booking.lab?.name,
       tests,
       collectedDate:
         report.collectedAt || report.booking.sampleDate,
-      issuedDate: report.issuedAt?.toISOString().split("T")[0],
+
+      // ✅ use createdAt instead of issuedAt
+      issuedDate: report.createdAt.toISOString().split("T")[0],
+
       resultSummary: report.summary || "No summary available",
       status: report.reportStatus,
       reports: report.reportUrls.map((url, i) => ({
@@ -1366,53 +1377,122 @@ export const submitLabFeedback = async (req, res) => {
     feedback
   });
 };
+export const addRecentView = async (req, res) => {
+  try {
+    const { userId, labId, packageId } = req.body;
+
+    if (!userId || !labId || !packageId) {
+      return res.status(400).json({
+        message: "userId, labId, packageId required"
+      });
+    }
+
+    await prisma.labRecentView.upsert({
+      where: {
+        userId_packageId: {
+          userId,
+          packageId
+        }
+      },
+      update: {
+        createdAt: new Date()
+      },
+      create: {
+        userId,
+        labId,
+        packageId
+      }
+    });
+
+    res.json({ message: "Recent view saved" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};export const getRecentViews = async (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
+    const limit = Number(req.query.limit || 5);
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
+    }
+
+    const views = await prisma.labRecentView.findMany({
+      where: { userId },
+      include: {
+        lab: true,
+        package: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    });
+
+    res.json({
+      count: views.length,
+      recent: views.map(v => ({
+        packageId: v.package.id,
+        packageName: v.package.name,
+        price: v.package.finalPrice,
+        labId: v.lab.id,
+        labName: v.lab.name,
+        viewedAt: v.createdAt.toISOString().split("T")[0]
+      }))
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 export const getRecentLabTests = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
     const limit = Number(req.query.limit || 5);
- 
+
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
- 
+
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
         status: "COMPLETED"
       },
       include: {
-        test: true,
-        lab: true
+        lab: true,
+        package: true
       },
       orderBy: { createdAt: "desc" }
     });
- 
-    // 🧠 Remove duplicates by testId
+
+    // 🧠 Remove duplicate packages
     const unique = [];
     const seen = new Set();
- 
+
     for (const b of bookings) {
-      if (!seen.has(b.labTestId)) {
-        seen.add(b.labTestId);
+      if (!seen.has(b.packageId)) {
+        seen.add(b.packageId);
         unique.push(b);
       }
       if (unique.length === limit) break;
     }
- 
+
     res.json({
       count: unique.length,
       tests: unique.map(b => ({
-        testId: b.test.id,
-        testName: b.test.name,
-        price: b.test.price,
+        packageId: b.package.id,
+        testName: b.package.name, // still call it testName for UI
+        price: b.package.finalPrice,
         labId: b.lab.id,
         labName: b.lab.name,
         lastBookedOn: b.createdAt.toISOString().split("T")[0]
       }))
     });
- 
+
   } catch (error) {
     console.error("getRecentLabTests error:", error);
     res.status(500).json({ message: "Server error" });
   }
-}
+};

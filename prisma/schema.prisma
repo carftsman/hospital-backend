@@ -37,6 +37,7 @@ model User {
   notifications         Notification[]
   patientProfiles       PatientProfile[]
   reminders             Reminder[]
+  recentViews           LabRecentView[]
 }
 
 model Hospital {
@@ -252,6 +253,7 @@ model Lab {
   slots         LabSlot[]
   tests         LabTest[]
   LabCategories LabCategories[]
+  recentViews   LabRecentView[]
 }
 
 model LabCategory {
@@ -403,6 +405,21 @@ model LabPrescription {
   @@index([groupId])
 }
 
+model LabRecentView {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  labId     Int
+  packageId Int
+  createdAt DateTime @default(now())
+
+  user    User       @relation(fields: [userId], references: [id])
+  lab     Lab        @relation(fields: [labId], references: [id])
+  package LabPackage @relation(fields: [packageId], references: [id])
+
+  @@unique([userId, packageId]) // prevent duplicates
+  @@index([userId, createdAt])
+}
+
 model Reminder {
   id          Int            @id @default(autoincrement())
   userId      Int
@@ -433,9 +450,9 @@ model LabPackage {
   minage        Int?
   maxage        Int?
   gender        LabPackageGender @default(MALE)
-
-  lab   Lab              @relation(fields: [labId], references: [id])
-  items LabPackageItem[]
+  recentViews   LabRecentView[]
+  lab           Lab              @relation(fields: [labId], references: [id])
+  items         LabPackageItem[]
 
   // ✅ ADD THIS LINE
   bookings LabBooking[]
