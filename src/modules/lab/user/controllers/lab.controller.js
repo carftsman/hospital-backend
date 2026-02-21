@@ -364,6 +364,7 @@ export const searchLabs = async (req, res) => {
  
   res.json(labs);
 };
+
  export const searchLabTests = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
@@ -873,26 +874,112 @@ export const getUserLabBookings = async (req, res) => {
 };
  
  
-/**
- * 1️⃣2️⃣ Cancel Booking
- */
 export const cancelLabBooking = async (req, res) => {
-  const bookingId = Number(req.params.bookingId);
-  await prisma.labBooking.update({
-    where: { id: bookingId },
-    data: { status: "CANCELLED" },
-  });
-  res.json({ message: "Booking cancelled" });
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const userId = Number(req.query.userId); // or req.user.id (recommended)
+
+    if (!bookingId || !userId) {
+      return res.status(400).json({
+        message: "bookingId and userId required"
+      });
+    }
+
+    const booking = await prisma.labBooking.findFirst({
+      where: { id: bookingId, userId },
+      include: { lab: true }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Lab booking not found"
+      });
+    }
+
+    // ❌ Already cancelled
+    if (booking.status === "CANCELLED") {
+      return res.status(400).json({
+        message: "Booking already cancelled"
+      });
+    }
+
+    // ❌ Completed cannot cancel
+    if (booking.status === "COMPLETED") {
+      return res.status(400).json({
+        message: "Completed booking cannot be cancelled"
+      });
+    }
+
+    // ❌ Sample collected cannot cancel
+    if (booking.status === "SAMPLE_COLLECTED") {
+      return res.status(400).json({
+        message: "Sample already collected, cannot cancel"
+      });
+    }
+
+    // ✅ Cancel booking
+    await prisma.labBooking.update({
+      where: { id: booking.id },
+      data: { status: "CANCELLED" }
+    });
+
+    res.json({
+      message: "Lab booking cancelled successfully",
+      bookingId: booking.id,
+      labName: booking.lab?.name,
+      status: "CANCELLED"
+    });
+
+  } catch (error) {
+    console.error("cancelLabBooking error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
- 
-// src/modules/lab/user/controllers/labReports.controller.js
- 
- 
- 
- 
-/* ===================== REPORT DETAILS ===================== */
- 
-// src/modules/lab/user/controllers/labReportDetails.controller.js
+export const getUserCancelledLabBookings = async (req, res) => {
+  try {
+    const userId = Number(req.query.userId);
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
+    }
+
+    const bookings = await prisma.labBooking.findMany({
+      where: {
+        userId,
+        status: "CANCELLED",
+      },
+      include: {
+        lab: true,
+        package: {
+          include: {
+            items: {
+              include: { test: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const formatted = bookings.map(b => ({
+      bookingId: b.id,
+      labName: b.lab?.name,
+      status: b.status,
+      cancelledOn: b.createdAt,
+      tests: b.package
+        ? b.package.items.map(i => i.test.name)
+        : [],
+    }));
+
+    res.json({
+      count: formatted.length,
+      bookings: formatted,
+    });
+  } catch (error) {
+    console.error("getUserCancelledLabBookings error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 export const globalSearchLabs = async (req, res) => {
   try {
     const { query, labId, categoryId, minPrice, maxPrice } = req.query;

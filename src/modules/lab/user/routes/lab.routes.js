@@ -611,7 +611,24 @@ router.get("/bookings/past", controller.getUserPastLabBookings);
  *         description: Upcoming lab bookings
  */
 router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
- 
+/**
+ * @swagger
+ * /api/labs/bookings/cancelled:
+ *   get:
+ *     summary: Get cancelled lab bookings
+ *     tags: [Labs]
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Cancelled lab bookings
+ */
+ router.get("/bookings/cancelled", controller.getUserCancelledLabBookings);
 /**
  * @swagger
  * /api/labs/bookings/confirm:
@@ -643,27 +660,25 @@ router.post("/bookings/confirm", controller.confirmLabBooking);
 /**
  * @swagger
  * /api/labs/bookings/{bookingId}/cancel:
- *   post:
+ *   patch:
  *     summary: Cancel lab booking
- *     tags: [Lab Checkout]
+ *     tags: [Labs]
  *     parameters:
  *       - in: path
  *         name: bookingId
  *         required: true
  *         schema:
  *           type: integer
- *         example: 45
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
- *         description: Booking cancelled
- *         content:
- *           application/json:
- *             example:
- *               message: Booking cancelled
+ *         description: Lab booking cancelled
  */
-
-router.post("/bookings/:bookingId/cancel", controller.cancelLabBooking);
- 
+router.patch("/bookings/:bookingId/cancel", controller.cancelLabBooking); 
 /**
  * @swagger
  * /api/labs/feedback:

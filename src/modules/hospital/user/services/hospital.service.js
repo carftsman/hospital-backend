@@ -23,9 +23,9 @@ export const getNearbyHospitalsWithFilters = async ({
   /* MODE FILTER */
   const modeCondition =
     mode === "ONLINE"
-      ? Prisma.sql`AND (h."consultationMode" IN ('ONLINE','BOTH'))`
+      ? Prisma.sql`AND h."consultationMode" IN ('ONLINE','BOTH')`
       : mode === "OFFLINE"
-      ? Prisma.sql`AND (h."consultationMode" IN ('OFFLINE','BOTH'))`
+      ? Prisma.sql`AND h."consultationMode" IN ('OFFLINE','BOTH')`
       : Prisma.empty;
 
   /* AVAILABILITY */
@@ -49,7 +49,7 @@ export const getNearbyHospitalsWithFilters = async ({
 
   /* WOMEN FILTER */
   const womenCondition = women
-    ? Prisma.sql`AND (h."isWomenFriendly" = true)`
+    ? Prisma.sql`AND h."isWomenFriendly" = true`
     : Prisma.empty;
 
   /* CATEGORY JOIN */
@@ -57,79 +57,83 @@ export const getNearbyHospitalsWithFilters = async ({
     categoryIds.length > 0
       ? Prisma.sql`
           JOIN "Category" c
-          ON c."hospitalId" = h.id
-          AND c.id IN (${Prisma.join(categoryIds)})
+            ON c."hospitalId" = h.id
+           AND c.id IN (${Prisma.join(categoryIds)})
         `
       : Prisma.empty;
 
-  /* SORT */
+  /* ORDER BY */
   const orderBy =
     sort === "rating"
-      ? Prisma.sql`ORDER BY h.rating DESC NULLS LAST`
+      ? Prisma.sql`sub.rating DESC NULLS LAST`
       : sort === "popularity"
-      ? Prisma.sql`ORDER BY COALESCE(h.popularity,0) DESC`
-      : Prisma.sql`ORDER BY distance ASC`;
+      ? Prisma.sql`COALESCE(sub.popularity,0) DESC`
+      : Prisma.sql`sub.distance ASC`;
 
-  /* DATA QUERY */
+  /* MAIN QUERY (FIXED) */
   const hospitals = await prisma.$queryRaw`
-    SELECT DISTINCT
-      h.*,
-      (
-        ${EARTH_RADIUS_KM} * acos(
-          cos(radians(${lat}))
-          * cos(radians(h.latitude))
-          * cos(radians(h.longitude) - radians(${lng}))
-          + sin(radians(${lat})) * sin(radians(h.latitude))
-        )
-      ) AS distance
-    FROM "Hospital" h
-    ${categoryJoin}
-    WHERE
-      h.status = 'APPROVED'
-      AND h."isListed" = true
-      AND h.latitude IS NOT NULL
-      AND h.longitude IS NOT NULL
-      ${modeCondition}
-      ${availabilityCondition}
-      ${stateCondition}
-      ${cityCondition}
-      ${womenCondition}
-      AND (
-        ${EARTH_RADIUS_KM} * acos(
-          cos(radians(${lat}))
-          * cos(radians(h.latitude))
-          * cos(radians(h.longitude) - radians(${lng}))
-          + sin(radians(${lat})) * sin(radians(h.latitude))
-        )
-      ) <= ${radius}
-    ${orderBy}
+    SELECT *
+    FROM (
+      SELECT
+        h.id,
+        h.name,
+        h."imageUrl",
+        h.location,
+        h.city,
+        h.state,
+        h.speciality,
+        h."consultationMode",
+        h."isOpen",
+        h."open24x7",
+        h.rating,
+        h.popularity,
+        h."isWomenFriendly",
+        h."hasMaternityCare",
+        (
+          ${EARTH_RADIUS_KM} * acos(
+            cos(radians(${lat}))
+            * cos(radians(h.latitude))
+            * cos(radians(h.longitude) - radians(${lng}))
+            + sin(radians(${lat})) * sin(radians(h.latitude))
+          )
+        ) AS distance
+      FROM "Hospital" h
+      ${categoryJoin}
+      WHERE
+        h.status = 'APPROVED'
+        AND h."isListed" = true
+        AND h.latitude IS NOT NULL
+        AND h.longitude IS NOT NULL
+        ${modeCondition}
+        ${availabilityCondition}
+        ${stateCondition}
+        ${cityCondition}
+        ${womenCondition}
+    ) sub
+    WHERE sub.distance <= ${radius}
+    ORDER BY ${orderBy}
     LIMIT ${limit}
     OFFSET ${offset};
   `;
 
   /* COUNT QUERY */
   const countRows = await prisma.$queryRaw`
-    SELECT COUNT(DISTINCT h.id)::int AS count
-    FROM "Hospital" h
-    ${categoryJoin}
-    WHERE
-      h.status = 'APPROVED'
-      AND h."isListed" = true
-      AND h.latitude IS NOT NULL
-      AND h.longitude IS NOT NULL
-      ${modeCondition}
-      ${availabilityCondition}
-      ${stateCondition}
-      ${cityCondition}
-      ${womenCondition}
-      AND (
-        ${EARTH_RADIUS_KM} * acos(
-          cos(radians(${lat}))
-          * cos(radians(h.latitude))
-          * cos(radians(h.longitude) - radians(${lng}))
-          + sin(radians(${lat})) * sin(radians(h.latitude))
-        )
-      ) <= ${radius};
+    SELECT COUNT(*)::int AS count
+    FROM (
+      SELECT h.id
+      FROM "Hospital" h
+      ${categoryJoin}
+      WHERE
+        h.status = 'APPROVED'
+        AND h."isListed" = true
+        AND h.latitude IS NOT NULL
+        AND h.longitude IS NOT NULL
+        ${modeCondition}
+        ${availabilityCondition}
+        ${stateCondition}
+        ${cityCondition}
+        ${womenCondition}
+    ) sub;
   `;
 
   return {

@@ -221,8 +221,43 @@ router.post("/hold", auth, role("USER"), controller.holdAppointment);
  *         description: Internal server error
  */
 router.get("/my", controller.getMyAppointments);
-
 /**
+ * @swagger
+ * /api/appointments/{bookingId}/cancel:
+ *   patch:
+ *     summary: Cancel appointment
+ *     description: Allows user to cancel an existing appointment.
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Booking ID to cancel
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID (temporary without auth)
+ *     responses:
+ *       200:
+ *         description: Appointment cancelled successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Appointment cancelled successfully
+ *               bookingId: 52
+ *               status: CANCELLED
+ *       400:
+ *         description: Invalid request
+ *       404:
+ *         description: Booking not found
+ *       500:
+ *         description: Server error
+ */
+router.patch("/:bookingId/cancel", controller.cancelAppointment);/**
  * @swagger
  * /api/appointments/{bookingId}:
  *   get:
