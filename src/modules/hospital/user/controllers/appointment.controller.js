@@ -17,42 +17,57 @@ export const getDoctorAvailability = async (req, res) => {
     const days = [];
 
     for (let i = 0; i < 12; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
+  const d = new Date(today);
+  d.setDate(today.getDate() + i);
 
-      const dateStr = d.toISOString().slice(0, 10);
+  const dateStr = d.toISOString().slice(0, 10);
+  const isSunday = d.getDay() === 0;
 
-      const slotsAvailable = await prisma.timeSlot.count({
-        where: {
-          doctorId,
-          start: {
-            gte: new Date(`${dateStr}T00:00:00.000Z`),
-            lte: new Date(`${dateStr}T23:59:59.999Z`)
-          },
-          isActive: true,
-          OR: [
-            { booking: null },
-            {
-              booking: {
-                status: "HOLD",
-                expiresAt: { lt: new Date() }
-              }
-            }
-          ]
+  if (isSunday) {
+    days.push({
+      date: dateStr,
+      label: d.toLocaleDateString("en-IN", { weekday: "short" }),
+      slotsAvailable: 0,
+      isHoliday: true
+    });
+    continue;
+  }
+
+  const startOfDay = new Date(dateStr);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(dateStr);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const slotsAvailable = await prisma.timeSlot.count({
+    where: {
+      doctorId,
+      start: { gte: startOfDay, lte: endOfDay },
+      isActive: true,
+      OR: [
+        { booking: null },
+        {
+          booking: {
+            status: "HOLD",
+            expiresAt: { lt: new Date() }
+          }
         }
-      });
-
-      days.push({
-        date: dateStr,
-        label:
-          i === 0
-            ? "Today"
-            : i === 1
-            ? "Tomorrow"
-            : d.toLocaleDateString("en-IN", { weekday: "short" }),
-        slotsAvailable
-      });
+      ]
     }
+  });
+
+  days.push({
+    date: dateStr,
+    label:
+      i === 0
+        ? "Today"
+        : i === 1
+        ? "Tomorrow"
+        : d.toLocaleDateString("en-IN", { weekday: "short" }),
+    slotsAvailable,
+    isHoliday: false
+  });
+}
 
     res.json({ doctorId, days });
   } catch (e) {
@@ -61,9 +76,6 @@ export const getDoctorAvailability = async (req, res) => {
   }
 };
 
-/* ======================================================
-   2️⃣ GET AVAILABLE SLOTS
-====================================================== */
 export const getAvailableSlots = async (req, res) => {
   try {
     const doctorId = Number(req.query.doctorId);
@@ -73,8 +85,23 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: "doctorId and date required" });
     }
 
-    const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(`${date}T23:59:59.999Z`);
+    // ✅ Sunday Holiday Check
+    const selected = new Date(date);
+    if (selected.getDay() === 0) {
+      return res.json({
+        date,
+        count: 0,
+        isHoliday: true,
+        slots: []
+      });
+    }
+
+    // ✅ Normal slot logic
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
 
     const slots = await prisma.timeSlot.findMany({
       where: {
@@ -97,6 +124,7 @@ export const getAvailableSlots = async (req, res) => {
     res.json({
       date,
       count: slots.length,
+      isHoliday: false,
       slots: slots.map(s => ({
         slotId: s.id,
         start: s.start,
@@ -106,29 +134,22 @@ export const getAvailableSlots = async (req, res) => {
           .slice(11, 16)}`
       }))
     });
+
   } catch (e) {
     console.error("getAvailableSlots error:", e);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 export const holdAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
     const { slotId, bookingFor, reason, patient } = req.body;
-
-    /* ===============================
-       VALIDATION
-    =============================== */
     if (!slotId || !bookingFor) {
       return res
         .status(400)
         .json({ message: "slotId and bookingFor required" });
     }
 
-    /* ===============================
-       FETCH SLOT
-    =============================== */
     const slot = await prisma.timeSlot.findUnique({
       where: { id: slotId },
       include: { booking: true }

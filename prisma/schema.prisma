@@ -30,14 +30,15 @@ model User {
   gender                String?           @default("MALE")
   DateOfBirth           DateTime?         @db.Date
   bookings              Booking[]
+  FamilyMember          FamilyMember[]
   labAddresses          LabAddress[]
   labBookings           LabBooking[]
   labCart               LabCart[]
   labPrescriptions      LabPrescription[]
+  recentViews           LabRecentView[]
   notifications         Notification[]
   patientProfiles       PatientProfile[]
   reminders             Reminder[]
-  recentViews           LabRecentView[]
 }
 
 model Hospital {
@@ -71,6 +72,8 @@ model Hospital {
   categories           Category[]
   doctors              Doctor[]
   notifications        Notification[]
+
+  @@index([latitude, longitude], map: "hospital_geo_idx")
 }
 
 model Category {
@@ -109,7 +112,7 @@ model DoctorSymptom {
 }
 
 model Doctor {
-  id               Int               @id @default(autoincrement())
+  id               Int                  @id @default(autoincrement())
   name             String
   imageUrl         String?
   experience       Int
@@ -118,21 +121,19 @@ model Doctor {
   about            String?
   categoryId       Int
   hospitalId       Int
-  createdAt        DateTime          @default(now())
-  consultationFee  Int               @default(0)
-  languages        String[]          @default([])
-  rating           Decimal?          @default(0) @db.Decimal(2, 1)
-  isfavorite       Boolean?          @default(false)
-  consultationMode ConsultationMode  @default(BOTH)
-  genderPreference GenderPreference? @default(ALL)
-
-  category       Category             @relation(fields: [categoryId], references: [id])
-  hospital       Hospital             @relation(fields: [hospitalId], references: [id])
-  availabilities DoctorAvailability[]
-  DoctorSymptom  DoctorSymptom[]
-  timeSlots      TimeSlot[]
-
-  bookings Booking[] // ✅ ADD THIS
+  createdAt        DateTime             @default(now())
+  consultationFee  Int                  @default(0)
+  languages        String[]             @default([])
+  rating           Decimal?             @default(0) @db.Decimal(2, 1)
+  isfavorite       Boolean?             @default(false)
+  consultationMode ConsultationMode     @default(BOTH)
+  genderPreference GenderPreference?    @default(ALL)
+  bookings         Booking[]
+  category         Category             @relation(fields: [categoryId], references: [id])
+  hospital         Hospital             @relation(fields: [hospitalId], references: [id])
+  availabilities   DoctorAvailability[]
+  DoctorSymptom    DoctorSymptom[]
+  timeSlots        TimeSlot[]
 }
 
 model DoctorAvailability {
@@ -163,16 +164,9 @@ model TimeSlot {
 }
 
 model Booking {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-
-  doctorId Int
-  doctor   Doctor @relation(fields: [doctorId], references: [id])
-
-  doctorName   String?
-  hospitalId   Int?
-  hospitalName String?
-
+  id               Int             @id @default(autoincrement())
+  createdAt        DateTime        @default(now())
+  doctorId         Int
   end              DateTime
   start            DateTime
   userId           Int
@@ -180,12 +174,15 @@ model Booking {
   status           BookingStatus
   expiresAt        DateTime?
   reason           String?
-  timeSlotId       Int?          @unique
-
-  patientProfile PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  timeSlot       TimeSlot?       @relation(fields: [timeSlotId], references: [id])
-  user           User            @relation(fields: [userId], references: [id])
-  notification   Notification?
+  timeSlotId       Int?            @unique
+  doctorName       String?
+  hospitalName     String?
+  hospitalId       Int?
+  doctor           Doctor          @relation(fields: [doctorId], references: [id])
+  patientProfile   PatientProfile? @relation(fields: [patientProfileId], references: [id])
+  timeSlot         TimeSlot?       @relation(fields: [timeSlotId], references: [id])
+  user             User            @relation(fields: [userId], references: [id])
+  notification     Notification?
 
   @@index([userId])
 }
@@ -250,10 +247,10 @@ model Lab {
   bookings      LabBooking[]
   LabCart       LabCart[]
   LabPackage    LabPackage[]
+  recentViews   LabRecentView[]
   slots         LabSlot[]
   tests         LabTest[]
   LabCategories LabCategories[]
-  recentViews   LabRecentView[]
 }
 
 model LabCategory {
@@ -268,24 +265,22 @@ model LabCategory {
 }
 
 model LabTest {
-  id          Int      @id @default(autoincrement())
-  labId       Int
-  categoryId  Int
-  name        String
-  description String?
-  price       Int
-  reportTime  String
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  minAge      Int?
-  maxAge      Int?
-  imageUrl    String?
-
+  id             Int              @id @default(autoincrement())
+  labId          Int
+  categoryId     Int
+  name           String
+  description    String?
+  price          Int
+  reportTime     String
+  isAvailable    Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  minAge         Int?
+  maxAge         Int?
+  imageUrl       String?
   LabCart        LabCart[]
   LabPackageItem LabPackageItem[]
-
-  category LabCategory @relation(fields: [categoryId], references: [id])
-  lab      Lab         @relation(fields: [labId], references: [id])
+  category       LabCategory      @relation(fields: [categoryId], references: [id])
+  lab            Lab              @relation(fields: [labId], references: [id])
 
   @@unique([labId, categoryId, name])
 }
@@ -321,30 +316,27 @@ model LabSlot {
 
   @@unique([labId, slotDate, startTime])
   @@index([labId, slotDate])
+  @@index([labId, slotDate], map: "idx_lab_slot_lookup")
 }
 
 model LabBooking {
-  id Int @id @default(autoincrement())
-
-  userId    Int
-  labId     Int
-  packageId Int?
-
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  labId            Int
   status           LabBookingStatus @default(PENDING)
   sampleDate       DateTime
   createdAt        DateTime         @default(now())
   expiresAt        DateTime?
   slotId           Int?
   patientProfileId Int?
-
-  // RELATIONS
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lab         Lab             @relation(fields: [labId], references: [id])
-  package     LabPackage?     @relation(fields: [packageId], references: [id])
-  slot        LabSlot?        @relation(fields: [slotId], references: [id])
-  patient     PatientProfile? @relation(fields: [patientProfileId], references: [id])
-  LabReport   LabReport?
-  LabFeedback LabFeedback?
+  packageId        Int?
+  lab              Lab              @relation(fields: [labId], references: [id])
+  package          LabPackage?      @relation(fields: [packageId], references: [id])
+  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  slot             LabSlot?         @relation(fields: [slotId], references: [id])
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  LabFeedback      LabFeedback?
+  LabReport        LabReport?
 
   @@index([userId])
 }
@@ -370,25 +362,20 @@ model LabFeedback {
 }
 
 model LabCart {
-  id     Int @id @default(autoincrement())
-  userId Int
-  labId  Int
-
-  labTestId Int?
-  packageId Int?
-
-  quantity  Int      @default(1)
-  createdAt DateTime @default(now())
-
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  labId            Int
+  labTestId        Int?
+  quantity         Int              @default(1)
+  createdAt        DateTime         @default(now())
   consultationType ConsultationType @default(LAB_VISIT)
   patientProfileId Int?
-
-  test    LabTest?    @relation(fields: [labTestId], references: [id])
-  package LabPackage? @relation(fields: [packageId], references: [id])
-
-  lab     Lab             @relation(fields: [labId], references: [id])
-  user    User            @relation(fields: [userId], references: [id])
-  patient PatientProfile? @relation(fields: [patientProfileId], references: [id])
+  packageId        Int?
+  lab              Lab              @relation(fields: [labId], references: [id])
+  test             LabTest?         @relation(fields: [labTestId], references: [id])
+  package          LabPackage?      @relation(fields: [packageId], references: [id])
+  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
 }
 
 model LabPrescription {
@@ -406,17 +393,16 @@ model LabPrescription {
 }
 
 model LabRecentView {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   userId    Int
   labId     Int
   packageId Int
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
+  lab       Lab        @relation(fields: [labId], references: [id])
+  package   LabPackage @relation(fields: [packageId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
 
-  user    User       @relation(fields: [userId], references: [id])
-  lab     Lab        @relation(fields: [labId], references: [id])
-  package LabPackage @relation(fields: [packageId], references: [id])
-
-  @@unique([userId, packageId]) // prevent duplicates
+  @@unique([userId, packageId])
   @@index([userId, createdAt])
 }
 
@@ -450,13 +436,11 @@ model LabPackage {
   minage        Int?
   maxage        Int?
   gender        LabPackageGender @default(MALE)
-  recentViews   LabRecentView[]
+  bookings      LabBooking[]
+  LabCart       LabCart[]
   lab           Lab              @relation(fields: [labId], references: [id])
   items         LabPackageItem[]
-
-  // ✅ ADD THIS LINE
-  bookings LabBooking[]
-  LabCart  LabCart[]
+  recentViews   LabRecentView[]
 
   @@index([labId])
   @@index([gender])
@@ -480,6 +464,28 @@ model LabCategories {
   @@unique([A, B], map: "_LabCategories_AB_unique")
   @@index([B], map: "_LabCategories_B_index")
   @@map("_LabCategories")
+}
+
+model FamilyMember {
+  id           Int            @id @default(autoincrement())
+  userId       Int
+  fullName     String
+  relation     Relation
+  age          Int?
+  gender       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  User         User           @relation(fields: [userId], references: [id])
+  FamilyReport FamilyReport[]
+}
+
+model FamilyReport {
+  id             Int          @id @default(autoincrement())
+  familyMemberId Int
+  url            String
+  type           String
+  createdAt      DateTime     @default(now())
+  FamilyMember   FamilyMember @relation(fields: [familyMemberId], references: [id])
 }
 
 enum BookingFor {
@@ -596,4 +602,12 @@ enum ReportStatus {
 enum ConsultationType {
   LAB_VISIT
   SAMPLE_COLLECTION
+}
+
+enum Relation {
+  FATHER
+  MOTHER
+  SON
+  DAUGHTER
+  GRANDPARENT
 }

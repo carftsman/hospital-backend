@@ -81,9 +81,6 @@ export const getLabAvailability = async (req, res) => {
   }
 };
 
-/**
- * GET LAB SLOTS
- */
 export const getLabSlots = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
@@ -95,7 +92,9 @@ export const getLabSlots = async (req, res) => {
       });
     }
 
-    // ✅ Cart lab validation
+    /* ==============================
+       1️⃣ CART VALIDATION
+    ============================== */
     const cart = await prisma.labCart.findFirst({
       where: { userId: Number(userId) },
       select: { labId: true }
@@ -113,44 +112,70 @@ export const getLabSlots = async (req, res) => {
       });
     }
 
+    /* ==============================
+       2️⃣ DATE RANGE
+    ============================== */
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
 
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
 
+    const now = new Date();
+
+    /* ==============================
+       3️⃣ FETCH SLOTS WITH EXPIRY LOGIC
+    ============================== */
     const slots = await prisma.labSlot.findMany({
-      where: { labId, slotDate: { gte: start, lte: end } },
+      where: {
+        labId,
+        slotDate: { gte: start, lte: end }
+      },
       include: {
-        bookings: {
-          where: {
-            OR: [
-              { status: "COMPLETED" },
-              { status: "HOLD", expiresAt: { gt: new Date() } }
-            ]
-          }
-        }
+        bookings: true // fetch all, filter manually
       },
       orderBy: { startTime: "asc" }
     });
 
+    /* ==============================
+       4️⃣ FORMAT + EXPIRY HANDLING
+    ============================== */
     const unique = new Map();
 
-slots.forEach(s => {
-  const key = `${s.startTime}-${s.endTime}`;
+    slots.forEach(s => {
+      const key = `${s.startTime}-${s.endTime}`;
 
-  if (!unique.has(key)) {
-    unique.set(key, {
-      slotId: s.id,
-      startTime: formatTime(s.startTime),
-      endTime: formatTime(s.endTime),
-      time: `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`,
-      isBooked: s.bookings.length > 0
+      if (!unique.has(key)) {
+        // find active booking
+        const activeBooking = s.bookings.find(b => {
+          if (b.status === "COMPLETED") return true;
+          if (b.status === "HOLD" && b.expiresAt > now) return true;
+          return false;
+        });
+
+        let expiresIn = null;
+
+        // calculate expiry countdown
+        if (activeBooking?.status === "HOLD") {
+          expiresIn = Math.max(
+            0,
+            Math.floor((activeBooking.expiresAt - now) / 1000)
+          ); // seconds
+        }
+
+        unique.set(key, {
+          slotId: s.id,
+          startTime: formatTime(s.startTime),
+          endTime: formatTime(s.endTime),
+          time: `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`,
+          isBooked: !!activeBooking,
+          expiresIn // ⏳ NEW FIELD
+        });
+      }
     });
-  }
-});
 
-const formatted = Array.from(unique.values());
+    const formatted = Array.from(unique.values());
+
     res.json({
       labId,
       date,
