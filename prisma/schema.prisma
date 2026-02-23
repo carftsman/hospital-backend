@@ -39,6 +39,7 @@ model User {
   notifications         Notification[]
   patientProfiles       PatientProfile[]
   reminders             Reminder[]
+  Review                Review[]
 }
 
 model Hospital {
@@ -133,7 +134,24 @@ model Doctor {
   hospital         Hospital             @relation(fields: [hospitalId], references: [id])
   availabilities   DoctorAvailability[]
   DoctorSymptom    DoctorSymptom[]
+  Review           Review[]
   timeSlots        TimeSlot[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  rating    Int
+  comment   String?
+  userName  String
+  userImage String?
+  createdAt DateTime @default(now())
+
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+  User   User?  @relation(fields: [userId], references: [id])
+  userId Int?
+
+  @@index([doctorId])
 }
 
 model DoctorAvailability {

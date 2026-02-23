@@ -1,22 +1,37 @@
 import prisma from "../../../../prisma/client.js";
 
-export const getCategoriesByMode = async (mode, page, limit, isWomen) => {
-  const skip = (page - 1) * limit;
+export const getCategoriesByMode = async (
+  mode,
+  page,
+  limit,
+  isWomen,
+  search = ""
+) => {
+  /* ---------------- BASE FILTER ---------------- */
+  const where = {};
 
-  const where = {
-    ...(isWomen && { isWomenSpecific: true }),
+  // ✅ MODE FILTER (safe Prisma way)
+  if (mode !== "BOTH") {
+    where.hospital = {
+      consultationMode: { in: [mode, "BOTH"] }
+    };
+  }
 
-    // 🔥 IMPORTANT JOIN
-    hospital: {
-      consultationMode: mode === "BOTH"
-        ? { in: ["ONLINE", "OFFLINE", "BOTH"] }
-        : { in: [mode, "BOTH"] }
-    }
-  };
+  // ✅ WOMEN FILTER
+  if (isWomen) {
+    where.isWomenSpecific = true;
+  }
 
-  const [total, categories] = await Promise.all([
-    prisma.category.count({ where }),
+  // ✅ SEARCH FILTER (heart → cardiology)
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } }
+    ];
+  }
 
+  /* ---------------- QUERY ---------------- */
+  const [categories, total] = await Promise.all([
     prisma.category.findMany({
       where,
       include: {
@@ -28,10 +43,11 @@ export const getCategoriesByMode = async (mode, page, limit, isWomen) => {
           }
         }
       },
-      skip,
+      skip: (page - 1) * limit,
       take: limit,
-      orderBy: { name: "asc" }
-    })
+      orderBy: { name: "asc" } // nice UX
+    }),
+    prisma.category.count({ where })
   ]);
 
   return { categories, total };

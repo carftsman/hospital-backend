@@ -34,6 +34,7 @@ import symptomRoutes from "./modules/hospital/user/routes/symptom.routes.js";
 import appointmentRoutes from "./modules/hospital/user/routes/appointments.routes.js";
 import hospitalInfoRoutes from "./modules/hospital/user/routes/hospitalInfo.routes.js";
 import reminderRoutes from "./modules/hospital/user/routes/reminder.routes.js";
+import reviewRoutes from "./modules/hospital/user/routes/review.routes.js";
 
 //lab
 import labAddressRoutes from "./modules/lab/user/routes/labAddress.routes.js";
@@ -90,8 +91,9 @@ app.use("/api/hospital/admin/doctors", doctorAdminRoutes);
 app.use("/api/hospital/admin", hospitalOpenStatusRoutes);
 app.use("/api/hospital/admin", bookedSlotsRoutes);
 app.use("/api/upload", uploadRoutes);
- 
-//user routes
+
+
+app.use("/api/hospital/user", reviewRoutes);
 app.use("/api/hospital/user", nearbyRoutes);
 app.use("/api/hospital/user", onlineCategoriesRoutes);
 app.use("/api/hospital/user", hospitalByModeRoutes);

@@ -826,26 +826,25 @@ export const confirmLabBooking = async (req, res) => {
       });
 
    const response = {
-      message: "Booking Confirmed",
-      booking: {
-        bookingIds: bookings.map(b => b.id),
-          booking: formattedBooking,
-        testName: first.package.name,
-        labName: first.lab.name,
-        date: slot.slotDate,
-        time: formatTime(slot.startTime),
-        price: first.package.finalPrice,
-        location: first.lab.city,
-        consultationType:
-          first.consultationType === "SAMPLE_COLLECTION"
-            ? "Sample Collection"
-            : "Lab Visit",
-        patientName: patient?.fullName || "Self",
-        age: patient?.age || null,
-        gender: patient?.gender || null,
-        phone: patient?.phone || null
-      }
-    };
+  message: "Booking Confirmed",
+  booking: {
+    bookingIds: bookings.map(b => b.id),
+    testName: first.package.name,
+    labName: first.lab.name,
+    date: slot.slotDate,
+    time: formatTime(slot.startTime),
+    price: first.package.finalPrice,
+    location: first.lab.city,
+    consultationType:
+      first.consultationType === "SAMPLE_COLLECTION"
+        ? "Sample Collection"
+        : "Lab Visit",
+    patientName: patient?.fullName || "Self",
+    age: patient?.age || null,
+    gender: patient?.gender || null,
+    phone: patient?.phone || null
+  }
+};
 
     res.json(response);
 
@@ -854,6 +853,89 @@ export const confirmLabBooking = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+export const getLabBookingById = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+
+ const booking = await prisma.labBooking.findUnique({
+  where: { id: bookingId },
+  include: {
+    lab: true,
+    package: true,
+    slot: true,
+    patient: true,
+    user: true
+  }
+});
+
+res.json({
+  message: "Booking Details",
+  booking: {
+    bookingId: booking.id,
+    labName: booking.lab.name,
+    date: booking.sampleDate,
+
+    address: booking.lab.address || booking.lab.city, // FIXED
+
+    patient: {
+      name:
+        booking.patient?.fullName ||
+        booking.user?.fullName ||
+        "Self",
+      age: booking.patient?.age,
+      gender: booking.patient?.gender
+    }
+  }
+});
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const formatTime = (t) =>
+      new Date(t).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+
+    const start = formatTime(booking.slot.startTime);
+    const end = formatTime(booking.slot.endTime);
+
+    res.json({
+      message: "Booking Details",
+      booking: {
+        bookingId: booking.id,
+        labName: booking.lab.name,
+        date: booking.sampleDate,
+        timeRange: `${start} - ${end}`,
+        consultationType:
+          booking.package
+            ? "Home Sample Collection"
+            : "Lab Visit",
+
+        address: booking.lab.address,
+        city: booking.lab.city,
+
+        patient: {
+          name: booking.patient?.fullName || "Self",
+          age: booking.patient?.age,
+          gender: booking.patient?.gender,
+          phone: booking.patient?.phone
+        },
+
+        price: booking.package?.finalPrice || null,
+        status: booking.status,
+        createdAt: booking.createdAt
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const getUserLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
  
@@ -873,7 +955,90 @@ export const getUserLabBookings = async (req, res) => {
   res.json(bookings);
 };
  
- 
+ export const getLabInvoice = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+
+    const booking = await prisma.labBooking.findUnique({
+      where: { id: bookingId },
+      include: {
+        lab: true,
+        package: true,
+        patient: true,
+        user: true,
+        slot: true
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const formatDate = (d) =>
+      new Date(d).toLocaleDateString("en-IN");
+
+    const formatTime = (t) =>
+      new Date(t).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+
+    const start = formatTime(booking.slot.startTime);
+    const end = formatTime(booking.slot.endTime);
+
+    const patientName =
+      booking.patient?.fullName ||
+      booking.user?.fullName ||
+      "Self";
+
+    res.json({
+      message: "Invoice generated",
+      invoice: {
+        invoiceId: `LAB-${booking.id}`,
+        bookingId: booking.id,
+        status: booking.status,
+
+        lab: {
+          name: booking.lab.name,
+          address: booking.lab.address || booking.lab.city,
+          phone: booking.lab.phone
+        },
+
+        patient: {
+          name: patientName,
+          age: booking.patient?.age,
+          gender: booking.patient?.gender
+        },
+
+        test: {
+          packageName: booking.package?.name,
+          price: booking.package?.finalPrice
+        },
+
+        slot: {
+          date: formatDate(booking.sampleDate),
+          time: `${start} - ${end}`
+        },
+
+        payment: {
+          subtotal: booking.package?.finalPrice || 0,
+          discount: 0,
+          tax: 0,
+          total: booking.package?.finalPrice || 0,
+          paid: true,
+          paymentMode: "CASH" // or ONLINE later
+        },
+
+        generatedAt: new Date()
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 export const cancelLabBooking = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);

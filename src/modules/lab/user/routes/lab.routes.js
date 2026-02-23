@@ -655,8 +655,84 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  */
 
 router.post("/bookings/confirm", controller.confirmLabBooking);
+/**
+ * @swagger
+ * /api/labs/bookings/{bookingId}:
+ *   get:
+ *     summary: Get lab booking details by booking ID
+ *     description: Fetch single lab booking details for success screen or invoice
+ *     tags: [Lab Booking]
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Lab booking ID
+ *     responses:
+ *       200:
+ *         description: Booking details fetched successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Booking Details
+ *               booking:
+ *                 bookingId: 8
+ *                 labName: Thyrocare Lab
+ *                 date: 2026-02-19
+ *                 timeRange: 02:30 PM - 03:30 PM
+ *                 consultationType: Lab Visit
+ *                 address: Hyderabad
+ *                 price: 2499
+ *                 status: CONFIRMED
+ *       404:
+ *         description: Booking not found
+ */
+router.get("/bookings/:bookingId", controller.getLabBookingById); 
+/**
+ * @swagger
+ * /api/labs/bookings/{bookingId}/invoice:
+ *   get:
+ *     summary: Get lab booking invoice
+ *     description: Generates invoice for a confirmed lab booking
+ *     tags: [Lab Booking]
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Lab booking ID
+ *     responses:
+ *       200:
+ *         description: Invoice generated successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Invoice generated
+ *               invoice:
+ *                 invoiceId: LAB-8
+ *                 bookingId: 8
+ *                 lab:
+ *                   name: Thyrocare Lab
+ *                   address: Hyderabad
+ *                 patient:
+ *                   name: Durga Prasad
+ *                 test:
+ *                   packageName: Women Wellness Package
+ *                   price: 2499
+ *                 slot:
+ *                   date: 19 Feb 2026
+ *                   time: 02:30 PM - 03:30 PM
+ *                 payment:
+ *                   total: 2499
+ *                   paid: true
+ */
+router.get(
+  "/bookings/:bookingId/invoice",
+  controller.getLabInvoice
+);
 
- 
 /**
  * @swagger
  * /api/labs/bookings/{bookingId}/cancel:

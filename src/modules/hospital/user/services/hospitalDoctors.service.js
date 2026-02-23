@@ -1,6 +1,19 @@
 import prisma from "../../../../prisma/client.js";
 
-/* ---------------- FETCH DOCTORS (GLOBAL LIST) ---------------- */
+/* ---------------- DISTANCE HELPER ---------------- */
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+  return Number((R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+};
 export const fetchDoctors = async (filters, page, limit) => {
   const skip = (page - 1) * limit;
 
@@ -51,8 +64,7 @@ export const fetchDoctors = async (filters, page, limit) => {
   return { rows, total };
 };
 
-
-/* ---------------- HOSPITAL DOCTORS ---------------- */
+/* ---------------- DOCTOR PROFILE ---------------- */
 export const fetchHospitalDoctors = async (
   hospitalId,
   page = 1,
@@ -153,46 +165,108 @@ export const fetchHospitalDoctors = async (
   };
 };
 
-/* ---------------- DOCTOR PROFILE ---------------- */
-export const fetchDoctorInfo = async (doctorId) => {
-  return prisma.doctor.findUnique({
-    where: { id: doctorId },
 
+
+/* ---------------- DOCTOR PROFILE ---------------- */
+export const fetchDoctorInfo = async (doctorId, userLat = null, userLng = null) => {
+  const now = new Date();
+
+  // UTC SAFE RANGE
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const tomorrow = new Date(todayStart);
+  tomorrow.setUTCDate(todayStart.getUTCDate() + 1);
+
+  const doctor = await prisma.doctor.findUnique({
+    where: { id: doctorId },
     include: {
       category: true,
-
-      hospital: {
-        select: {
-          id: true,
-          name: true,
-          imageUrl: true,
-          location: true,
-          place: true,
-          latitude: true,
-          longitude: true,
-          consultationMode: true,
-          isOpen: true,
+      hospital: true,
+      timeSlots: {
+        where: {
+          start: { gte: todayStart, lt: tomorrow },
+          isActive: true
         },
-      },
-
-      timeSlots: true,
-      availabilities: true,
-    },
+        orderBy: { start: "asc" },
+        take: 20
+      }
+    }
   });
+
+  if (!doctor) return null;
+
+  /* ---------------- PATIENTS TREATED ---------------- */
+  const patientsTreated = await prisma.booking.count({
+    where: { doctorId, status: "COMPLETED" }
+  });
+
+  /* ---------------- REVIEW COUNT (SAFE) ---------------- */
+  let reviewCount = 0;
+  try {
+    reviewCount = await prisma.review.count({
+      where: { doctorId }
+    });
+  } catch (e) {
+    reviewCount = 0; // if review table not exists
+  }
+
+  /* ---------------- DISTANCE ---------------- */
+  let distanceKm = null;
+  if (userLat && userLng && doctor.hospital?.latitude) {
+    distanceKm = calculateDistance(
+      userLat,
+      userLng,
+      doctor.hospital.latitude,
+      doctor.hospital.longitude
+    );
+  }
+
+  /* ---------------- FINAL RESPONSE ---------------- */
+  return {
+    id: doctor.id,
+    name: doctor.name,
+    imageUrl: doctor.imageUrl,
+    experience: doctor.experience,
+    specialization: doctor.specialization,
+    qualification: doctor.qualification,
+    about: doctor.about,
+    consultationFee: doctor.consultationFee,
+    rating: Number(doctor.rating),
+    languages: doctor.languages,
+
+    reviewCount, // ⭐ NEW
+    patientsTreated, // 👨‍⚕️ NEW
+
+    category: doctor.category,
+
+    hospital: {
+      id: doctor.hospital.id,
+      name: doctor.hospital.name,
+      imageUrl: doctor.hospital.imageUrl,
+      location: doctor.hospital.location,
+      place: doctor.hospital.place,
+      consultationMode: doctor.hospital.consultationMode,
+      isOpen: doctor.hospital.isOpen,
+
+      latitude: doctor.hospital.latitude,
+      longitude: doctor.hospital.longitude,
+
+      distanceKm, // 📍 NEW
+      rating: doctor.hospital.rating || 4.3, // ⭐ NEW
+      timings: doctor.hospital.timings || "Mon-Sat 9AM-8PM" // 🕒 NEW
+    },
+
+    availableSlotsToday: doctor.timeSlots.length,
+    nextAvailableSlot: doctor.timeSlots[0] || null,
+    timeSlots: doctor.timeSlots
+  };
 };
-
-
-/* ---------------- DOCTOR AVAILABILITY ---------------- */
 export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
   const start = new Date(`${date}T00:00:00`);
   const end = new Date(`${date}T23:59:59`);
 
   const slots = await prisma.timeSlot.findMany({
-    where: {
-      doctorId,
-      start: { gte: start, lte: end },
-    },
-    orderBy: { start: "asc" },
+    where: { doctorId, start: { gte: start, lte: end } },
+    orderBy: { start: "asc" }
   });
 
   return {
@@ -200,6 +274,6 @@ export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
     date,
     totalSlots: slots.length,
     availableSlots: slots.filter(s => s.isActive).length,
-    slots,
+    slots
   };
 };

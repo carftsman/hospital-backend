@@ -1,39 +1,30 @@
 // src/jobs/expireHoldBookings.job.js
 import prisma from "../prisma/client.js";
 
-export async function expireHoldBookings() {
+export const expireHoldBookings = async () => {
   try {
-    const expiredBookings = await prisma.booking.findMany({
-      where: {
-        status: "HOLD"
-,
-        expiresAt: { lt: new Date() }
-      },
-      select: {
-        id: true,
-        timeSlotId: true   // ✅ correct
-      }
+    const bookings = await prisma.booking.findMany({
+      where: { status: "HOLD" }
     });
 
-    if (expiredBookings.length === 0) return;
+    if (!bookings.length) return;
 
-    const bookingIds = expiredBookings.map(b => b.id);
-    const timeSlotIds = expiredBookings.map(b => b.timeSlotId);
+    const slotIds = bookings
+  .map(b => b.slotId)
+  .filter(Boolean); // removes undefined/null
 
-    // Mark bookings as EXPIRED
-    await prisma.booking.updateMany({
-      where: { id: { in: bookingIds } },
-      data: { status: "EXPIRED" }
-    });
-
-    // (Optional) deactivate slots if you want
-    await prisma.timeSlot.updateMany({
-      where: { id: { in: timeSlotIds } },
-      data: { isActive: true }
-    });
-
-    console.log(`✅ Expired ${bookingIds.length} HOLD bookings`);
-  } catch (err) {
-    console.error("❌ Expire booking job failed:", err);
-  }
+if (slotIds.length > 0) {
+  await prisma.timeSlot.updateMany({
+    where: {
+      id: { in: slotIds },
+      isActive: false
+    },
+    data: { isActive: true }
+  });
 }
+
+    console.log("Expired bookings cleaned");
+  } catch (err) {
+    console.error("❌ Expire booking job failed:", err.message);
+  }
+};
