@@ -66,6 +66,8 @@ model Hospital {
   city                 String?
   open24x7             Boolean?         @default(false)
   rating               Float?           @default(0)
+  monSatTiming String?   // "9AM - 6PM"
+  sundayTiming String?   // "Closed"
   popularity           Int?             @default(0)
   isWomenFriendly      Boolean?         @default(false)
   hasMaternityCare     Boolean?         @default(false)
@@ -141,15 +143,14 @@ model Doctor {
 model Review {
   id        Int      @id @default(autoincrement())
   doctorId  Int
-  rating    Int
-  comment   String?
   userName  String
   userImage String?
+  rating    Int
+  comment   String?
   createdAt DateTime @default(now())
-
-  doctor Doctor @relation(fields: [doctorId], references: [id])
-  User   User?  @relation(fields: [userId], references: [id])
-  userId Int?
+  userId    Int?
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  User      User?    @relation(fields: [userId], references: [id])
 
   @@index([doctorId])
 }
@@ -304,20 +305,21 @@ model LabTest {
 }
 
 model LabAddress {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  fullName  String
-  mobile    String
-  house     String
-  street    String
-  landmark  String?
-  city      String
-  state     String
-  pinCode   String
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int          @id @default(autoincrement())
+  userId     Int
+  fullName   String
+  mobile     String
+  house      String
+  street     String
+  landmark   String?
+  city       String
+  state      String
+  pinCode    String
+  isDefault  Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  LabBooking LabBooking[]
 
   @@index([userId])
 }
@@ -348,7 +350,8 @@ model LabBooking {
   slotId           Int?
   patientProfileId Int?
   packageId        Int?
-  
+  labAddressId     Int?
+  LabAddress       LabAddress?      @relation(fields: [labAddressId], references: [id])
   lab              Lab              @relation(fields: [labId], references: [id])
   package          LabPackage?      @relation(fields: [packageId], references: [id])
   patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
@@ -494,7 +497,7 @@ model FamilyMember {
   gender       String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime
-  User         User           @relation(fields: [userId], references: [id])
+  User         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   FamilyReport FamilyReport[]
 }
 
@@ -504,7 +507,7 @@ model FamilyReport {
   url            String
   type           String
   createdAt      DateTime     @default(now())
-  FamilyMember   FamilyMember @relation(fields: [familyMemberId], references: [id])
+  FamilyMember   FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
 }
 
 enum BookingFor {

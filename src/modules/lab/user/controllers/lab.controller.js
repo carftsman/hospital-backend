@@ -861,9 +861,9 @@ export const getLabBookingById = async (req, res) => {
       where: { id: bookingId },
       include: {
         lab: true,
+        slot: true,
         patient: true,
-        slot: true,     
-        address: true
+        user: true   // ⭐ needed for self name
       }
     });
 
@@ -871,46 +871,84 @@ export const getLabBookingById = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // 🕒 Format helpers
-    const formatDate = (d) =>
-      new Date(d).toLocaleDateString("en-IN");
+    /* ---------- SAFE FORMATTERS ---------- */
 
-    const formatTime = (t) =>
-      new Date(t).toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true
-      });
+    const safeDate = (d) =>
+      d ? new Date(d).toLocaleDateString("en-IN") : null;
 
-    const start = booking.slot ? formatTime(booking.slot.startTime) : null;
-    const end = booking.slot ? formatTime(booking.slot.endTime) : null;
+    const safeTime = (t) => {
+  if (!t) return null;
 
-    res.json({
+  let dateObj;
+
+  // Case 1: Already Date object
+  if (t instanceof Date) {
+    dateObj = t;
+  }
+  // Case 2: Full ISO string
+  else if (String(t).includes("T")) {
+    dateObj = new Date(t);
+  }
+  // Case 3: HH:mm:ss
+  else {
+    dateObj = new Date(`1970-01-01T${t}`);
+  }
+
+  if (isNaN(dateObj)) return null;
+
+  return dateObj.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+};
+
+    const start = booking.slot ? safeTime(booking.slot.startTime) : null;
+    const end = booking.slot ? safeTime(booking.slot.endTime) : null;
+
+    /* ---------- PATIENT NAME LOGIC ---------- */
+
+    let patientName = null;
+
+    // 1️⃣ Family member
+    if (booking.patient && !booking.patient.isSelf) {
+      patientName = booking.patient.fullName;
+    }
+
+    // 2️⃣ Self booking → use USER NAME
+    if (!patientName && booking.user?.fullName) {
+      patientName = booking.user.fullName;
+    }
+
+    // 3️⃣ Final fallback
+    if (!patientName) {
+      patientName = "Guest";
+    }
+
+    /* ---------- RESPONSE ---------- */
+
+    return res.json({
       message: "Booking Details",
       booking: {
         bookingId: booking.id,
         labName: booking.lab?.name,
 
-        // ⭐ SLOT FORMAT
         slot: {
-          date: booking.slot ? formatDate(booking.slot.slotDate) : null,
+          date: booking.slot ? safeDate(booking.slot.slotDate) : null,
           time: start && end ? `${start} - ${end}` : null
         },
 
-        // Address (optional)
-        address: booking.address
-          ? `${booking.address.house}, ${booking.address.street}, ${booking.address.city}`
-          : null,
-
         patient: {
-          name: booking.patient?.fullName || "Self"
-        }
+          name: patientName
+        },
+
+        status: booking.status
       }
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Lab booking error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 export const getUserLabBookings = async (req, res) => {

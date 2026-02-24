@@ -187,18 +187,20 @@ export const fetchDoctors = async (filters, page, limit) => {
     include: {
       category: true,
       hospital: {
-        select: {
-          id: true,
-          name: true,
-          imageUrl: true,
-          location: true,
-          place: true,
-          latitude: true,
-          longitude: true,
-          consultationMode: true,
-          isOpen: true
-        }
-      }
+  select: {
+    id: true,
+    name: true,
+    imageUrl: true,
+    location: true,
+    latitude: true,
+    longitude: true,
+    consultationMode: true,
+    isOpen: true,
+    rating: true,           // ⭐ ADD
+    monSatTiming: true,     // ⭐ ADD
+    sundayTiming: true      // ⭐ ADD
+  }
+}
     }
   });
 
@@ -312,7 +314,6 @@ export const fetchHospitalDoctors = async (
   };
 };
 
-/* ---------------- DOCTOR PROFILE ---------------- */
 export const fetchDoctorInfo = async (doctorId) => {
   return prisma.doctor.findUnique({
     where: { id: doctorId },
@@ -330,13 +331,27 @@ export const fetchDoctorInfo = async (doctorId) => {
           longitude: true,
           consultationMode: true,
           isOpen: true,
-        },
+
+          // ⭐ NEW FIELDS
+          rating: true,
+          monSatTiming: true,
+          sundayTiming: true,
+          contactName: true,
+          contactNumber: true,
+          open24x7: true,
+          establishedYear: true,
+          city: true,
+          state: true
+        }
       },
+
       timeSlots: true,
       availabilities: true,
-    },
+      Review: true // optional (if showing reviews)
+    }
   });
 };
+
 export const fetchDoctorAvailabilityByDate = async (doctorId, date) => {
   const start = new Date(`${date}T00:00:00`);
   const end = new Date(`${date}T23:59:59`);
