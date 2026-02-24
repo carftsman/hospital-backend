@@ -105,67 +105,57 @@ router.get(
  * @swagger
  * /api/hospital/user/doctors:
  *   get:
- *     summary: Get doctors based on location and filters
+ *     summary: Get doctors based on location and advanced filters
  *     description: >
- *       Public API to fetch doctors based on user location with optional filters
- *       like distance, specialization, availability, and women-specific doctors.
- *       No authentication token is required.
+ *       Public API to fetch doctors near user location with UI filters like
+ *       department, experience, fee range, distance, availability, and sorting.
+ *       No authentication required.
+ *
  *     tags:
  *       - Doctors
+ *
  *     parameters:
  *       - in: query
  *         name: lat
+ *         required: true
  *         schema:
  *           type: number
  *           format: float
- *         required: true
- *         description: User latitude
  *         example: 17.385044
+ *         description: User latitude
  *
  *       - in: query
  *         name: lng
- *         schema:
- *           type: number
- *           format: float
  *         required: true
- *         description: User longitude
- *         example: 78.486671
- *
- *       - in: query
- *         name: distance
  *         schema:
  *           type: number
  *           format: float
- *         required: false
- *         description: Maximum distance in kilometers
- *         example: 5
+ *         example: 78.486671
+ *         description: User longitude
+ *
+ *       # ---------------- BASIC FILTERS ----------------
  *
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         required: false
- *         description: Search by doctor name
  *         example: rakesh
+ *         description: Search doctor by name
  *
  *       - in: query
  *         name: specialization
  *         schema:
  *           type: string
- *         required: false
- *         description: Filter by doctor specialization
  *         example: Cardiology
+ *         description: Filter by specialization
  *
  *       - in: query
  *         name: women
  *         schema:
  *           type: boolean
  *           default: false
- *         required: false
- *         description: >
- *           If true, returns only doctors belonging to women-specific categories
- *           (e.g., Gynecology, Dermatology, Psychiatry, etc.)
  *         example: true
+ *         description: Return only women-specific doctors
  *
  *       - in: query
  *         name: mode
@@ -173,17 +163,57 @@ router.get(
  *           type: string
  *           enum: [ONLINE, OFFLINE, BOTH]
  *           default: BOTH
- *         required: false
  *         description: Consultation mode filter
+ *
+ *       # ---------------- UI FILTERS ----------------
+ *
+ *       - in: query
+ *         name: categoryIds
+ *         schema:
+ *           type: string
+ *         example: "1,2,3"
+ *         description: Department filter (comma-separated category IDs)
+ *
+ *       - in: query
+ *         name: minExp
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: Minimum experience in years
+ *
+ *       - in: query
+ *         name: maxFee
+ *         schema:
+ *           type: integer
+ *         example: 1000
+ *         description: Maximum consultation fee
+ *
+ *       - in: query
+ *         name: distance
+ *         schema:
+ *           type: number
+ *         example: 5
+ *         description: Max distance in KM (2 / 5 / 10 from UI)
  *
  *       - in: query
  *         name: availability
  *         schema:
  *           type: string
- *           enum: [AVAILABLE, ALL]
- *           default: ALL
- *         required: false
- *         description: Filter doctors based on availability
+ *           enum: [today, tomorrow, now, all]
+ *           default: all
+ *         example: today
+ *         description: Filter by slot availability
+ *
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [distance, experience_desc, fee_asc, fee_desc]
+ *           default: distance
+ *         example: experience_desc
+ *         description: Sorting option from UI
+ *
+ *       # ---------------- PAGINATION ----------------
  *
  *       - in: query
  *         name: page
@@ -191,8 +221,7 @@ router.get(
  *           type: integer
  *           minimum: 1
  *           default: 1
- *         required: false
- *         description: Page number
+ *         example: 1
  *
  *       - in: query
  *         name: limit
@@ -201,69 +230,32 @@ router.get(
  *           minimum: 1
  *           maximum: 100
  *           default: 20
- *         required: false
- *         description: Number of doctors per page
+ *         example: 20
  *
  *     responses:
  *       200:
  *         description: Doctors fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 page:
- *                   type: integer
- *                   example: 1
- *                 limit:
- *                   type: integer
- *                   example: 20
- *                 total:
- *                   type: integer
- *                   example: 42
- *                 count:
- *                   type: integer
- *                   example: 10
- *                 doctors:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                         example: 12
- *                       name:
- *                         type: string
- *                         example: Dr. Kavya Rao
- *                       specialization:
- *                         type: string
- *                         example: Gynecology
- *                       experience:
- *                         type: integer
- *                         example: 10
- *                       consultationFee:
- *                         type: integer
- *                         example: 650
- *                       languages:
- *                         type: array
- *                         items:
- *                           type: string
- *                         example: ["English", "Telugu"]
- *                       hospital:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 1
- *                           name:
- *                             type: string
- *                             example: Apollo Hospital
- *                           place:
- *                             type: string
- *                             example: Hyderabad
- *                           isOpen:
- *                             type: boolean
- *                             example: true
+ *             example:
+ *               page: 1
+ *               limit: 20
+ *               total: 42
+ *               count: 10
+ *               doctors:
+ *                 - id: 12
+ *                   name: Dr. Kavya Rao
+ *                   specialization: Gynecology
+ *                   experience: 10
+ *                   consultationFee: 650
+ *                   rating: 4.6
+ *                   distanceKm: 3.2
+ *                   languages: ["English", "Telugu"]
+ *                   hospital:
+ *                     id: 1
+ *                     name: Apollo Hospital
+ *                     place: Hyderabad
+ *                     isOpen: true
  *
  *       400:
  *         description: Invalid request parameters

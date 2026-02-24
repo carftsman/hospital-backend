@@ -857,40 +857,23 @@ export const getLabBookingById = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
 
- const booking = await prisma.labBooking.findUnique({
-  where: { id: bookingId },
-  include: {
-    lab: true,
-    package: true,
-    slot: true,
-    patient: true,
-    user: true
-  }
-});
-
-res.json({
-  message: "Booking Details",
-  booking: {
-    bookingId: booking.id,
-    labName: booking.lab.name,
-    date: booking.sampleDate,
-
-    address: booking.lab.address || booking.lab.city, // FIXED
-
-    patient: {
-      name:
-        booking.patient?.fullName ||
-        booking.user?.fullName ||
-        "Self",
-      age: booking.patient?.age,
-      gender: booking.patient?.gender
-    }
-  }
-});
+    const booking = await prisma.labBooking.findUnique({
+      where: { id: bookingId },
+      include: {
+        lab: true,
+        patient: true,
+        slot: true,     
+        address: true
+      }
+    });
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+
+    // 🕒 Format helpers
+    const formatDate = (d) =>
+      new Date(d).toLocaleDateString("en-IN");
 
     const formatTime = (t) =>
       new Date(t).toLocaleTimeString("en-IN", {
@@ -899,34 +882,29 @@ res.json({
         hour12: true
       });
 
-    const start = formatTime(booking.slot.startTime);
-    const end = formatTime(booking.slot.endTime);
+    const start = booking.slot ? formatTime(booking.slot.startTime) : null;
+    const end = booking.slot ? formatTime(booking.slot.endTime) : null;
 
     res.json({
       message: "Booking Details",
       booking: {
         bookingId: booking.id,
-        labName: booking.lab.name,
-        date: booking.sampleDate,
-        timeRange: `${start} - ${end}`,
-        consultationType:
-          booking.package
-            ? "Home Sample Collection"
-            : "Lab Visit",
+        labName: booking.lab?.name,
 
-        address: booking.lab.address,
-        city: booking.lab.city,
-
-        patient: {
-          name: booking.patient?.fullName || "Self",
-          age: booking.patient?.age,
-          gender: booking.patient?.gender,
-          phone: booking.patient?.phone
+        // ⭐ SLOT FORMAT
+        slot: {
+          date: booking.slot ? formatDate(booking.slot.slotDate) : null,
+          time: start && end ? `${start} - ${end}` : null
         },
 
-        price: booking.package?.finalPrice || null,
-        status: booking.status,
-        createdAt: booking.createdAt
+        // Address (optional)
+        address: booking.address
+          ? `${booking.address.house}, ${booking.address.street}, ${booking.address.city}`
+          : null,
+
+        patient: {
+          name: booking.patient?.fullName || "Self"
+        }
       }
     });
 
@@ -935,7 +913,6 @@ res.json({
     res.status(500).json({ message: "Server error" });
   }
 };
-
 export const getUserLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
  

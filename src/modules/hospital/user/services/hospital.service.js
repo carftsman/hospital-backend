@@ -1,198 +1,186 @@
+// services/hospital.service.js
 import prisma from "../../../../prisma/client.js";
-import { Prisma } from "@prisma/client";
 
-const EARTH_RADIUS_KM = 6371;
+/* ==============================
+   DISTANCE HELPER
+================================ */
+const distanceKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
 
-export const getNearbyHospitalsWithFilters = async ({
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+  return Number((R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+};
+
+/* =========================================
+   NEARBY HOSPITALS WITH ALL FILTERS
+========================================= */
+export const getNearbyHospitalsWithFilters = async (filters) => {
+  const {
+    lat,
+    lng,
+    radius = 10,
+    categoryIds = [],
+    mode = "BOTH",
+    state,
+    city,
+    openNow,
+    open24x7,
+    women,
+    sort = "distance",
+    page = 1,
+    limit = 20
+  } = filters;
+
+  const skip = (page - 1) * limit;
+
+  const where = {};
+
+  // LOCATION FILTERS
+  if (state) where.state = { contains: state, mode: "insensitive" };
+  if (city) where.city = { contains: city, mode: "insensitive" };
+
+  // MODE FILTER
+  if (mode !== "BOTH") {
+    where.consultationMode = { in: [mode, "BOTH"] };
+  }
+
+  // AVAILABILITY FILTERS
+  if (openNow) where.isOpen = true;
+  if (open24x7) where.open24x7 = true;
+if (women) {
+  where.OR = [
+    { isWomenFriendly: true },
+    { hasMaternityCare: true }
+  ];
+}
+  // CATEGORY FILTER
+  if (categoryIds.length) {
+    where.categories = {
+      some: { id: { in: categoryIds } }
+    };
+  }
+
+  // FETCH FROM DB
+  const hospitals = await prisma.hospital.findMany({
+    where,
+    include: {
+      categories: {
+        select: { id: true, name: true, imageUrl: true }
+      }
+    }
+  });
+
+  // MAP + DISTANCE
+  let rows = hospitals.map(h => {
+    const dist = distanceKm(lat, lng, h.latitude, h.longitude);
+
+    return {
+      id: h.id,
+      name: h.name,
+      imageUrl: h.imageUrl,
+      location: h.location,
+      city: h.city,
+      state: h.state,
+      latitude: h.latitude,
+      longitude: h.longitude,
+      speciality: h.speciality,
+      consultationMode: h.consultationMode,
+      isOpen: h.isOpen,
+      open24x7: h.open24x7,
+      rating: Number(h.rating || 0),
+      popularity: Number(h.popularity || 0),
+      distance: dist,
+      categories: h.categories,
+      primaryCategory: h.categories?.[0] || null
+    };
+  });
+
+  // RADIUS FILTER
+  rows = rows.filter(r => r.distance <= radius);
+
+  // SORTING
+  if (sort === "rating") {
+    rows.sort((a, b) => b.rating - a.rating);
+  } else if (sort === "popularity") {
+    rows.sort((a, b) => b.popularity - a.popularity);
+  } else {
+    rows.sort((a, b) => a.distance - b.distance);
+  }
+
+  const total = rows.length;
+  const paginated = rows.slice(skip, skip + limit);
+
+  return { hospitals: paginated, total };
+};
+
+/* ======================================================
+   HOSPITALS BY CATEGORY
+====================================================== */
+export const getHospitalsByCategory = async (
+  categoryId,
+  mode,
   lat,
   lng,
-  radius = 10,
-  categoryIds = [],
-  mode = "BOTH",
-  openNow = false,
-  open24x7 = false,
-  women = false,
-  state,
-  city,
-  sort = "distance",
-  page = 1,
-  limit = 20
-}) => {
-  const offset = (page - 1) * limit;
-
-  /* MODE FILTER */
-  const modeCondition =
-    mode === "ONLINE"
-      ? Prisma.sql`AND h."consultationMode" IN ('ONLINE','BOTH')`
-      : mode === "OFFLINE"
-      ? Prisma.sql`AND h."consultationMode" IN ('OFFLINE','BOTH')`
-      : Prisma.empty;
-
-  /* AVAILABILITY */
-  const availabilityCondition =
-    openNow && open24x7
-      ? Prisma.sql`AND (h."isOpen" = true OR h."open24x7" = true)`
-      : openNow
-      ? Prisma.sql`AND h."isOpen" = true`
-      : open24x7
-      ? Prisma.sql`AND h."open24x7" = true`
-      : Prisma.empty;
-
-  /* LOCATION */
-  const stateCondition = state
-    ? Prisma.sql`AND h."state" ILIKE ${`%${state}%`}`
-    : Prisma.empty;
-
-  const cityCondition = city
-    ? Prisma.sql`AND (h."city" ILIKE ${`%${city}%`} OR h."location" ILIKE ${`%${city}%`})`
-    : Prisma.empty;
-
-  /* WOMEN FILTER */
-  const womenCondition = women
-    ? Prisma.sql`AND h."isWomenFriendly" = true`
-    : Prisma.empty;
-
-  /* CATEGORY JOIN */
-  const categoryJoin =
-    categoryIds.length > 0
-      ? Prisma.sql`
-          JOIN "Category" c
-            ON c."hospitalId" = h.id
-           AND c.id IN (${Prisma.join(categoryIds)})
-        `
-      : Prisma.empty;
-
-  /* ORDER BY */
-  const orderBy =
-    sort === "rating"
-      ? Prisma.sql`sub.rating DESC NULLS LAST`
-      : sort === "popularity"
-      ? Prisma.sql`COALESCE(sub.popularity,0) DESC`
-      : Prisma.sql`sub.distance ASC`;
-
-  /* MAIN QUERY (FIXED) */
-  const hospitals = await prisma.$queryRaw`
-    SELECT *
-    FROM (
-      SELECT
-        h.id,
-        h.name,
-        h."imageUrl",
-        h.location,
-        h.city,
-        h.state,
-        h.speciality,
-        h."consultationMode",
-        h."isOpen",
-        h."open24x7",
-        h.rating,
-        h.popularity,
-        h."isWomenFriendly",
-        h."hasMaternityCare",
-        (
-          ${EARTH_RADIUS_KM} * acos(
-            cos(radians(${lat}))
-            * cos(radians(h.latitude))
-            * cos(radians(h.longitude) - radians(${lng}))
-            + sin(radians(${lat})) * sin(radians(h.latitude))
-          )
-        ) AS distance
-      FROM "Hospital" h
-      ${categoryJoin}
-      WHERE
-        h.status = 'APPROVED'
-        AND h."isListed" = true
-        AND h.latitude IS NOT NULL
-        AND h.longitude IS NOT NULL
-        ${modeCondition}
-        ${availabilityCondition}
-        ${stateCondition}
-        ${cityCondition}
-        ${womenCondition}
-    ) sub
-    WHERE sub.distance <= ${radius}
-    ORDER BY ${orderBy}
-    LIMIT ${limit}
-    OFFSET ${offset};
-  `;
-
-  /* COUNT QUERY */
-  const countRows = await prisma.$queryRaw`
-    SELECT COUNT(*)::int AS count
-    FROM (
-      SELECT h.id
-      FROM "Hospital" h
-      ${categoryJoin}
-      WHERE
-        h.status = 'APPROVED'
-        AND h."isListed" = true
-        AND h.latitude IS NOT NULL
-        AND h.longitude IS NOT NULL
-        ${modeCondition}
-        ${availabilityCondition}
-        ${stateCondition}
-        ${cityCondition}
-        ${womenCondition}
-    ) sub;
-  `;
-
-  return {
-    hospitals,
-    total: countRows?.[0]?.count || 0
-  };
-};
-export const getHospitalsByMode = async (
-  mode,
-  userLat,
-  userLng,
   page,
   limit
 ) => {
-  const offset = (page - 1) * limit;
+  const skip = (page - 1) * limit;
 
-  const hospitalModeCondition =
-    mode === "ONLINE"
-      ? Prisma.sql`(h."consultationMode" = 'ONLINE' OR h."consultationMode" = 'BOTH')`
-      : mode === "OFFLINE"
-      ? Prisma.sql`(h."consultationMode" = 'OFFLINE' OR h."consultationMode" = 'BOTH')`
-      : Prisma.sql`h."consultationMode" IN ('ONLINE','OFFLINE','BOTH')`;
+  const hospitals = await prisma.hospital.findMany({
+    where: {
+      consultationMode: { in: [mode, "BOTH"] },
+      categories: {
+        some: { id: categoryId }
+      }
+    },
+    include: {
+      categories: {
+        select: { id: true, name: true }
+      }
+    }
+  });
 
-  const rows = await prisma.$queryRaw`
-    SELECT *
-    FROM (
-      SELECT
-        h.id,
-        h.name,
-        h."imageUrl",
-        h.speciality,
-        h.location,
-        h.place,
-        h.latitude,
-        h.longitude,
-        h."isOpen",
-        (
-          ${EARTH_RADIUS_KM} * acos(
-            cos(radians(${userLat}))
-            * cos(radians(h.latitude))
-            * cos(radians(h.longitude) - radians(${userLng}))
-            + sin(radians(${userLat})) * sin(radians(h.latitude))
-          )
-        ) AS distance
-      FROM "Hospital" h
-      WHERE
-        h.status = 'APPROVED'
-        AND h."isListed" = true
-        AND h.latitude IS NOT NULL
-        AND h.longitude IS NOT NULL
-        AND ${hospitalModeCondition}
-    ) sub
-    ORDER BY distance ASC
-    LIMIT ${limit}
-    OFFSET ${offset};
-  `;
+  const mapped = hospitals.map(h => ({
+    ...h,
+    distance: distanceKm(lat, lng, h.latitude, h.longitude)
+  }));
 
-  return {
-    hospitals: rows,
-    total: rows.length
-  };
+  mapped.sort((a, b) => a.distance - b.distance);
+
+  const total = mapped.length;
+  const paginated = mapped.slice(skip, skip + limit);
+
+  return { hospitals: paginated, total };
+};
+
+/* ======================================================
+   HOSPITALS BY MODE
+====================================================== */
+export const getHospitalsByMode = async (mode, lat, lng, page, limit) => {
+  const skip = (page - 1) * limit;
+
+  const hospitals = await prisma.hospital.findMany({
+    where: {
+      consultationMode: { in: [mode, "BOTH"] }
+    }
+  });
+
+  const mapped = hospitals.map(h => ({
+    ...h,
+    distance: distanceKm(lat, lng, h.latitude, h.longitude)
+  }));
+
+  mapped.sort((a, b) => a.distance - b.distance);
+
+  const total = mapped.length;
+  const paginated = mapped.slice(skip, skip + limit);
+
+  return { hospitals: paginated, total };
 };

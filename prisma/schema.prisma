@@ -348,6 +348,7 @@ model LabBooking {
   slotId           Int?
   patientProfileId Int?
   packageId        Int?
+  
   lab              Lab              @relation(fields: [labId], references: [id])
   package          LabPackage?      @relation(fields: [packageId], references: [id])
   patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])

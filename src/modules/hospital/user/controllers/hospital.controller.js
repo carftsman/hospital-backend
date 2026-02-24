@@ -41,7 +41,7 @@ export const listNearbyHospitals = async (req, res) => {
         lat,
         lng,
         radius: Number(radius),
-        categoryIds: categories, // ✅ FIXED
+        categoryIds: categories,
         mode: String(mode).toUpperCase(),
         sort,
         state,
