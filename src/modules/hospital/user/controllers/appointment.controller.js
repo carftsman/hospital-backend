@@ -365,6 +365,12 @@ export const getMyAppointments = async (req, res) => {
       const doctor = b.timeSlot?.doctor;
       const hospital = doctor?.hospital;
 
+      // ✅ BACKWARD COMPATIBLE (old bookings support)
+      const start = b.timeSlot?.start ?? b.start;
+      const end = b.timeSlot?.end ?? b.end;
+
+      if (!start || !end) return; // skip corrupted rows
+
       const item = {
         bookingId: b.id,
         status: b.status,
@@ -374,12 +380,8 @@ export const getMyAppointments = async (req, res) => {
           hospital: hospital?.name || null
         },
         appointment: {
-          date: b.timeSlot.start,
-          time: `${b.timeSlot.start
-            .toISOString()
-            .slice(11, 16)} - ${b.timeSlot.end
-            .toISOString()
-            .slice(11, 16)}`
+          date: start,
+          time: `${new Date(start).toISOString().slice(11, 16)} - ${new Date(end).toISOString().slice(11, 16)}`
         }
       };
 

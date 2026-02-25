@@ -5,7 +5,11 @@ import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
 
 import { expireHoldBookings } from "./jobs/expireHoldBookings.job.js";
 import { releaseExpiredBookings } from "./jobs/releaseExpiredBookings.job.js";
+import { Prisma } from "@prisma/client";
 
+Prisma.Decimal.prototype.toJSON = function () {
+  return parseFloat(this.toString());
+};
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
