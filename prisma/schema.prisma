@@ -496,11 +496,7 @@ model FamilyMember {
   age          Int?
   gender       String?
   createdAt    DateTime       @default(now())
-<<<<<<< Updated upstream
-  updatedAt    DateTime
-=======
   updatedAt    DateTime       @updatedAt
->>>>>>> Stashed changes
   User         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   FamilyReport FamilyReport[]
 }
