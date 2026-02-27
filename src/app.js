@@ -47,6 +47,22 @@ import labAdminReportRoutes from "./modules/lab/admin/routes/labAdminReport.rout
 import labPrescriptionRoutes from "./modules/lab/user/routes/labPrescription.routes.js";
 
 
+// profile
+
+
+import addFamilyMember from "./modules/profile/routes/familyMember.routes.js"
+import updateFamilyMember from "./modules/profile/routes/familyMember.routes.js"
+import getFamilyMemberById from "./modules/profile/routes/familyMember.routes.js"
+import getAllFamilyMembers from "./modules/profile/routes/familyMember.routes.js"
+import removeFamilyMember from "./modules/profile/routes/familyMember.routes.js"
+import removeAllFamilyMembers from "./modules/profile/routes/familyMember.routes.js"
+
+
+import addHealthReport from "./modules/profile/routes/familyReports.routes.js"
+import getHealthReportById from "./modules/profile/routes/familyReports.routes.js"
+import  getAllHealthReports from "./modules/profile/routes/familyReports.routes.js"
+import removeHealthReport from "./modules/profile/routes/familyReports.routes.js"
+
 // =======================
 // Swagger
 // =======================
@@ -135,5 +151,20 @@ app.use("/api/labs/address", labAddressRoutes);
 
 app.use("/api/lab-admin", labAdminReportRoutes);
 app.use("/api/lab-prescriptions", labPrescriptionRoutes);
+
+
+// profile
+
+app.use("/api/family-member",addFamilyMember)
+app.use("/api/family-member/:id",updateFamilyMember)
+app.use("/api/family-member",removeAllFamilyMembers)
+app.use("/api/family-member/:id ",removeFamilyMember)
+app.use("/api/family-member/:id",getFamilyMemberById)
+app.use("/api/family-member",getAllFamilyMembers)
+app.use("/api/health-report",addHealthReport)
+app.use("/api/health-report/:id",removeHealthReport) 
+app.use("/api/health-report/all/:familyMemberId",getAllHealthReports)
+app.use("/api/health-report/:id",getHealthReportById) 
+
 
 export default app;
