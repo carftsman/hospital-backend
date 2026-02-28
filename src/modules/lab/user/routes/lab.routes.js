@@ -266,7 +266,7 @@ router.get("/auto-suggest", controller.autoSuggestLabs);
  *           example: 25
  *       - in: query
  *         name: labId
- *         required: true
+ *         required: false
  *         schema:
  *           type: integer
  *           example: 1

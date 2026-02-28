@@ -101,6 +101,7 @@ router.get(
 );
 
 
+
 /**
  * @swagger
  * /api/hospital/user/doctors:
@@ -133,8 +134,6 @@ router.get(
  *         example: 78.486671
  *         description: User longitude
  *
- *       # ---------------- BASIC FILTERS ----------------
- *
  *       - in: query
  *         name: search
  *         schema:
@@ -164,8 +163,6 @@ router.get(
  *           enum: [ONLINE, OFFLINE, BOTH]
  *           default: BOTH
  *         description: Consultation mode filter
- *
- *       # ---------------- UI FILTERS ----------------
  *
  *       - in: query
  *         name: categoryIds
@@ -208,13 +205,15 @@ router.get(
  *         name: sort
  *         schema:
  *           type: string
- *           enum: [distance, experience_desc, fee_asc, fee_desc]
+ *           enum:
+ *             - distance
+ *             - experience_desc
+ *             - fee_asc
+ *             - fee_desc
+ *             - rating_desc
+ *             - rating_asc
  *           default: distance
- *         example: experience_desc
- *         description: Sorting option from UI
- *
- *       # ---------------- PAGINATION ----------------
- *
+ *         example: rating_desc
  *       - in: query
  *         name: page
  *         schema:
@@ -235,31 +234,8 @@ router.get(
  *     responses:
  *       200:
  *         description: Doctors fetched successfully
- *         content:
- *           application/json:
- *             example:
- *               page: 1
- *               limit: 20
- *               total: 42
- *               count: 10
- *               doctors:
- *                 - id: 12
- *                   name: Dr. Kavya Rao
- *                   specialization: Gynecology
- *                   experience: 10
- *                   consultationFee: 650
- *                   rating: 4.6
- *                   distanceKm: 3.2
- *                   languages: ["English", "Telugu"]
- *                   hospital:
- *                     id: 1
- *                     name: Apollo Hospital
- *                     place: Hyderabad
- *                     isOpen: true
- *
  *       400:
  *         description: Invalid request parameters
- *
  *       500:
  *         description: Internal server error
  */

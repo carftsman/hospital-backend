@@ -32,7 +32,7 @@ export const fetchDoctorsNearby = async (filters, page, limit) => {
     };
   }
 
-  /* ---------------- DEPARTMENT ---------------- */
+  /* ---------------- CATEGORY ---------------- */
   if (filters.categoryIds?.length) {
     where.categoryId = { in: filters.categoryIds };
   }
@@ -47,13 +47,9 @@ export const fetchDoctorsNearby = async (filters, page, limit) => {
     where.consultationFee = { lte: filters.maxFee };
   }
 
-  /* ---------------- WOMEN SAFE FILTER ---------------- */
+  /* ---------------- WOMEN SAFE ---------------- */
   if (filters.women) {
-    where.category = {
-      is: {
-        isWomenSpecific: true
-      }
-    };
+    where.category = { is: { isWomenSpecific: true } };
   }
 
   const doctors = await prisma.doctor.findMany({
@@ -106,8 +102,8 @@ export const fetchDoctorsNearby = async (filters, page, limit) => {
       imageUrl: doc.imageUrl,
       experience: doc.experience,
       specialization: doc.specialization,
-      consultationFee: doc.consultationFee,
-      rating: Number(doc.rating),
+      consultationFee: Number(doc.consultationFee || 0),
+      rating: Number(doc.rating || 0),
       languages: doc.languages,
       distanceKm: dist,
 
@@ -145,13 +141,39 @@ export const fetchDoctorsNearby = async (filters, page, limit) => {
   if (filters.availability === "now")
     rows = rows.filter(d => d.availability.availableNow);
 
-  /* ---------- SORT ---------- */
-  if (filters.sort === "experience_desc")
-    rows.sort((a, b) => b.experience - a.experience);
-  else if (filters.sort === "fee_asc")
-    rows.sort((a, b) => a.consultationFee - b.consultationFee);
-  else
-    rows.sort((a, b) => a.distanceKm - b.distanceKm);
+  /* ================= SORT FIX ================= */
+  switch (filters.sort) {
+    case "experience_desc":
+    case "exp_desc":
+      rows.sort((a, b) => b.experience - a.experience);
+      break;
+case "rating_desc":
+    rows.sort((a, b) => b.rating - a.rating); // ⭐ HIGH → LOW
+    break;
+
+  case "rating_asc":
+    rows.sort((a, b) => a.rating - b.rating); // ⭐ LOW → HIGH
+    break;
+    case "fee_asc":
+      rows.sort((a, b) => a.consultationFee - b.consultationFee);
+      break;
+
+    case "fee_desc":
+      rows.sort((a, b) => b.consultationFee - a.consultationFee);
+      break;
+
+    case "rating_desc":
+      rows.sort((a, b) => b.rating - a.rating);
+      break;
+
+    case "rating_asc":
+      rows.sort((a, b) => a.rating - b.rating);
+      break;
+
+    case "distance":
+    default:
+      rows.sort((a, b) => a.distanceKm - b.distanceKm);
+  }
 
   const total = rows.length;
   return { rows: rows.slice(skip, skip + limit), total };

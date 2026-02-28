@@ -36,14 +36,19 @@ export const getDoctors = async (req, res) => {
       sort
     }, Number(page), Number(limit));
 
-    res.json({ page: Number(page), limit: Number(limit), total, count: rows.length, doctors: rows });
+    res.json({
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      count: rows.length,
+      doctors: rows
+    });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 export const getHospitalDoctors = async (req, res) => {
   try {
     const hospitalId = Number(req.params.hospitalId);

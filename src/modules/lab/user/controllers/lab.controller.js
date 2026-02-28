@@ -173,6 +173,7 @@ export const getLabPackageDetails = async (req, res) => {
     res.json({
       packageId: pkg.id,
       packageName: pkg.name,
+      labId: pkg.labId,
       labName: pkg.lab.name,
       imageUrl: pkg.imageUrl || null,
 
@@ -209,49 +210,39 @@ export const getLabPackageDetails = async (req, res) => {
 export const getPackagesByAge = async (req, res) => {
   try {
     const age = Number(req.query.age);
-    const labId = Number(req.query.labId);
-    const gender = req.query.gender?.toUpperCase(); // optional
+    const labId = req.query.labId ? Number(req.query.labId) : null;
+    const gender = req.query.gender?.toUpperCase();
 
-    if (!age || !labId) {
+    if (!age) {
       return res.status(400).json({
-        message: "age and labId are required",
+        message: "age is required",
       });
     }
 
     const packages = await prisma.labPackage.findMany({
       where: {
-        labId,
+        ...(labId && { labId }), // ✅ only apply if present
 
         // AGE FILTER
         AND: [
           {
-            OR: [
-              { minage: null },
-              { minage: { lte: age } },
-            ],
+            OR: [{ minage: null }, { minage: { lte: age } }],
           },
           {
-            OR: [
-              { maxage: null },
-              { maxage: { gte: age } },
-            ],
+            OR: [{ maxage: null }, { maxage: { gte: age } }],
           },
         ],
 
         // GENDER FILTER (optional)
         ...(gender && {
-          OR: [
-            { gender: "ALL" },
-            { gender },
-          ],
+          OR: [{ gender: "ALL" }, { gender }],
         }),
       },
       include: {
+        lab: { select: { id: true, name: true } }, // ✅ show lab info
         items: {
           include: {
-            test: {
-              select: { name: true },
-            },
+            test: { select: { name: true } },
           },
         },
       },
@@ -260,11 +251,13 @@ export const getPackagesByAge = async (req, res) => {
 
     res.json({
       age,
-      labId,
+      labFilterApplied: !!labId,
       count: packages.length,
       packages: packages.map(p => ({
         packageId: p.id,
         packageName: p.name,
+        labId: p.lab.id,
+        labName: p.lab.name,
         finalPrice: p.finalPrice,
         reportTime: p.reportTime,
         gender: p.gender,
@@ -280,7 +273,6 @@ export const getPackagesByAge = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
  
 export const getUserPastLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
