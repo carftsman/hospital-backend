@@ -9,6 +9,8 @@ import {
   removeAllFamilyMembers
 } from "../controllers/familyMember.controllers.js";
 
+import { upload } from "../../../middlewares/upload.middleware.js";
+
 const router = express.Router();
 
 /**
@@ -29,7 +31,7 @@ const router = express.Router();
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -41,23 +43,35 @@ const router = express.Router();
  *               fullName:
  *                 type: string
  *                 example: John Doe
- *                 description: Full name of the family member
+ *                 description: Full name (alphabets and spaces only)
  *               relation:
  *                 type: string
- *                 enum: [FATHER, MOTHER, SON, DAUGHTER, GRANDPARENT]
+ *                 enum: [FATHER, MOTHER, SON, DAUGHTER, SISTER, BROTHER, OTHERS]
  *                 example: FATHER
  *                 description: Relation with the user
  *               age:
  *                 type: integer
  *                 example: 50
- *                 description: Age of the family member
+ *                 description: Age must be a positive number
  *               gender:
  *                 type: string
  *                 enum: [MALE, FEMALE, OTHER]
  *                 example: MALE
  *                 description: Gender of the family member
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *                 description: 10 digit phone number
+ *               email:
+ *                 type: string
+ *                 example: "john@gmail.com"
+ *                 description: Allowed domains - gmail.com,yahoo.com,zoho.com,outlook.com
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Upload a photo of the family member (optional)
  *     responses:
- *       200:
+ *       201:
  *         description: Family member added successfully
  *         content:
  *           application/json:
@@ -80,9 +94,21 @@ const router = express.Router();
  *                       type: integer
  *                     gender:
  *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     photo:
+ *                       type: string
+ *                       description: URL of uploaded photo
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
  */
+router.post("/", authenticate, upload.single("photo"), addFamilyMember);
 
-router.post("/", authenticate, addFamilyMember);
+
 
 
 /**
@@ -156,11 +182,12 @@ router.get("/", authenticate, getAllFamilyMembers);
 router.get("/:id", authenticate, getFamilyMemberById);
 
 
+
 /**
  * @swagger
  * /api/family-member/{id}:
  *   patch:
- *     summary: Edit a family member
+ *     summary: Update a family member
  *     tags: [Family Member]
  *     security:
  *       - bearerAuth: []
@@ -172,36 +199,64 @@ router.get("/:id", authenticate, getFamilyMemberById);
  *         schema:
  *           type: integer
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               fullName:
  *                 type: string
  *                 example: Jane Doe
- *                 description: Full name of the family member
+ *                 description: Full name (alphabets and spaces only)
  *               relation:
  *                 type: string
- *                 enum: [FATHER, MOTHER, SON, DAUGHTER, GRANDPARENT]
+ *                 enum: [FATHER, MOTHER, SON, DAUGHTER, SISTER, BROTHER, OTHERS]
  *                 example: DAUGHTER
  *                 description: Relation with the user
  *               age:
  *                 type: integer
  *                 example: 25
- *                 description: Age of the family member
+ *                 description: Age must be a positive number
  *               gender:
  *                 type: string
  *                 enum: [MALE, FEMALE, OTHER]
  *                 example: FEMALE
  *                 description: Gender of the family member
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *                 description: 10 digit phone number
+ *               email:
+ *                 type: string
+ *                 example: "jane@gmail.com"
+ *                 description: Allowed domains - gmail.com, yahoo.com, outlook.com, zoho.com
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: Upload a new photo (optional)
  *     responses:
  *       200:
  *         description: Family member updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Family member not found
  */
 
-router.patch("/:id", authenticate, updateFamilyMember);
+router.patch("/:id",authenticate,upload.single("photo"),updateFamilyMember);
+
+
 
 
 /**

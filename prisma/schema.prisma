@@ -66,12 +66,12 @@ model Hospital {
   city                 String?
   open24x7             Boolean?         @default(false)
   rating               Float?           @default(0)
-  monSatTiming String?   // "9AM - 6PM"
-  sundayTiming String?   // "Closed"
   popularity           Int?             @default(0)
   isWomenFriendly      Boolean?         @default(false)
   hasMaternityCare     Boolean?         @default(false)
   isEmergencySupported Boolean?         @default(false)
+  monSatTiming         String?
+  sundayTiming         String?
   categories           Category[]
   doctors              Doctor[]
   notifications        Notification[]
@@ -497,6 +497,9 @@ model FamilyMember {
   gender       String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  phone        String?        @db.VarChar(10)
+  email        String?        @unique @db.VarChar(255)
+  photo        String?
   User         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   FamilyReport FamilyReport[]
 }
@@ -631,5 +634,7 @@ enum Relation {
   MOTHER
   SON
   DAUGHTER
-  GRANDPARENT
+  OTHERS
+  BROTHER
+  SISTER
 }
