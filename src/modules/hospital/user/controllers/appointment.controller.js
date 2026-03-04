@@ -110,12 +110,11 @@ export const getAvailableSlots = async (req, res) => {
 };
 export const holdAppointment = async (req, res) => {
   try {
+    const { slotId, bookingFor, reason, patient, consultationMode } = req.body;
     const userId = req.user.id;
-    const { slotId, bookingFor, reason, patient } = req.body;
+
     if (!slotId || !bookingFor) {
-      return res
-        .status(400)
-        .json({ message: "slotId and bookingFor required" });
+      return res.status(400).json({ message: "slotId and bookingFor required" });
     }
 
     const slot = await prisma.timeSlot.findUnique({
@@ -127,30 +126,46 @@ export const holdAppointment = async (req, res) => {
       return res.status(404).json({ message: "Slot not found" });
     }
 
-    /* ===============================
-       SLOT ALREADY BOOKED CHECK
-    =============================== */
+    // ===============================
+    // SLOT ALREADY BOOKED CHECK
+    // ===============================
     if (
       slot.booking &&
-      (
-        slot.booking.status === "CONFIRMED" ||
-        (slot.booking.status === "HOLD" &&
-          slot.booking.expiresAt > new Date())
-      )
+      (slot.booking.status === "CONFIRMED" ||
+        (slot.booking.status === "HOLD" && slot.booking.expiresAt > new Date()))
     ) {
       return res.status(409).json({ message: "Slot already booked" });
     }
 
     let patientProfileId = null;
 
-    /* ===============================
-       BOOKING FOR OTHER
-    =============================== */
+    // ===============================
+    // CONSULTATION MODE VALIDATION
+    // ===============================
+    const allowedModes = ["ONLINE", "OFFLINE"];
+    let finalMode = consultationMode || slot.consultationMode || "OFFLINE"; // ✅ always take root-level mode
+
+    // Validate selected mode
+    if (!allowedModes.includes(finalMode) && finalMode !== "BOTH") {
+      return res.status(400).json({
+        message: "consultationMode must be ONLINE, OFFLINE, or BOTH"
+      });
+    }
+
+    // Check if slot supports selected mode
+    if (slot.consultationMode !== "BOTH" && slot.consultationMode !== finalMode) {
+      return res.status(400).json({
+        message: "Selected consultation mode not available for this slot"
+      });
+    }
+
+    // ===============================
+    // BOOKING FOR OTHER PATIENT
+    // ===============================
     if (bookingFor === "OTHER") {
       if (!patient?.fullName || !patient?.gender) {
         return res.status(400).json({
-          message:
-            "Patient fullName and gender required for OTHER booking"
+          message: "Patient fullName and gender required for OTHER booking"
         });
       }
 
@@ -173,30 +188,26 @@ export const holdAppointment = async (req, res) => {
       patientProfileId = newPatient.id;
     }
 
-    /* ===============================
-       BOOKING FOR SELF
-    =============================== */
+    // ===============================
+    // BOOKING FOR SELF - Gender check
+    // ===============================
     if (bookingFor === "SELF") {
-      const user = await prisma.user.findUnique({
-        where: { id: userId }
-      });
-
+      const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user?.gender) {
         return res.status(400).json({
-          message:
-            "Please complete your profile with gender before booking"
+          message: "Please complete your profile with gender before booking"
         });
       }
     }
 
-    /* ===============================
-       HOLD EXPIRY (10 MINUTES)
-    =============================== */
+    // ===============================
+    // HOLD EXPIRY (10 MINUTES)
+    // ===============================
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    /* ===============================
-       UPSERT BOOKING
-    =============================== */
+    // ===============================
+    // UPSERT BOOKING
+    // ===============================
     const booking = await prisma.booking.upsert({
       where: { timeSlotId: slot.id },
       update: {
@@ -204,7 +215,8 @@ export const holdAppointment = async (req, res) => {
         status: "HOLD",
         expiresAt,
         reason,
-        patientProfileId
+        patientProfileId,
+        consultationMode: finalMode
       },
       create: {
         timeSlotId: slot.id,
@@ -215,13 +227,18 @@ export const holdAppointment = async (req, res) => {
         status: "HOLD",
         expiresAt,
         reason,
-        patientProfileId
+        patientProfileId,
+        consultationMode: finalMode
       }
     });
 
+    // ===============================
+    // RESPONSE
+    // ===============================
     return res.status(201).json({
       bookingId: booking.id,
-      expiresAt
+      expiresAt,
+      consultationMode: finalMode // ✅ will now show OFFLINE/ONLINE correctly
     });
 
   } catch (error) {
@@ -263,12 +280,9 @@ export const getBookingSummary = async (req, res) => {
     ============================ */
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        fullName: true      }
+      select: { fullName: true }
     });
 
-    // If OTHER booking → use patient profile
-    // If SELF booking → use logged-in user
     const patientName =
       booking.patientProfile?.fullName ||
       user?.fullName ||
@@ -296,16 +310,17 @@ export const getBookingSummary = async (req, res) => {
     return res.json({
       bookingId: booking.id,
 
+      consultationMode: booking.consultationMode || slot.consultationMode || "BOTH", // ✅ added
+
       doctor: {
         name: doctor.name,
-        image: doctor.imageUrl || null, // bonus: doctor image
+        image: doctor.imageUrl || null,
         specialization: doctor.specialization,
         experience: doctor.experience ?? 0,
         rating: doctor.rating ?? 4.5,
         reviews: doctor.reviews ?? 0
       },
 
-      // ✅ FIXED HERE (no more "Self")
       patient: patientName,
 
       appointment: {
@@ -338,6 +353,7 @@ export const getBookingSummary = async (req, res) => {
 export const getMyAppointments = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
+    const filterMode = req.query.consultationMode; // ONLINE, OFFLINE, or ALL
 
     if (!userId) {
       return res.status(400).json({
@@ -345,8 +361,16 @@ export const getMyAppointments = async (req, res) => {
       });
     }
 
+    // =========================
+    // FETCH BOOKINGS
+    // =========================
     const bookings = await prisma.booking.findMany({
-      where: { userId },
+      where: {
+        userId,
+        ...(filterMode && filterMode !== "ALL"
+          ? { consultationMode: filterMode } // filter ONLINE or OFFLINE only
+          : {})
+      },
       include: {
         timeSlot: {
           include: {
@@ -357,6 +381,9 @@ export const getMyAppointments = async (req, res) => {
       orderBy: { createdAt: "desc" }
     });
 
+    // =========================
+    // SPLIT BOOKINGS
+    // =========================
     const ongoing = [];
     const completed = [];
     const cancelled = [];
@@ -365,7 +392,7 @@ export const getMyAppointments = async (req, res) => {
       const doctor = b.timeSlot?.doctor;
       const hospital = doctor?.hospital;
 
-      // ✅ BACKWARD COMPATIBLE (old bookings support)
+      // BACKWARD COMPATIBLE (old bookings support)
       const start = b.timeSlot?.start ?? b.start;
       const end = b.timeSlot?.end ?? b.end;
 
@@ -374,6 +401,7 @@ export const getMyAppointments = async (req, res) => {
       const item = {
         bookingId: b.id,
         status: b.status,
+        consultationMode: b.consultationMode || "BOTH", // ✅ add consultationMode
         doctor: {
           name: doctor?.name || null,
           image: doctor?.imageUrl || null,
@@ -389,11 +417,9 @@ export const getMyAppointments = async (req, res) => {
         case "HOLD":
           ongoing.push(item);
           break;
-
         case "CONFIRMED":
           completed.push(item);
           break;
-
         case "EXPIRED":
         case "CANCELLED":
           cancelled.push(item);
@@ -496,7 +522,9 @@ export const createPaymentOrder = async (req, res) => {
 
     res.json({
       message: "Appointment confirmed successfully",
-      bookingId: booking.id
+      bookingId: booking.id,
+      consultationMode: booking.consultationMode // ✅ added here
+
     });
   } catch (error) {
     console.error("createPaymentOrder error:", error);
@@ -630,6 +658,7 @@ export const getPaymentSuccessDetails = async (req, res) => {
 
     res.json({
       bookingId: booking.id,
+      consultationMode: booking.consultationMode || booking.timeSlot.consultationMode || "BOTH",
 
       payment: {
         status: "SUCCESS",

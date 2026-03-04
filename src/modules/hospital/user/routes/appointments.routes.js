@@ -104,6 +104,7 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *             required:
  *               - slotId
  *               - bookingFor
+ *               - consultationMode
  *             properties:
  *               slotId:
  *                 type: integer
@@ -115,6 +116,10 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *               reason:
  *                 type: string
  *                 example: Fever and cough
+ *               consultationMode:   # ✅ corrected
+ *                 type: string
+ *                 enum: [ONLINE, OFFLINE]
+ *                 example: OFFLINE
  *               patient:
  *                 type: object
  *                 description: Required only if bookingFor is OTHER
@@ -143,12 +148,14 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *                 slotId: 791
  *                 bookingFor: SELF
  *                 reason: Regular checkup
+ *                 consultationMode: OFFLINE
  *             OTHER:
  *               summary: Booking for another patient
  *               value:
  *                 slotId: 791
  *                 bookingFor: OTHER
  *                 reason: Fever and cough
+ *                 consultationMode: OFFLINE
  *                 patient:
  *                   fullName: Riya Sharma
  *                   phone: "9876543210"
@@ -163,6 +170,7 @@ router.get("/slots", auth, controller.getAvailableSlots);
  *             example:
  *               bookingId: 55
  *               expiresAt: "2026-01-26T10:40:00Z"
+ *               consultationMode: OFFLINE
  *       400:
  *         description: Validation error
  *       401:
@@ -187,40 +195,51 @@ router.post("/hold", auth, role("USER"), controller.holdAppointment);
  *         schema:
  *           type: integer
  *         example: 2
+ *         description: ID of the user whose appointments are fetched
+ *       - in: query
+ *         name: consultationMode
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [ONLINE, OFFLINE, ALL]
+ *           default: ALL
+ *         description: Filter appointments by consultation mode
  *     responses:
  *       200:
  *         description: Past and upcoming appointments
  *         content:
  *           application/json:
  *             example:
- *               pastAppointments:
- *                 - bookingId: 12
- *                   status: CONFIRMED
- *                   doctor:
- *                     name: Dr. Manoj Iyer
- *                     specialization: Urology
- *                     hospital: Apollo Hospitals
- *                   patient: John Doe
- *                   appointment:
- *                     date: Mon, 20 Jan
- *                     time: 10:00 AM - 10:30 AM
- *               upcomingAppointments:
+ *               ongoing:
  *                 - bookingId: 15
  *                   status: HOLD
+ *                   consultationMode: OFFLINE
  *                   doctor:
  *                     name: Dr. Rajesh Kumar
- *                     specialization: Cardiology
  *                     hospital: Apollo Hospitals
- *                   patient: Self
  *                   appointment:
- *                     date: Fri, 07 Feb
- *                     time: 11:30 AM - 12:00 PM
+ *                     date: "2026-03-04T11:30:00Z"
+ *                     time: "11:30 - 12:00"
+ *               completed:
+ *                 - bookingId: 12
+ *                   status: CONFIRMED
+ *                   consultationMode: ONLINE
+ *                   doctor:
+ *                     name: Dr. Manoj Iyer
+ *                     hospital: Apollo Hospitals
+ *                   appointment:
+ *                     date: "2026-02-20T10:00:00Z"
+ *                     time: "10:00 - 10:30"
+ *               cancelled: []
  *       400:
  *         description: userId missing
  *       500:
  *         description: Internal server error
  */
+
 router.get("/my", controller.getMyAppointments);
+
+
 /**
  * @swagger
  * /api/appointments/{bookingId}/cancel:
@@ -257,7 +276,10 @@ router.get("/my", controller.getMyAppointments);
  *       500:
  *         description: Server error
  */
-router.patch("/:bookingId/cancel", controller.cancelAppointment);/**
+
+router.patch("/:bookingId/cancel", controller.cancelAppointment);
+
+/**
  * @swagger
  * /api/appointments/{bookingId}:
  *   get:
@@ -417,7 +439,7 @@ router.get(
  *     summary: Get payment success details for an appointment
  *     description: >
  *       Returns payment success details after appointment confirmation,
- *       including doctor, hospital, appointment time, and share link.
+ *       including doctor, hospital, appointment time, consultation mode, and share link.
  *     tags:
  *       - Appointments
  *     security:
@@ -440,6 +462,9 @@ router.get(
  *                 bookingId:
  *                   type: integer
  *                   example: 7
+ *                 consultationMode:   
+ *                   type: string
+ *                   example: OFFLINE
  *                 payment:
  *                   type: object
  *                   properties:
@@ -504,7 +529,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-
 router.get(
   "/:bookingId/success",
   auth,
