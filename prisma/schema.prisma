@@ -361,6 +361,7 @@ model LabBooking {
   LabFeedback      LabFeedback?
   LabReport        LabReport?
 
+  @@unique([slotId, sampleDate])
   @@index([userId])
 }
 

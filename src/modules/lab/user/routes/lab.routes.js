@@ -629,6 +629,7 @@ router.get("/bookings/upcoming", controller.getUserUpcomingLabBookings);
  *         description: Cancelled lab bookings
  */
  router.get("/bookings/cancelled", controller.getUserCancelledLabBookings);
+
 /**
  * @swagger
  * /api/labs/bookings/confirm:
@@ -755,6 +756,121 @@ router.get(
  *         description: Lab booking cancelled
  */
 router.patch("/bookings/:bookingId/cancel", controller.cancelLabBooking); 
+/**
+ * @swagger
+ * /api/labs/bookings/{bookingId}/reschedule:
+ *   put:
+ *     summary: Reschedule lab booking
+ *     description: >
+ *       Allows user to change the slot of an existing booking.
+ *       Booking must not be COMPLETED, CANCELLED, or SAMPLE_COLLECTED.
+ *
+ *     tags: [Labs]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 15
+ *         description: Lab booking ID
+ *
+ *       - in: query
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 2
+ *         description: User ID
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             newSlotId: 8
+ *
+ *     responses:
+ *       200:
+ *         description: Booking rescheduled successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Booking rescheduled successfully
+ *               bookingId: 15
+ *               newSlot:
+ *                 slotId: 8
+ *                 date: 2026-03-08
+ *
+ *       400:
+ *         description: Invalid request
+ *
+ *       404:
+ *         description: Booking or slot not found
+ *
+ *       500:
+ *         description: Server error
+ */
+router.put(
+  "/bookings/:bookingId/reschedule",
+  controller.rescheduleLabBooking
+);
+/**
+ * @swagger
+ * /api/labs/bookings/{bookingId}/rebook:
+ *   post:
+ *     summary: Rebook a previous lab test
+ *     description: >
+ *       Creates a new booking using details from a previous booking.
+ *       User must select a new slot.
+ *
+ *     tags: [Labs]
+ *
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 15
+ *         description: Previous booking ID
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             userId: 2
+ *             slotId: 10
+ *
+ *     responses:
+ *       200:
+ *         description: Rebooking successful
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Rebooking successful
+ *               booking:
+ *                 newBookingId: 32
+ *                 previousBookingId: 15
+ *                 labName: Apollo Diagnostics
+ *                 packageName: Full Body Checkup
+ *                 newSlotDate: 2026-03-10
+ *
+ *       400:
+ *         description: Invalid request
+ *
+ *       404:
+ *         description: Previous booking not found
+ *
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  "/bookings/:bookingId/rebook",
+  controller.rebookLabBooking
+);
 /**
  * @swagger
  * /api/labs/feedback:

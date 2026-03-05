@@ -59,8 +59,8 @@ export const getNearbyLabs = async (req, res) => {
           const a =
             Math.sin(dLat / 2) ** 2 +
             Math.cos((lat * Math.PI) / 180) *
-              Math.cos((lab.latitude * Math.PI) / 180) *
-              Math.sin(dLon / 2) ** 2;
+            Math.cos((lab.latitude * Math.PI) / 180) *
+            Math.sin(dLon / 2) ** 2;
 
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const distance = Number((R * c).toFixed(2));
@@ -120,7 +120,7 @@ export const getNearbyLabs = async (req, res) => {
   }
 };
 
- 
+
 export const getLabPackageDetails = async (req, res) => {
   try {
     const packageId = Number(req.params.packageId);
@@ -185,10 +185,10 @@ export const getLabPackageDetails = async (req, res) => {
       instructions: pkg.instructions
         ? pkg.instructions.split("\n")
         : [
-            "Requires 10–12 hours fasting",
-            "Only water allowed",
-            "Avoid alcohol 24 hours before test"
-          ],
+          "Requires 10–12 hours fasting",
+          "Only water allowed",
+          "Avoid alcohol 24 hours before test"
+        ],
 
       pricing: {
         mrp: originalPrice,
@@ -273,7 +273,7 @@ export const getPackagesByAge = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
- 
+
 export const getUserPastLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
@@ -311,40 +311,51 @@ export const getUserPastLabBookings = async (req, res) => {
 export const getUserUpcomingLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
 
+  if (!userId) {
+    return res.status(400).json({ message: "userId required" });
+  }
+
   const bookings = await prisma.labBooking.findMany({
     where: {
       userId,
-      status: { in: ["HOLD", "CONFIRMED"] },
+      status: { in: ["HOLD", "CONFIRMED"] }
     },
     include: {
       lab: true,
       package: {
         include: {
           items: {
-            include: { test: true },
-          },
-        },
-      },
+            include: { test: true }
+          }
+        }
+      }
     },
-    orderBy: { sampleDate: "asc" },
+    orderBy: { sampleDate: "asc" }
   });
 
   const formatted = bookings.map(b => ({
     bookingId: b.id,
     labName: b.lab?.name,
-    sampleDate: b.sampleDate,
+
+    // ✅ FIXED DATE FORMAT
+    sampleDate: b.sampleDate
+      ? new Date(b.sampleDate).toISOString().split("T")[0]
+      : null,
+
     tests: b.package
       ? b.package.items.map(i => i.test.name)
-      : [],
+      : []
   }));
 
-  res.json({ count: formatted.length, bookings: formatted });
+  res.json({
+    count: formatted.length,
+    bookings: formatted
+  });
 };
-
 export const searchLabs = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.json([]);
- 
+
   const labs = await prisma.lab.findMany({
     where: {
       OR: [
@@ -353,11 +364,11 @@ export const searchLabs = async (req, res) => {
       ],
     },
   });
- 
+
   res.json(labs);
 };
 
- export const searchLabTests = async (req, res) => {
+export const searchLabTests = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
     const { query } = req.query;
@@ -393,11 +404,11 @@ export const getLabCategories = async (req, res) => {
     const categories = await prisma.labCategory.findMany({
       where: q
         ? {
-            name: {
-              contains: q,
-              mode: "insensitive"
-            }
+          name: {
+            contains: q,
+            mode: "insensitive"
           }
+        }
         : undefined,
       select: {
         id: true,
@@ -456,35 +467,35 @@ export const getLabCategories = async (req, res) => {
 
 export const getLabById = async (req, res) => {
   const labId = Number(req.params.labId);
- 
+
   if (!Number.isInteger(labId)) {
     return res.status(400).json({ message: "Invalid labId" });
   }
- 
+
   const lab = await prisma.lab.findUnique({
     where: { id: labId },
   });
- 
+
   if (!lab) {
     return res.status(404).json({ message: "Lab not found" });
   }
- 
+
   res.json(lab);
 };
- 
- 
- 
+
+
+
 /**
  * 5️⃣ Categories inside Lab
  */
 export const getCategoriesByLab = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
- 
+
     if (!labId) {
       return res.status(400).json({ message: "Invalid labId" });
     }
- 
+
     const categories = await prisma.labCategory.findMany({
       where: {
         labId: labId
@@ -496,39 +507,39 @@ export const getCategoriesByLab = async (req, res) => {
         imageUrl: true
       }
     });
- 
+
     res.json({
       count: categories.length,
       data: categories
     });
- 
+
   } catch (error) {
     console.error("getCategoriesByLab error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
- 
- 
+
+
+
+
 /**
  * 6️⃣ Lab Tests (Packages)
  */
- 
- 
+
+
 /**
  * 7️⃣ Search Tests (NEW)
  */
 
- 
+
 export const getLabDetailsById = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
- 
+
     if (!Number.isInteger(labId) || labId <= 0) {
       return res.status(400).json({ message: "Invalid labId" });
     }
- 
+
     const lab = await prisma.lab.findUnique({
       where: { id: labId },
       include: {
@@ -548,32 +559,32 @@ export const getLabDetailsById = async (req, res) => {
         }
       }
     });
- 
+
     if (!lab) {
       return res.status(404).json({ message: "Lab not found" });
     }
- 
+
     res.json({
       id: lab.id,
       name: lab.name,
       rating: lab.rating,
       city: lab.city,
       isOpen: lab.isOpen,
- 
+
       packagesIncluded: lab.LabPackage.map(pkg => ({
-       
+
         packageId: pkg.id,
-      packageName: pkg.name,
+        packageName: pkg.name,
         tests: pkg.items.map(item => item.test.name)
       }))
     });
- 
+
   } catch (error) {
     console.error("getLabDetailsById error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
+
 export const getLabPackages = async (req, res) => {
   try {
     const { labId } = req.params;
@@ -630,8 +641,8 @@ export const getLabPackages = async (req, res) => {
         discountPercent:
           p.originalPrice > 0
             ? Math.round(
-                ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
-              )
+              ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
+            )
             : 0,
 
         reportTime: p.reportTime,
@@ -737,8 +748,8 @@ export const filterLabPackages = async (req, res) => {
         discountPercent:
           p.originalPrice > 0
             ? Math.round(
-                ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
-              )
+              ((p.originalPrice - p.finalPrice) / p.originalPrice) * 100
+            )
             : 0,
         reportTime: p.reportTime,
         tests: p.items.map(i => i.test.name),
@@ -758,93 +769,65 @@ export const filterLabPackages = async (req, res) => {
 
 export const confirmLabBooking = async (req, res) => {
   try {
+
     const { userId, slotId } = req.body;
 
-    if (!userId || !slotId) {
-      return res.status(400).json({
-        message: "userId and slotId required"
+    const result = await prisma.$transaction(async (tx) => {
+
+      const slot = await tx.labSlot.findUnique({
+        where: { id: Number(slotId) },
+        include: { bookings: true }
       });
-    }
 
-    const cart = await prisma.labCart.findMany({
-      where: { userId },
-      include: {
-        package: true,
-        lab: true,
-        patient: true
+      if (!slot) {
+        throw new Error("Slot not found");
       }
-    });
 
-    if (!cart.length) {
-      return res.status(400).json({ message: "Cart empty" });
-    }
+      const now = new Date();
 
-    const slot = await prisma.labSlot.findUnique({
-      where: { id: Number(slotId) }
-    });
+      const activeBooking = slot.bookings.find(b =>
+        ["CONFIRMED", "SAMPLE_COLLECTED", "COMPLETED"].includes(b.status) ||
+        (b.status === "HOLD" && b.expiresAt > now)
+      );
 
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
-    }
+      if (activeBooking) {
+        throw new Error("Slot already booked");
+      }
 
-    // create bookings
-    const bookings = [];
-    for (const item of cart) {
-      const booking = await prisma.labBooking.create({
+      const booking = await tx.labBooking.create({
         data: {
           userId,
-          labId: item.labId,
-          packageId: item.packageId,
-          slotId,
+          labId: slot.labId,
+          slotId: slot.id,
           sampleDate: slot.slotDate,
-          status: "CONFIRMED",
-          patientProfileId: item.patientProfileId || null
+          status: "CONFIRMED"
         }
       });
-      bookings.push(booking);
-    }
 
-    await prisma.labCart.deleteMany({ where: { userId } });
+      return booking;
+    });
 
-    // pick first booking for UI summary
-    const first = cart[0];
-    const patient = first.patient;
-
-    const formatTime = (t) =>
-      new Date(t).toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true
-      });
-
-   const response = {
-  message: "Booking Confirmed",
-  booking: {
-    bookingIds: bookings.map(b => b.id),
-    testName: first.package.name,
-    labName: first.lab.name,
-    date: slot.slotDate,
-    time: formatTime(slot.startTime),
-    price: first.package.finalPrice,
-    location: first.lab.city,
-    consultationType:
-      first.consultationType === "SAMPLE_COLLECTION"
-        ? "Sample Collection"
-        : "Lab Visit",
-    patientName: patient?.fullName || "Self",
-    age: patient?.age || null,
-    gender: patient?.gender || null,
-    phone: patient?.phone || null
-  }
-};
-
-    res.json(response);
+    res.json({
+      message: "Booking confirmed",
+      bookingId: result.id
+    });
 
   } catch (err) {
+
+    if (err.message === "Slot already booked") {
+      return res.status(409).json({
+        message: "Slot already booked by another user"
+      });
+    }
+
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
   }
 };
+
 export const getLabBookingById = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
@@ -869,31 +852,31 @@ export const getLabBookingById = async (req, res) => {
       d ? new Date(d).toLocaleDateString("en-IN") : null;
 
     const safeTime = (t) => {
-  if (!t) return null;
+      if (!t) return null;
 
-  let dateObj;
+      let dateObj;
 
-  // Case 1: Already Date object
-  if (t instanceof Date) {
-    dateObj = t;
-  }
-  // Case 2: Full ISO string
-  else if (String(t).includes("T")) {
-    dateObj = new Date(t);
-  }
-  // Case 3: HH:mm:ss
-  else {
-    dateObj = new Date(`1970-01-01T${t}`);
-  }
+      // Case 1: Already Date object
+      if (t instanceof Date) {
+        dateObj = t;
+      }
+      // Case 2: Full ISO string
+      else if (String(t).includes("T")) {
+        dateObj = new Date(t);
+      }
+      // Case 3: HH:mm:ss
+      else {
+        dateObj = new Date(`1970-01-01T${t}`);
+      }
 
-  if (isNaN(dateObj)) return null;
+      if (isNaN(dateObj)) return null;
 
-  return dateObj.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true
-  });
-};
+      return dateObj.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+    };
 
     const start = booking.slot ? safeTime(booking.slot.startTime) : null;
     const end = booking.slot ? safeTime(booking.slot.endTime) : null;
@@ -945,11 +928,11 @@ export const getLabBookingById = async (req, res) => {
 };
 export const getUserLabBookings = async (req, res) => {
   const userId = Number(req.query.userId);
- 
+
   if (!userId) {
     return res.status(400).json({ message: "userId is required" });
   }
- 
+
   const bookings = await prisma.labBooking.findMany({
     where: { userId },
     include: {
@@ -958,11 +941,11 @@ export const getUserLabBookings = async (req, res) => {
     },
     orderBy: { createdAt: "desc" },
   });
- 
+
   res.json(bookings);
 };
- 
- export const getLabInvoice = async (req, res) => {
+
+export const getLabInvoice = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
 
@@ -1155,11 +1138,11 @@ export const getUserCancelledLabBookings = async (req, res) => {
 export const globalSearchLabs = async (req, res) => {
   try {
     const { query, labId, categoryId, minPrice, maxPrice } = req.query;
- 
+
     if (!query) {
       return res.status(400).json({ message: "query is required" });
     }
- 
+
     /* 1️⃣ Labs */
     const labs = await prisma.lab.findMany({
       where: {
@@ -1175,7 +1158,7 @@ export const globalSearchLabs = async (req, res) => {
       },
       take: 5
     });
- 
+
     /* 2️⃣ Categories */
     const categories = await prisma.labCategory.findMany({
       where: {
@@ -1187,7 +1170,7 @@ export const globalSearchLabs = async (req, res) => {
       },
       take: 5
     });
- 
+
     /* 3️⃣ Tests (RAW) */
     const rawTests = await prisma.labTest.findMany({
       where: {
@@ -1196,21 +1179,21 @@ export const globalSearchLabs = async (req, res) => {
         ...(categoryId && { categoryId: Number(categoryId) }),
         ...(minPrice || maxPrice
           ? {
-              price: {
-                gte: Number(minPrice || 0),
-                lte: Number(maxPrice || 99999)
-              }
+            price: {
+              gte: Number(minPrice || 0),
+              lte: Number(maxPrice || 99999)
             }
+          }
           : {})
       },
       include: {
         lab: { select: { id: true, name: true } }
       }
     });
- 
+
     /* 4️⃣ GROUP TESTS BY NAME */
     const groupedTests = {};
- 
+
     rawTests.forEach(test => {
       if (!groupedTests[test.name]) {
         groupedTests[test.name] = {
@@ -1220,17 +1203,17 @@ export const globalSearchLabs = async (req, res) => {
           labs: []
         };
       }
- 
+
       groupedTests[test.name].minPrice = Math.min(
         groupedTests[test.name].minPrice,
         test.price
       );
- 
+
       groupedTests[test.name].maxPrice = Math.max(
         groupedTests[test.name].maxPrice,
         test.price
       );
- 
+
       groupedTests[test.name].labs.push({
         testId: test.id,
         labId: test.lab.id,
@@ -1238,24 +1221,24 @@ export const globalSearchLabs = async (req, res) => {
         price: test.price
       });
     });
- 
+
     res.json({
       labs,
       categories,
       tests: Object.values(groupedTests)
     });
- 
+
   } catch (error) {
     console.error("globalSearchLabs error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
- 
- 
+
+
 export const getLabSearchSuggestions = async (req, res) => {
   const { query } = req.query;
   if (!query) return res.status(400).json({ message: "query required" });
- 
+
   const [labs, categories, tests] = await Promise.all([
     prisma.lab.findMany({
       where: { name: { contains: query, mode: "insensitive" } },
@@ -1273,12 +1256,12 @@ export const getLabSearchSuggestions = async (req, res) => {
       take: 5
     })
   ]);
- 
+
   res.json({ labs, categories, tests });
 };
 export const globalSearchWithFilters = async (req, res) => {
   const { query, minPrice, maxPrice, labId, categoryId } = req.query;
- 
+
   const tests = await prisma.labTest.findMany({
     where: {
       name: { contains: query, mode: "insensitive" },
@@ -1292,7 +1275,7 @@ export const globalSearchWithFilters = async (req, res) => {
       lab: { select: { name: true } }
     }
   });
- 
+
   res.json({
     count: tests.length,
     tests: tests.map(t => ({
@@ -1303,10 +1286,10 @@ export const globalSearchWithFilters = async (req, res) => {
     }))
   });
 };
- 
+
 export const autoSuggestLabs = async (req, res) => {
   const { query, limit = 5 } = req.query;
- 
+
   if (!query || query.length < 2) {
     return res.json({
       labs: [],
@@ -1314,9 +1297,9 @@ export const autoSuggestLabs = async (req, res) => {
       tests: []
     });
   }
- 
+
   const take = Number(limit);
- 
+
   const [labs, categories, tests] = await Promise.all([
     prisma.lab.findMany({
       where: {
@@ -1325,7 +1308,7 @@ export const autoSuggestLabs = async (req, res) => {
       select: { id: true, name: true },
       take
     }),
- 
+
     prisma.labCategory.findMany({
       where: {
         name: { startsWith: query, mode: "insensitive" }
@@ -1333,7 +1316,7 @@ export const autoSuggestLabs = async (req, res) => {
       select: { id: true, name: true },
       take
     }),
- 
+
     prisma.labTest.findMany({
       where: {
         name: { startsWith: query, mode: "insensitive" }
@@ -1342,7 +1325,7 @@ export const autoSuggestLabs = async (req, res) => {
       take
     })
   ]);
- 
+
   res.json({
     labs,
     categories,
@@ -1353,8 +1336,8 @@ export const autoSuggestLabs = async (req, res) => {
     }))
   });
 };
- 
- 
+
+
 export const getUserLabReports = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
@@ -1369,18 +1352,18 @@ export const getUserLabReports = async (req, res) => {
     }
 
     // 📅 Date filter
-  let dateFilter = {};
+    let dateFilter = {};
 
-if (fromDate || toDate) {
-  dateFilter = {
-    ...(fromDate && { gte: new Date(fromDate) }),
-    ...(toDate && {
-      lte: new Date(
-        new Date(toDate).setHours(23, 59, 59, 999)
-      )
-    })
-  };
-}
+    if (fromDate || toDate) {
+      dateFilter = {
+        ...(fromDate && { gte: new Date(fromDate) }),
+        ...(toDate && {
+          lte: new Date(
+            new Date(toDate).setHours(23, 59, 59, 999)
+          )
+        })
+      };
+    }
 
     // ✅ MAIN QUERY
     const reports = await prisma.labReport.findMany({
@@ -1512,14 +1495,14 @@ export const getLabReportDetails = async (req, res) => {
 export const getLast30DaysLabTests = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
- 
+
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
- 
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
- 
+
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
@@ -1534,18 +1517,18 @@ export const getLast30DaysLabTests = async (req, res) => {
       },
       orderBy: { createdAt: "desc" }
     });
- 
+
     // 🔥 Remove duplicates by testId
     const uniqueTests = [];
     const seen = new Set();
- 
+
     for (const booking of bookings) {
       if (!seen.has(booking.labTestId)) {
         seen.add(booking.labTestId);
         uniqueTests.push(booking);
       }
     }
- 
+
     res.json({
       userId,
       last30DaysCount: uniqueTests.length,
@@ -1557,7 +1540,7 @@ export const getLast30DaysLabTests = async (req, res) => {
         date: b.createdAt.toISOString().split("T")[0]
       }))
     });
- 
+
   } catch (error) {
     console.error("getLast30DaysLabTests error:", error);
     res.status(500).json({ message: "Server error" });
@@ -1624,7 +1607,7 @@ export const submitLabFeedback = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
- export const checkFeedbackStatus = async (req, res) => {
+export const checkFeedbackStatus = async (req, res) => {
   const bookingId = Number(req.params.bookingId);
 
   const feedback = await prisma.labFeedback.findUnique({
@@ -1635,6 +1618,162 @@ export const submitLabFeedback = async (req, res) => {
     hasFeedback: !!feedback,
     feedback
   });
+};
+
+export const rescheduleLabBooking = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const userId = Number(req.query.userId);
+    const { newSlotId } = req.body;
+
+    if (!bookingId || !userId || !newSlotId) {
+      return res.status(400).json({
+        message: "bookingId, userId and newSlotId required"
+      });
+    }
+
+    const booking = await prisma.labBooking.findFirst({
+      where: {
+        id: bookingId,
+        userId
+      },
+      include: {
+        lab: true,
+        slot: true
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found"
+      });
+    }
+
+    if (
+      ["COMPLETED", "CANCELLED", "SAMPLE_COLLECTED"].includes(
+        booking.status
+      )
+    ) {
+      return res.status(400).json({
+        message: "This booking cannot be rescheduled"
+      });
+    }
+
+    const slot = await prisma.labSlot.findUnique({
+      where: { id: Number(newSlotId) },
+      include: { bookings: true }
+    });
+
+    if (!slot) {
+      return res.status(404).json({
+        message: "Slot not found"
+      });
+    }
+
+    const now = new Date();
+
+    // 🔒 Check if slot already booked
+    const activeBooking = slot.bookings.find(b =>
+      ["CONFIRMED", "SAMPLE_COLLECTED", "COMPLETED"].includes(b.status) ||
+      (b.status === "HOLD" && b.expiresAt > now)
+    );
+
+    if (activeBooking) {
+      return res.status(409).json({
+        message: "Selected slot already booked"
+      });
+    }
+
+    // ✅ Safe update
+    const updatedBooking = await prisma.labBooking.update({
+      where: { id: bookingId },
+      data: {
+        slotId: slot.id,
+        sampleDate: slot.slotDate
+      }
+    });
+
+    res.json({
+      message: "Booking rescheduled successfully",
+      bookingId: updatedBooking.id,
+      labName: booking.lab?.name,
+      newSlot: {
+        slotId: slot.id,
+        date: slot.slotDate.toISOString().split("T")[0]
+      }
+    });
+
+  } catch (error) {
+    console.error("rescheduleLabBooking error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+export const rebookLabBooking = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const { userId, slotId } = req.body;
+
+    if (!bookingId || !userId || !slotId) {
+      return res.status(400).json({
+        message: "bookingId, userId and slotId required"
+      });
+    }
+
+    const oldBooking = await prisma.labBooking.findFirst({
+      where: {
+        id: bookingId,
+        userId
+      },
+      include: {
+        lab: true,
+        package: true,
+        patient: true
+      }
+    });
+
+    if (!oldBooking) {
+      return res.status(404).json({
+        message: "Previous booking not found"
+      });
+    }
+
+    const slot = await prisma.labSlot.findUnique({
+      where: { id: Number(slotId) }
+    });
+
+    if (!slot) {
+      return res.status(404).json({
+        message: "Slot not found"
+      });
+    }
+
+    const newBooking = await prisma.labBooking.create({
+      data: {
+        userId,
+        labId: oldBooking.labId,
+        packageId: oldBooking.packageId,
+        patientProfileId: oldBooking.patientProfileId,
+        slotId: slot.id,
+        sampleDate: slot.slotDate,
+        status: "CONFIRMED"
+      }
+    });
+
+    res.json({
+      message: "Rebooking successful",
+      booking: {
+        newBookingId: newBooking.id,
+        previousBookingId: oldBooking.id,
+        labName: oldBooking.lab?.name,
+        packageName: oldBooking.package?.name,
+        newSlotDate: slot.slotDate
+      }
+    });
+
+  } catch (error) {
+    console.error("rebookLabBooking error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 export const addRecentView = async (req, res) => {
   try {
@@ -1669,7 +1808,7 @@ export const addRecentView = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-};export const getRecentViews = async (req, res) => {
+}; export const getRecentViews = async (req, res) => {
   try {
     const userId = Number(req.query.userId);
     const limit = Number(req.query.limit || 5);

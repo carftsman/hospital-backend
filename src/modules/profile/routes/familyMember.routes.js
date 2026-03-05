@@ -46,7 +46,7 @@ const router = express.Router();
  *                 description: Full name (alphabets and spaces only)
  *               relation:
  *                 type: string
- *                 enum: [FATHER, MOTHER, SON, DAUGHTER, SISTER, BROTHER, OTHERS]
+ *                 enum: [FATHER, MOTHER, SON, DAUGHTER, SISTER, BROTHER, SELF, COUSIN, HUSBAND, WIFE, GRANDFATHER ,GRANDMOTHER, FRIEND, GRANDSON GRANDDAUGHTER,OTHERS]
  *                 example: FATHER
  *                 description: Relation with the user
  *               age:

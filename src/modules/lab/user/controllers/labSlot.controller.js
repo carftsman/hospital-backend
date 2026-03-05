@@ -8,9 +8,6 @@ const formatTime = (time) =>
     hour12: true
   });
 
-/**
- * GET LAB AVAILABILITY (14 DAYS)
- */
 export const getLabAvailability = async (req, res) => {
   try {
     const labId = Number(req.params.labId);
@@ -20,7 +17,7 @@ export const getLabAvailability = async (req, res) => {
       return res.status(400).json({ message: "labId required" });
     }
 
-    // ✅ OPTIONAL: enforce cart lab lock
+    // 🔒 Cart lock
     if (userId) {
       const cart = await prisma.labCart.findFirst({
         where: { userId: Number(userId) },
@@ -35,32 +32,56 @@ export const getLabAvailability = async (req, res) => {
     }
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0,0,0,0);
 
     const endDate = new Date(today);
     endDate.setDate(today.getDate() + 13);
-    endDate.setHours(23, 59, 59, 999);
+    endDate.setHours(23,59,59,999);
 
-    const grouped = await prisma.labSlot.groupBy({
-      by: ["slotDate"],
+    const now = new Date();
+
+    /* 1️⃣ Get all slots */
+    const slots = await prisma.labSlot.findMany({
       where: {
         labId,
         slotDate: { gte: today, lte: endDate }
       },
-      _count: { id: true }
+      include: {
+        bookings: true
+      }
     });
 
+    /* 2️⃣ Count ONLY free slots */
     const slotMap = new Map();
-    grouped.forEach(s => {
-      slotMap.set(s.slotDate.toISOString().slice(0, 10), s._count.id);
+
+    slots.forEach(slot => {
+
+      const activeBooking = slot.bookings.find(b =>
+        ["CONFIRMED","SAMPLE_COLLECTED","COMPLETED"].includes(b.status) ||
+        (b.status === "HOLD" && b.expiresAt > now)
+      );
+
+      if (!activeBooking) {
+        const key = slot.slotDate.toISOString().split("T")[0];
+
+        slotMap.set(key, (slotMap.get(key) || 0) + 1);
+      }
+
     });
 
+    /* 3️⃣ Build 14 days */
     const days = [];
+
     for (let i = 0; i < 14; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
 
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr =
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0");
 
       days.push({
         date: dateStr,
@@ -74,7 +95,11 @@ export const getLabAvailability = async (req, res) => {
       });
     }
 
-    res.json({ labId, days });
+    res.json({
+      labId,
+      days
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -83,18 +108,20 @@ export const getLabAvailability = async (req, res) => {
 
 export const getLabSlots = async (req, res) => {
   try {
+
     const labId = Number(req.params.labId);
     const { date, userId } = req.query;
 
     if (!labId || !date || !userId) {
       return res.status(400).json({
-        message: "labId, userId and date required"
+        message: "labId, date and userId required"
       });
     }
 
-    /* ==============================
+    /* ==========================
        1️⃣ CART VALIDATION
-    ============================== */
+    ========================== */
+
     const cart = await prisma.labCart.findFirst({
       where: { userId: Number(userId) },
       select: { labId: true }
@@ -112,69 +139,76 @@ export const getLabSlots = async (req, res) => {
       });
     }
 
-    /* ==============================
+    /* ==========================
        2️⃣ DATE RANGE
-    ============================== */
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
+    ========================== */
 
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(`${date}T00:00:00`);
+    const end = new Date(`${date}T23:59:59`);
 
     const now = new Date();
 
-    /* ==============================
-       3️⃣ FETCH SLOTS WITH EXPIRY LOGIC
-    ============================== */
+    /* ==========================
+       3️⃣ FETCH SLOTS
+    ========================== */
+
     const slots = await prisma.labSlot.findMany({
       where: {
         labId,
-        slotDate: { gte: start, lte: end }
+        slotDate: {
+          gte: start,
+          lte: end
+        }
       },
       include: {
-        bookings: true // fetch all, filter manually
+        bookings: true
       },
-      orderBy: { startTime: "asc" }
-    });
-
-    /* ==============================
-       4️⃣ FORMAT + EXPIRY HANDLING
-    ============================== */
-    const unique = new Map();
-
-    slots.forEach(s => {
-      const key = `${s.startTime}-${s.endTime}`;
-
-      if (!unique.has(key)) {
-        // find active booking
-        const activeBooking = s.bookings.find(b => {
-          if (b.status === "COMPLETED") return true;
-          if (b.status === "HOLD" && b.expiresAt > now) return true;
-          return false;
-        });
-
-        let expiresIn = null;
-
-        // calculate expiry countdown
-        if (activeBooking?.status === "HOLD") {
-          expiresIn = Math.max(
-            0,
-            Math.floor((activeBooking.expiresAt - now) / 1000)
-          ); // seconds
-        }
-
-        unique.set(key, {
-          slotId: s.id,
-          startTime: formatTime(s.startTime),
-          endTime: formatTime(s.endTime),
-          time: `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`,
-          isBooked: !!activeBooking,
-          expiresIn // ⏳ NEW FIELD
-        });
+      orderBy: {
+        startTime: "asc"
       }
     });
 
-    const formatted = Array.from(unique.values());
+    /* ==========================
+       4️⃣ FORMAT SLOTS
+    ========================== */
+
+    const formatted = slots.map(slot => {
+
+      const activeBooking = slot.bookings.find(b =>
+        ["CONFIRMED","SAMPLE_COLLECTED","COMPLETED"].includes(b.status) ||
+        (b.status === "HOLD" && b.expiresAt > now)
+      );
+
+      let expiresIn = null;
+
+      if (activeBooking?.status === "HOLD") {
+        expiresIn = Math.max(
+          0,
+          Math.floor((activeBooking.expiresAt - now) / 1000)
+        );
+      }
+
+      const formatTime = (time) =>
+        new Date(time).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        });
+
+      return {
+        slotId: slot.id,
+        startTime: formatTime(slot.startTime),
+        endTime: formatTime(slot.endTime),
+        time: `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`,
+        isBooked: !!activeBooking,
+        expiresIn
+      };
+
+    });
+
+    /* ==========================
+       5️⃣ RESPONSE
+    ========================== */
 
     res.json({
       labId,
@@ -182,8 +216,64 @@ export const getLabSlots = async (req, res) => {
       count: formatted.length,
       slots: formatted
     });
+
+  } catch (error) {
+
+    console.error("getLabSlots error:", error);
+
+    res.status(500).json({
+      message: "Internal server error"
+    });
+
+  }
+};
+export const holdLabSlot = async (req, res) => {
+  try {
+    const { userId, slotId } = req.body;
+
+    const slot = await prisma.labSlot.findUnique({
+      where: { id: Number(slotId) },
+      include: { bookings: true }
+    });
+
+    if (!slot) {
+      return res.status(404).json({ message: "Slot not found" });
+    }
+
+    const now = new Date();
+
+    const activeBooking = slot.bookings.find(b =>
+      ["CONFIRMED", "SAMPLE_COLLECTED", "COMPLETED"].includes(b.status) ||
+      (b.status === "HOLD" && b.expiresAt > now)
+    );
+
+    if (activeBooking) {
+      return res.status(409).json({
+        message: "Slot already booked"
+      });
+    }
+
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
+
+    const holdBooking = await prisma.labBooking.create({
+      data: {
+        userId,
+        labId: slot.labId,
+        slotId: slot.id,
+        sampleDate: slot.slotDate,
+        status: "HOLD",
+        expiresAt
+      }
+    });
+
+    res.json({
+      message: "Slot locked for 5 minutes",
+      bookingId: holdBooking.id,
+      expiresAt
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: "Server error" });
   }
 };
