@@ -1072,12 +1072,20 @@ export const getLabInvoice = async (req, res) => {
 };
 export const cancelLabBooking = async (req, res) => {
   try {
+
     const bookingId = Number(req.params.bookingId);
-    const userId = Number(req.query.userId); // or req.user.id (recommended)
+    const userId = Number(req.query.userId); // better: req.user.id
+    const { reason } = req.body;
 
     if (!bookingId || !userId) {
       return res.status(400).json({
         message: "bookingId and userId required"
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        message: "Cancellation reason is required"
       });
     }
 
@@ -1116,64 +1124,87 @@ export const cancelLabBooking = async (req, res) => {
     // ✅ Cancel booking
     await prisma.labBooking.update({
       where: { id: booking.id },
-      data: { status: "CANCELLED" }
+      data: {
+        status: "CANCELLED",
+        reason
+      }
     });
 
     res.json({
       message: "Lab booking cancelled successfully",
       bookingId: booking.id,
       labName: booking.lab?.name,
-      status: "CANCELLED"
+      status: "CANCELLED",
+      reason
     });
 
   } catch (error) {
+
     console.error("cancelLabBooking error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
 export const getUserCancelledLabBookings = async (req, res) => {
   try {
+
     const userId = Number(req.query.userId);
 
     if (!userId) {
-      return res.status(400).json({ message: "userId required" });
+      return res.status(400).json({
+        message: "userId required"
+      });
     }
 
     const bookings = await prisma.labBooking.findMany({
       where: {
         userId,
-        status: "CANCELLED",
+        status: "CANCELLED"
       },
       include: {
         lab: true,
         package: {
           include: {
             items: {
-              include: { test: true },
-            },
-          },
-        },
+              include: {
+                test: true
+              }
+            }
+          }
+        }
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: {
+        createdAt: "desc"
+      }
     });
 
     const formatted = bookings.map(b => ({
       bookingId: b.id,
       labName: b.lab?.name,
       status: b.status,
+      reason: b.reason, // ✅ added reason
       cancelledOn: b.createdAt,
       tests: b.package
         ? b.package.items.map(i => i.test.name)
-        : [],
+        : []
     }));
 
     res.json({
       count: formatted.length,
-      bookings: formatted,
+      bookings: formatted
     });
+
   } catch (error) {
+
     console.error("getUserCancelledLabBookings error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
 export const globalSearchLabs = async (req, res) => {

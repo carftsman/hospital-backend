@@ -351,6 +351,7 @@ model LabBooking {
   sampleDate       DateTime
   createdAt        DateTime         @default(now())
   expiresAt        DateTime?
+  reason       String?
   slotId           Int?
   patientProfileId Int?
   packageId        Int?

@@ -316,11 +316,12 @@ export const getMyAppointments = async (req, res) => {
   try {
 
     const userId = Number(req.query.userId);
-let consultationMode = req.query.consultationMode;
+    let consultationMode = req.query.consultationMode;
 
-if (consultationMode === "Instant") {
-  consultationMode = "ONLINE";
-}
+    if (consultationMode === "Instant") {
+      consultationMode = "ONLINE";
+    }
+
     if (!userId) {
       return res.status(400).json({
         message: "userId is required"
@@ -328,14 +329,12 @@ if (consultationMode === "Instant") {
     }
 
     const whereCondition = {
-  userId,
-  status: {
-    not: "EXPIRED"
-  },
-  ...(consultationMode && consultationMode !== "ALL"
-    ? { consultationMode }
-    : {})
-};
+      userId,
+      status: { not: "EXPIRED" },
+      ...(consultationMode && consultationMode !== "ALL"
+        ? { consultationMode }
+        : {})
+    };
 
     const bookings = await prisma.booking.findMany({
       where: whereCondition,
@@ -428,7 +427,10 @@ if (consultationMode === "Instant") {
     const missed = [];
     const cancelled = [];
 
-const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    let totalPaidAmount = 0;
+
+    const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+
     const formatTime = (date) =>
       new Date(date).toISOString().slice(11, 16);
 
@@ -439,9 +441,23 @@ const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
 
       if (!start || !end) return;
 
+      // -------------------------
+      // PATIENT
+      // -------------------------
       const patient = b.patientProfile
         ? { type: "OTHER", ...b.patientProfile }
         : { type: "SELF", ...b.user };
+
+      // -------------------------
+      // PAYMENT
+      // -------------------------
+      const consultationFee = b.doctor.consultationFee ?? 0;
+      const gst = Math.round(consultationFee * 0.18);
+      const amountPaid = consultationFee + gst;
+
+      if (["CONFIRMED", "COMPLETED", "CHECKED_IN"].includes(b.status)) {
+        totalPaidAmount += amountPaid;
+      }
 
       const item = {
 
@@ -470,7 +486,7 @@ const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
           specialization: b.doctor.specialization,
           qualification: b.doctor.qualification,
           experience: b.doctor.experience,
-          consultationFee: b.doctor.consultationFee,
+          consultationFee,
           languages: b.doctor.languages,
           rating: Number(b.doctor.rating),
           availableModes: b.doctor.consultationMode
@@ -478,48 +494,55 @@ const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
 
         hospital: b.doctor.hospital,
         category: b.doctor.category,
-        patient
+        patient,
+
+        payment: {
+          amountPaid
+        }
+
       };
 
       // ============================
-// STATUS CLASSIFICATION
-// ============================
+      // STATUS CLASSIFICATION
+      // ============================
 
-if (b.status === "CANCELLED") {
+      if (b.status === "CANCELLED") {
 
-  cancelled.push(item);
+        cancelled.push(item);
 
-}
+      }
 
-else if (b.status === "MISSED") {
+      else if (b.status === "MISSED") {
 
-  missed.push(item);
+        missed.push(item);
 
-}
+      }
 
-else if (b.status === "COMPLETED") {
+      else if (b.status === "COMPLETED") {
 
-  past.push(item);
+        past.push(item);
 
-}
+      }
 
-else if (b.status === "CONFIRMED" && end < now) {
+      else if (b.status === "CONFIRMED" && end < now) {
 
-  missed.push(item);
+        missed.push(item);
 
-}
+      }
 
-else if (b.status === "CHECKED_IN") {
+      else if (b.status === "CHECKED_IN") {
 
-  past.push(item);
+        past.push(item);
 
-}
+      }
 
-else {
+      else {
 
-  upcoming.push(item);
+        upcoming.push(item);
 
-}    });
+      }
+
+    });
 
     res.json({
       total: bookings.length,
@@ -545,10 +568,17 @@ export const cancelAppointment = async (req, res) => {
 
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
+    const { reason } = req.body;
 
     if (!bookingId) {
       return res.status(400).json({
         message: "bookingId is required"
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        message: "Cancellation reason is required"
       });
     }
 
@@ -593,21 +623,16 @@ export const cancelAppointment = async (req, res) => {
     await prisma.booking.update({
       where: { id: bookingId },
       data: {
-        status: "CANCELLED"
+        status: "CANCELLED",
+        reason
       }
     });
-
-    // ===============================
-    // RELEASE SLOT
-    // ===============================
-
-    if (booking.timeSlotId) {
-    }
 
     res.json({
       message: "Appointment cancelled successfully",
       bookingId,
-      status: "CANCELLED"
+      status: "CANCELLED",
+      reason
     });
 
   } catch (error) {
@@ -620,7 +645,6 @@ export const cancelAppointment = async (req, res) => {
 
   }
 };
-
 export const createPaymentOrder = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);

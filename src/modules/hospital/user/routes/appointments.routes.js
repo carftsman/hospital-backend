@@ -260,29 +260,23 @@ router.get("/my", controller.getMyAppointments);
  *           type: integer
  *         description: Booking ID of the appointment
  *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 example: Doctor unavailable / Personal reason
+ *
  *     responses:
  *       200:
  *         description: Appointment cancelled successfully
- *         content:
- *           application/json:
- *             example:
- *               message: Appointment cancelled successfully
- *               bookingId: 25
- *               status: CANCELLED
- *
- *       400:
- *         description: Invalid request or appointment cannot be cancelled
- *
- *       401:
- *         description: Unauthorized
- *
- *       404:
- *         description: Booking not found
- *
- *       500:
- *         description: Server error
  */
-
 router.patch(
   "/:bookingId/cancel",
   auth,

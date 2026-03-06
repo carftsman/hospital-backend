@@ -739,23 +739,60 @@ router.get(
  * /api/labs/bookings/{bookingId}/cancel:
  *   patch:
  *     summary: Cancel lab booking
- *     tags: [Labs]
+ *     description: Allows a user to cancel a lab booking before the sample is collected.
+ *     tags:
+ *       - Labs
+ *
  *     parameters:
  *       - in: path
  *         name: bookingId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: Lab booking ID
+ *
  *       - in: query
  *         name: userId
  *         required: true
  *         schema:
  *           type: integer
+ *         description: ID of the user who made the booking
+ *
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 example: Booked by mistake
+ *
  *     responses:
  *       200:
- *         description: Lab booking cancelled
+ *         description: Lab booking cancelled successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Lab booking cancelled successfully
+ *               bookingId: 96
+ *               labName: Apollo Diagnostics
+ *               status: CANCELLED
+ *               reason: Booked by mistake
+ *
+ *       400:
+ *         description: Invalid request or booking cannot be cancelled
+ *
+ *       404:
+ *         description: Lab booking not found
+ *
+ *       500:
+ *         description: Server error
  */
-router.patch("/bookings/:bookingId/cancel", controller.cancelLabBooking); 
+router.patch("/bookings/:bookingId/cancel", controller.cancelLabBooking);
 /**
  * @swagger
  * /api/labs/bookings/{bookingId}/reschedule:
