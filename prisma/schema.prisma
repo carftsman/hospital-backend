@@ -168,18 +168,21 @@ model DoctorAvailability {
 }
 
 model TimeSlot {
-  id               Int              @id @default(autoincrement())
+  id               Int      @id @default(autoincrement())
   doctorId         Int
   start            DateTime
   end              DateTime
   consultationMode ConsultationMode @default(BOTH)
-  isActive         Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  booking          Booking?
-  doctor           Doctor           @relation(fields: [doctorId], references: [id])
 
-  @@unique([doctorId, start, end], map: "uniq_doctor_slot")
-  @@index([doctorId, start])
+  isActive         Boolean  @default(true)
+  isBooked         Boolean  @default(false)   // ⭐ add this
+
+  createdAt        DateTime @default(now())
+
+  booking          Booking?
+  doctor           Doctor   @relation(fields: [doctorId], references: [id])
+
+  @@unique([doctorId, start, end])
 }
 
 model Booking {
@@ -197,7 +200,7 @@ model Booking {
   doctorName       String?
   hospitalName     String?
   hospitalId       Int?
-  consultationMode ConsultationMode?
+  consultationMode ConsultationMode
   doctor           Doctor            @relation(fields: [doctorId], references: [id])
   patientProfile   PatientProfile?   @relation(fields: [patientProfileId], references: [id])
   timeSlot         TimeSlot?         @relation(fields: [timeSlotId], references: [id])
@@ -551,11 +554,13 @@ enum HospitalStatus {
 
 enum BookingStatus {
   PENDING
-  SAMPLE_COLLECTED
-  COMPLETED
-  CANCELLED
-  CONFIRMED
   HOLD
+  CONFIRMED
+  SAMPLE_COLLECTED
+  CHECKED_IN
+  COMPLETED
+  MISSED
+  CANCELLED
   EXPIRED
 }
 

@@ -245,21 +245,21 @@ router.get("/my", controller.getMyAppointments);
  * /api/appointments/{bookingId}/cancel:
  *   patch:
  *     summary: Cancel appointment
- *     description: Allows user to cancel an existing appointment.
- *     tags: [Appointments]
+ *     description: Allows authenticated user to cancel an appointment before it starts.
+ *     tags:
+ *       - Appointments
+ *
+ *     security:
+ *       - bearerAuth: []
+ *
  *     parameters:
  *       - in: path
  *         name: bookingId
  *         required: true
  *         schema:
  *           type: integer
- *         description: Booking ID to cancel
- *       - in: query
- *         name: userId
- *         required: true
- *         schema:
- *           type: integer
- *         description: User ID (temporary without auth)
+ *         description: Booking ID of the appointment
+ *
  *     responses:
  *       200:
  *         description: Appointment cancelled successfully
@@ -267,17 +267,29 @@ router.get("/my", controller.getMyAppointments);
  *           application/json:
  *             example:
  *               message: Appointment cancelled successfully
- *               bookingId: 52
+ *               bookingId: 25
  *               status: CANCELLED
+ *
  *       400:
- *         description: Invalid request
+ *         description: Invalid request or appointment cannot be cancelled
+ *
+ *       401:
+ *         description: Unauthorized
+ *
  *       404:
  *         description: Booking not found
+ *
  *       500:
  *         description: Server error
  */
 
-router.patch("/:bookingId/cancel", controller.cancelAppointment);
+router.patch(
+  "/:bookingId/cancel",
+  auth,
+  role("USER"),
+  controller.cancelAppointment
+);
+
 
 /**
  * @swagger

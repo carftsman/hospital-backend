@@ -3,78 +3,28 @@ import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
-/* ======================================================
-   1️⃣ DOCTOR AVAILABILITY (NEXT 12 DAYS)
-====================================================== */
 export const getDoctorAvailability = async (req, res) => {
   try {
+
     const doctorId = Number(req.query.doctorId);
+
     if (!doctorId) {
-      return res.status(400).json({ message: "doctorId required" });
+      return res.status(400).json({
+        message: "doctorId required"
+      });
     }
 
     const today = new Date();
-    const days = [];
+    const endDate = new Date();
+    endDate.setDate(today.getDate() + 12);
 
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-
-      const dateStr = d.toISOString().slice(0, 10);
-
-      const slotsAvailable = await prisma.timeSlot.count({
-        where: {
-          doctorId,
-          start: {
-            gte: new Date(`${dateStr}T00:00:00.000Z`),
-            lte: new Date(`${dateStr}T23:59:59.999Z`)
-          },
-          isActive: true,
-          OR: [
-            { booking: null },
-            {
-              booking: {
-                status: "HOLD",
-                expiresAt: { lt: new Date() }
-              }
-            }
-          ]
-        }
-      });
-  days.push({
-        date: dateStr,
-        label:
-          i === 0
-            ? "Today"
-            : i === 1
-            ? "Tomorrow"
-            : d.toLocaleDateString("en-IN", { weekday: "short" }),
-        slotsAvailable
-      });
-}
-
-   res.json({ doctorId, days });
-  } catch (e) {
-    console.error("getDoctorAvailability error:", e);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-export const getAvailableSlots = async (req, res) => {
-  try {
-    const doctorId = Number(req.query.doctorId);
-    const date = req.query.date;
-
-    if (!doctorId || !date) {
-      return res.status(400).json({ message: "doctorId and date required" });
-    }
-
-    const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(`${date}T23:59:59.999Z`);
-     const slots = await prisma.timeSlot.findMany({
+    const slots = await prisma.timeSlot.findMany({
       where: {
         doctorId,
-        start: { gte: start, lte: end },
+        start: {
+          gte: today,
+          lte: endDate
+        },
         isActive: true,
         OR: [
           { booking: null },
@@ -86,165 +36,190 @@ export const getAvailableSlots = async (req, res) => {
           }
         ]
       },
+      select: { start: true }
+    });
+
+    const map = {};
+
+    slots.forEach(s => {
+      const date = s.start.toISOString().slice(0, 10);
+      map[date] = (map[date] || 0) + 1;
+    });
+
+    const days = [];
+
+    for (let i = 0; i < 12; i++) {
+
+      const d = new Date();
+      d.setDate(today.getDate() + i);
+
+      const dateStr = d.toISOString().slice(0, 10);
+
+      days.push({
+        date: dateStr,
+        label:
+          i === 0
+            ? "Today"
+            : i === 1
+            ? "Tomorrow"
+            : d.toLocaleDateString("en-IN", { weekday: "short" }),
+        slotsAvailable: map[dateStr] || 0
+      });
+
+    }
+
+    res.json({
+      doctorId,
+      days
+    });
+
+  } catch (error) {
+
+    console.error("getDoctorAvailability error:", error);
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
+  }
+};
+export const getAvailableSlots = async (req, res) => {
+
+  try {
+
+    const doctorId = Number(req.query.doctorId);
+    const date = req.query.date;
+
+    if (!doctorId || !date) {
+      return res.status(400).json({
+        message: "doctorId and date required"
+      });
+    }
+
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
+
+    const slots = await prisma.timeSlot.findMany({
+      where: {
+        doctorId,
+        start: { gte: start, lte: end },
+        isActive: true
+      },
+      include: {
+        booking: true
+      },
       orderBy: { start: "asc" }
+    });
+
+    const result = slots.map(slot => {
+
+      const booked =
+        slot.booking &&
+        (
+          slot.booking.status === "CONFIRMED" ||
+          (
+            slot.booking.status === "HOLD" &&
+            slot.booking.expiresAt > new Date()
+          )
+        );
+
+      return {
+        slotId: slot.id,
+        start: slot.start,
+        end: slot.end,
+        time:
+          slot.start.toISOString().slice(11, 16) +
+          " - " +
+          slot.end.toISOString().slice(11, 16),
+        consultationMode: slot.consultationMode,
+        isBooked: booked
+      };
+
     });
 
     res.json({
       date,
-      count: slots.length,
-      isHoliday: false,
-      slots: slots.map(s => ({
-        slotId: s.id,
-        start: s.start,
-        end: s.end,
-        time: `${s.start.toISOString().slice(11, 16)} - ${s.end
-          .toISOString()
-          .slice(11, 16)}`
-      }))
+      count: result.length,
+      slots: result
     });
 
-  } catch (e) {
-    console.error("getAvailableSlots error:", e);
-    res.status(500).json({ message: "Server error" });
+  } catch (error) {
+
+    console.error("getAvailableSlots error:", error);
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
+
 };
 export const holdAppointment = async (req, res) => {
+
   try {
-    const { slotId, bookingFor, reason, patient, consultationMode } = req.body;
+
+    const { slotId, consultationMode } = req.body;
     const userId = req.user.id;
 
-    if (!slotId || !bookingFor) {
-      return res.status(400).json({ message: "slotId and bookingFor required" });
+    const lock = await prisma.timeSlot.updateMany({
+      where: {
+        id: slotId,
+        isBooked: false
+      },
+      data: {
+        isBooked: true
+      }
+    });
+
+    if (lock.count === 0) {
+      return res.status(409).json({
+        message: "Slot already booked"
+      });
     }
 
     const slot = await prisma.timeSlot.findUnique({
       where: { id: slotId },
-      include: { booking: true }
+      include: {
+        doctor: {
+          include: { hospital: true }
+        }
+      }
     });
 
-    if (!slot) {
-      return res.status(404).json({ message: "Slot not found" });
-    }
-
-    // ===============================
-    // SLOT ALREADY BOOKED CHECK
-    // ===============================
-    if (
-      slot.booking &&
-      (slot.booking.status === "CONFIRMED" ||
-        (slot.booking.status === "HOLD" && slot.booking.expiresAt > new Date()))
-    ) {
-      return res.status(409).json({ message: "Slot already booked" });
-    }
-
-    let patientProfileId = null;
-
-    // ===============================
-    // CONSULTATION MODE VALIDATION
-    // ===============================
-    const allowedModes = ["ONLINE", "OFFLINE"];
-    let finalMode = consultationMode || slot.consultationMode || "OFFLINE"; // ✅ always take root-level mode
-
-    // Validate selected mode
-    if (!allowedModes.includes(finalMode) && finalMode !== "BOTH") {
-      return res.status(400).json({
-        message: "consultationMode must be ONLINE, OFFLINE, or BOTH"
-      });
-    }
-
-    // Check if slot supports selected mode
-    if (slot.consultationMode !== "BOTH" && slot.consultationMode !== finalMode) {
-      return res.status(400).json({
-        message: "Selected consultation mode not available for this slot"
-      });
-    }
-
-    // ===============================
-    // BOOKING FOR OTHER PATIENT
-    // ===============================
-    if (bookingFor === "OTHER") {
-      if (!patient?.fullName || !patient?.gender) {
-        return res.status(400).json({
-          message: "Patient fullName and gender required for OTHER booking"
-        });
-      }
-
-      const allowedGenders = ["MALE", "FEMALE", "OTHER"];
-      if (!allowedGenders.includes(patient.gender)) {
-        return res.status(400).json({ message: "Invalid gender value" });
-      }
-
-      const newPatient = await prisma.patientProfile.create({
-        data: {
-          userId,
-          fullName: patient.fullName,
-          phone: patient.phone,
-          email: patient.email,
-          dob: patient.dob ? new Date(patient.dob) : null,
-          gender: patient.gender
-        }
-      });
-
-      patientProfileId = newPatient.id;
-    }
-
-    // ===============================
-    // BOOKING FOR SELF - Gender check
-    // ===============================
-    if (bookingFor === "SELF") {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user?.gender) {
-        return res.status(400).json({
-          message: "Please complete your profile with gender before booking"
-        });
-      }
-    }
-
-    // ===============================
-    // HOLD EXPIRY (10 MINUTES)
-    // ===============================
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // ===============================
-    // UPSERT BOOKING
-    // ===============================
-    const booking = await prisma.booking.upsert({
-      where: { timeSlotId: slot.id },
-      update: {
-        userId,
-        status: "HOLD",
-        expiresAt,
-        reason,
-        patientProfileId,
-        consultationMode: finalMode
-      },
-      create: {
-        timeSlotId: slot.id,
+    const booking = await prisma.booking.create({
+      data: {
         userId,
         doctorId: slot.doctorId,
         start: slot.start,
         end: slot.end,
+        timeSlotId: slot.id,
         status: "HOLD",
         expiresAt,
-        reason,
-        patientProfileId,
-        consultationMode: finalMode
+        consultationMode,
+        doctorName: slot.doctor.name,
+        hospitalName: slot.doctor.hospital.name,
+        hospitalId: slot.doctor.hospital.id
       }
     });
 
-    // ===============================
-    // RESPONSE
-    // ===============================
-    return res.status(201).json({
+    res.json({
+      message: "Slot held successfully",
       bookingId: booking.id,
-      expiresAt,
-      consultationMode: finalMode // ✅ will now show OFFLINE/ONLINE correctly
+      expiresAt
     });
 
   } catch (error) {
+
     console.error("holdAppointment error:", error);
-    return res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
+
 };
 
 export const getBookingSummary = async (req, res) => {
@@ -352,103 +327,243 @@ export const getBookingSummary = async (req, res) => {
 
 export const getMyAppointments = async (req, res) => {
   try {
+
     const userId = Number(req.query.userId);
-    const filterMode = req.query.consultationMode; // ONLINE, OFFLINE, or ALL
+    const consultationMode = req.query.consultationMode;
 
     if (!userId) {
       return res.status(400).json({
-        message: "userId query param required"
+        message: "userId is required"
       });
     }
 
-    // =========================
-    // FETCH BOOKINGS
-    // =========================
+    const whereCondition = {
+      userId,
+      ...(consultationMode && consultationMode !== "ALL"
+        ? { consultationMode }
+        : {})
+    };
+
     const bookings = await prisma.booking.findMany({
-      where: {
-        userId,
-        ...(filterMode && filterMode !== "ALL"
-          ? { consultationMode: filterMode } // filter ONLINE or OFFLINE only
-          : {})
-      },
-      include: {
+      where: whereCondition,
+      orderBy: { createdAt: "desc" },
+
+      select: {
+        id: true,
+        status: true,
+        consultationMode: true,
+        createdAt: true,
+        expiresAt: true,
+        reason: true,
+        start: true,
+        end: true,
+
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            email: true,
+            bloodGroup: true,
+            gender: true,
+            DateOfBirth: true
+          }
+        },
+
+        patientProfile: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            age: true,
+            gender: true,
+            email: true
+          }
+        },
+
         timeSlot: {
-          include: {
-            doctor: { include: { hospital: true } }
+          select: {
+            start: true,
+            end: true
+          }
+        },
+
+        doctor: {
+          select: {
+            id: true,
+            name: true,
+            imageUrl: true,
+            specialization: true,
+            qualification: true,
+            experience: true,
+            consultationFee: true,
+            languages: true,
+            rating: true,
+            consultationMode: true,
+
+            category: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+
+            hospital: {
+              select: {
+                id: true,
+                name: true,
+                location: true,
+                place: true,
+                city: true,
+                state: true,
+                pinCode: true,
+                contactName: true,
+                contactNumber: true,
+                imageUrl: true,
+                rating: true,
+                isOpen: true,
+                open24x7: true
+              }
+            }
           }
         }
-      },
-      orderBy: { createdAt: "desc" }
-    });
-
-    // =========================
-    // SPLIT BOOKINGS
-    // =========================
-    const ongoing = [];
-    const completed = [];
-    const cancelled = [];
-
-    bookings.forEach(b => {
-      const doctor = b.timeSlot?.doctor;
-      const hospital = doctor?.hospital;
-
-      // BACKWARD COMPATIBLE (old bookings support)
-      const start = b.timeSlot?.start ?? b.start;
-      const end = b.timeSlot?.end ?? b.end;
-
-      if (!start || !end) return; // skip corrupted rows
-
-      const item = {
-        bookingId: b.id,
-        status: b.status,
-        consultationMode: b.consultationMode || "BOTH", // ✅ add consultationMode
-        doctor: {
-          name: doctor?.name || null,
-          image: doctor?.imageUrl || null,
-          hospital: hospital?.name || null
-        },
-        appointment: {
-          date: start,
-          time: `${new Date(start).toISOString().slice(11, 16)} - ${new Date(end).toISOString().slice(11, 16)}`
-        }
-      };
-
-      switch (b.status) {
-        case "HOLD":
-          ongoing.push(item);
-          break;
-        case "CONFIRMED":
-          completed.push(item);
-          break;
-        case "EXPIRED":
-        case "CANCELLED":
-          cancelled.push(item);
-          break;
       }
     });
 
-    res.json({ ongoing, completed, cancelled });
+    const upcoming = [];
+    const past = [];
+    const missed = [];
+    const cancelled = [];
+
+const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const formatTime = (date) =>
+      new Date(date).toISOString().slice(11, 16);
+
+    bookings.forEach((b) => {
+
+      const start = b.timeSlot?.start ?? b.start;
+      const end = b.timeSlot?.end ?? b.end;
+
+      if (!start || !end) return;
+
+      const patient = b.patientProfile
+        ? { type: "OTHER", ...b.patientProfile }
+        : { type: "SELF", ...b.user };
+
+      const item = {
+
+        booking: {
+          id: b.id,
+          status: b.status,
+          reason: b.reason,
+          createdAt: b.createdAt
+        },
+
+        consultation: {
+          mode: b.consultationMode
+        },
+
+        appointment: {
+          date: start.toISOString().slice(0, 10),
+          time: `${formatTime(start)} - ${formatTime(end)}`,
+          start,
+          end
+        },
+
+        doctor: {
+          id: b.doctor.id,
+          name: b.doctor.name,
+          imageUrl: b.doctor.imageUrl,
+          specialization: b.doctor.specialization,
+          qualification: b.doctor.qualification,
+          experience: b.doctor.experience,
+          consultationFee: b.doctor.consultationFee,
+          languages: b.doctor.languages,
+          rating: Number(b.doctor.rating),
+          availableModes: b.doctor.consultationMode
+        },
+
+        hospital: b.doctor.hospital,
+        category: b.doctor.category,
+        patient
+      };
+
+      // ============================
+// STATUS CLASSIFICATION
+// ============================
+
+if (b.status === "CANCELLED") {
+
+  cancelled.push(item);
+
+}
+
+else if (b.status === "MISSED") {
+
+  missed.push(item);
+
+}
+
+else if (b.status === "COMPLETED") {
+
+  past.push(item);
+
+}
+
+else if (b.status === "CONFIRMED" && end < now) {
+
+  missed.push(item);
+
+}
+
+else if (b.status === "CHECKED_IN") {
+
+  past.push(item);
+
+}
+
+else {
+
+  upcoming.push(item);
+
+}    });
+
+    res.json({
+      total: bookings.length,
+      upcoming,
+      past,
+      missed,
+      cancelled
+    });
 
   } catch (error) {
+
     console.error("getMyAppointments error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
 
 export const cancelAppointment = async (req, res) => {
   try {
-    const bookingId = Number(req.params.bookingId);
-    const userId = Number(req.query.userId); // or req.user.id
 
-    if (!bookingId || !userId) {
+    const bookingId = Number(req.params.bookingId);
+    const userId = req.user.id;
+
+    if (!bookingId) {
       return res.status(400).json({
-        message: "bookingId and userId required"
+        message: "bookingId is required"
       });
     }
 
     const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, userId },
-      include: { timeSlot: true }
+      where: {
+        id: bookingId,
+        userId
+      }
     });
 
     if (!booking) {
@@ -457,47 +572,70 @@ export const cancelAppointment = async (req, res) => {
       });
     }
 
-    // ❌ Already cancelled
-    if (booking.status === "CANCELLED") {
+    const blockedStatuses = [
+      "CANCELLED",
+      "COMPLETED",
+      "MISSED",
+      "CHECKED_IN"
+    ];
+
+    if (blockedStatuses.includes(booking.status)) {
       return res.status(400).json({
-        message: "Booking already cancelled"
+        message: "Appointment cannot be cancelled"
       });
     }
 
-    // ❌ Expired booking cannot cancel
-    if (booking.status === "EXPIRED") {
+    const now = new Date();
+
+    if (booking.end < now) {
       return res.status(400).json({
-        message: "Expired booking cannot be cancelled"
+        message: "Past appointments cannot be cancelled"
       });
     }
 
-    // ❌ Confirmed completed cannot cancel (optional)
-    if (booking.status === "CONFIRMED") {
-      const now = new Date();
-      if (booking.timeSlot.end < now) {
-        return res.status(400).json({
-          message: "Completed appointment cannot be cancelled"
-        });
-      }
-    }
+    // ===============================
+    // CANCEL BOOKING
+    // ===============================
 
-    // ✅ Cancel booking
     await prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: "CANCELLED" }
+      where: { id: bookingId },
+      data: {
+        status: "CANCELLED"
+      }
     });
+
+    // ===============================
+    // RELEASE SLOT
+    // ===============================
+
+    if (booking.timeSlotId) {
+
+      await prisma.timeSlot.update({
+        where: { id: booking.timeSlotId },
+        data: {
+          isBooked: false
+        }
+      });
+
+    }
 
     res.json({
       message: "Appointment cancelled successfully",
-      bookingId: booking.id,
+      bookingId,
       status: "CANCELLED"
     });
 
   } catch (error) {
+
     console.error("cancelAppointment error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
+
 export const createPaymentOrder = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);

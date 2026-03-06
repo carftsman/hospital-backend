@@ -14,6 +14,7 @@ import doctorAdminRoutes from "./modules/hospital/admin/routes/doctor.routes.js"
 import uploadRoutes from "./modules/hospital/admin/routes/upload.routes.js";
 import bookedSlotsRoutes from "./modules/hospital/admin/routes/notification.routes.js";
 import hospitalOpenStatusRoutes from "./modules/hospital/admin/routes/openStatus.routes.js";
+import adminAppointmentRoutes from "./modules/hospital/admin/routes/appointmentsAdmin.routes.js";
 
 // =======================
 // User Routes
@@ -108,6 +109,7 @@ app.use("/api/hospital/admin", hospitalOpenStatusRoutes);
 app.use("/api/hospital/admin", bookedSlotsRoutes);
 app.use("/api/upload", uploadRoutes);
 
+app.use("/api", adminAppointmentRoutes);
 
 app.use("/api/hospital/user", reviewRoutes);
 app.use("/api/hospital/user", nearbyRoutes);

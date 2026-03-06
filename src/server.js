@@ -6,7 +6,12 @@ import { swaggerUiServe, swaggerUiSetup } from "./swagger/swagger.js";
 import { expireHoldBookings } from "./jobs/expireHoldBookings.job.js";
 import { releaseExpiredBookings } from "./jobs/releaseExpiredBookings.job.js";
 import { Prisma } from "@prisma/client";
+import cron from "node-cron";
+import { releaseExpiredSlots } from "./jobs/expireBookings.js";
 
+cron.schedule("* * * * *", async () => {
+  await releaseExpiredSlots();
+});
 Prisma.Decimal.prototype.toJSON = function () {
   return parseFloat(this.toString());
 };
