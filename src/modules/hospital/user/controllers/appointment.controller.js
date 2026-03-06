@@ -772,6 +772,7 @@ export const getDoctorBookedSlots = async (req, res) => {
 };
 export const getPaymentSuccessDetails = async (req, res) => {
   try {
+
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
 
@@ -779,9 +780,13 @@ export const getPaymentSuccessDetails = async (req, res) => {
       where: {
         id: bookingId,
         userId,
-        status: "CONFIRMED"
+        status: {
+          in: ["CONFIRMED", "COMPLETED"]
+        }
       },
       include: {
+        user: true,
+        patientProfile: true,
         timeSlot: {
           include: {
             doctor: {
@@ -796,26 +801,61 @@ export const getPaymentSuccessDetails = async (req, res) => {
 
     if (!booking) {
       return res.status(404).json({
-        message: "Booking not found or not confirmed"
+        message: "Booking not found"
       });
     }
 
     const doctor = booking.timeSlot.doctor;
     const hospital = doctor.hospital;
 
+    // =========================
+    // PATIENT DETAILS
+    // =========================
+
+    const patient = booking.patientProfile
+      ? {
+          type: "OTHER",
+          id: booking.patientProfile.id,
+          fullName: booking.patientProfile.fullName,
+          phone: booking.patientProfile.phone,
+          age: booking.patientProfile.age,
+          gender: booking.patientProfile.gender,
+          email: booking.patientProfile.email
+        }
+      : {
+          type: "SELF",
+          id: booking.user.id,
+          fullName: booking.user.fullName,
+          phone: booking.user.phone,
+          email: booking.user.email,
+          bloodGroup: booking.user.bloodGroup,
+          gender: booking.user.gender,
+          DateOfBirth: booking.user.DateOfBirth
+        };
+
+    const consultationFee = doctor.consultationFee ?? 0;
+
     res.json({
+
       bookingId: booking.id,
-      consultationMode: booking.consultationMode || booking.timeSlot.consultationMode || "BOTH",
+
+      // ✅ BOOKING CREATED TIME
+      bookedAt: booking.createdAt,
+
+      consultationMode:
+        booking.consultationMode ||
+        booking.timeSlot.consultationMode ||
+        "BOTH",
 
       payment: {
         status: "SUCCESS",
-        amountPaid: doctor.consultationFee ?? 0,
+        amountPaid: consultationFee,
         hospital: hospital.name
       },
 
       doctor: {
         name: doctor.name,
-        image: doctor.imageUrl || null, // ✅ added
+        image: doctor.imageUrl || null,
         specialization: doctor.specialization,
         experience: doctor.experience ?? 0,
         rating: doctor.rating ?? 0,
@@ -824,11 +864,10 @@ export const getPaymentSuccessDetails = async (req, res) => {
 
       appointment: {
         date: booking.timeSlot.start.toDateString(),
-        time: `${booking.timeSlot.start
-          .toISOString()
-          .slice(11, 16)} - ${booking.timeSlot.end
-          .toISOString()
-          .slice(11, 16)}`
+        time:
+          booking.timeSlot.start.toISOString().slice(11,16) +
+          " - " +
+          booking.timeSlot.end.toISOString().slice(11,16)
       },
 
       hospital: {
@@ -837,11 +876,20 @@ export const getPaymentSuccessDetails = async (req, res) => {
         longitude: hospital.longitude
       },
 
-      shareLink: `${process.env.BASE_URL}/appointments/${booking.id}`
+      // ✅ PATIENT FULL DETAILS
+      patient,
+
+      shareLink: `${process.env.BASE_URL || "https://hospital-backend-1-9jq0.onrender.com"}/appointments/${booking.id}`
+
     });
 
   } catch (error) {
+
     console.error("getPaymentSuccessDetails error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    res.status(500).json({
+      message: "Server error"
+    });
+
   }
 };
