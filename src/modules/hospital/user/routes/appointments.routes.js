@@ -201,7 +201,7 @@ router.post("/hold", auth, role("USER"), controller.holdAppointment);
  *         required: false
  *         schema:
  *           type: string
- *           enum: [ONLINE, OFFLINE, ALL]
+ *           enum: [ONLINE, OFFLINE, ALL,Instant]
  *           default: ALL
  *         description: Filter appointments by consultation mode
  *     responses:

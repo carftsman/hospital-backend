@@ -168,26 +168,22 @@ model DoctorAvailability {
 }
 
 model TimeSlot {
-  id               Int      @id @default(autoincrement())
+  id               Int              @id @default(autoincrement())
   doctorId         Int
   start            DateTime
   end              DateTime
   consultationMode ConsultationMode @default(BOTH)
-
-  isActive         Boolean  @default(true)
-  isBooked         Boolean  @default(false)   // ⭐ add this
-
-  createdAt        DateTime @default(now())
-
-  booking          Booking?
-  doctor           Doctor   @relation(fields: [doctorId], references: [id])
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  booking          Booking[]
+  doctor           Doctor           @relation(fields: [doctorId], references: [id])
 
   @@unique([doctorId, start, end])
 }
 
 model Booking {
-  id               Int               @id @default(autoincrement())
-  createdAt        DateTime          @default(now())
+  id               Int              @id @default(autoincrement())
+  createdAt        DateTime         @default(now())
   doctorId         Int
   end              DateTime
   start            DateTime
@@ -196,15 +192,18 @@ model Booking {
   status           BookingStatus
   expiresAt        DateTime?
   reason           String?
-  timeSlotId       Int?              @unique
+
+  timeSlotId       Int?
+  timeSlot         TimeSlot?        @relation(fields: [timeSlotId], references: [id])
+
   doctorName       String?
   hospitalName     String?
   hospitalId       Int?
   consultationMode ConsultationMode
-  doctor           Doctor            @relation(fields: [doctorId], references: [id])
-  patientProfile   PatientProfile?   @relation(fields: [patientProfileId], references: [id])
-  timeSlot         TimeSlot?         @relation(fields: [timeSlotId], references: [id])
-  user             User              @relation(fields: [userId], references: [id])
+
+  doctor           Doctor           @relation(fields: [doctorId], references: [id])
+  patientProfile   PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  user             User             @relation(fields: [userId], references: [id])
   notification     Notification?
 
   @@index([userId])
@@ -339,6 +338,7 @@ model LabSlot {
   lab       Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
 
   @@unique([labId, slotDate, startTime])
+  @@unique([labId, slotDate, startTime], map: "unique_lab_slot")
   @@index([labId, slotDate])
   @@index([labId, slotDate], map: "idx_lab_slot_lookup")
 }
@@ -543,6 +543,7 @@ enum LabPackageGender {
 enum ConsultationMode {
   ONLINE
   OFFLINE
+  INSTANT
   BOTH
 }
 
@@ -554,14 +555,14 @@ enum HospitalStatus {
 
 enum BookingStatus {
   PENDING
-  HOLD
-  CONFIRMED
   SAMPLE_COLLECTED
-  CHECKED_IN
   COMPLETED
-  MISSED
   CANCELLED
+  CONFIRMED
+  HOLD
   EXPIRED
+  CHECKED_IN
+  MISSED
 }
 
 enum GenderPreference {

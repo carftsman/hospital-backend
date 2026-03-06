@@ -772,51 +772,91 @@ export const confirmLabBooking = async (req, res) => {
 
     const { userId, slotId } = req.body;
 
-    const result = await prisma.$transaction(async (tx) => {
-
-      const slot = await tx.labSlot.findUnique({
-        where: { id: Number(slotId) },
-        include: { bookings: true }
-      });
-
-      if (!slot) {
-        throw new Error("Slot not found");
-      }
+    const booking = await prisma.$transaction(async (tx) => {
 
       const now = new Date();
 
-      const activeBooking = slot.bookings.find(b =>
-        ["CONFIRMED", "SAMPLE_COLLECTED", "COMPLETED"].includes(b.status) ||
-        (b.status === "HOLD" && b.expiresAt > now)
-      );
+      /* 1️⃣ GET CART ITEM */
+      const cartItem = await tx.labCart.findFirst({
+        where: { userId: Number(userId) }
+      });
 
-      if (activeBooking) {
-        throw new Error("Slot already booked");
+      if (!cartItem) {
+        throw new Error("CART_EMPTY");
       }
 
+      /* 2️⃣ SLOT CHECK */
+      const existing = await tx.labBooking.findFirst({
+        where: {
+          slotId: Number(slotId),
+          OR: [
+            { status: "CONFIRMED" },
+            { status: "SAMPLE_COLLECTED" },
+            { status: "COMPLETED" },
+            {
+              status: "HOLD",
+              expiresAt: { gt: now }
+            }
+          ]
+        }
+      });
+
+      if (existing) {
+        throw new Error("SLOT_BOOKED");
+      }
+
+      const slot = await tx.labSlot.findUnique({
+        where: { id: Number(slotId) }
+      });
+
+      if (!slot) {
+        throw new Error("SLOT_NOT_FOUND");
+      }
+
+      /* 3️⃣ CREATE BOOKING */
       const booking = await tx.labBooking.create({
         data: {
-          userId,
+          userId: Number(userId),
           labId: slot.labId,
+          packageId: cartItem.packageId,   // ⭐ FROM CART
+          patientProfileId: cartItem.patientProfileId,
           slotId: slot.id,
           sampleDate: slot.slotDate,
           status: "CONFIRMED"
         }
       });
 
+      /* 4️⃣ CLEAR CART */
+      await tx.labCart.deleteMany({
+        where: { userId: Number(userId) }
+      });
+
       return booking;
+
     });
 
     res.json({
       message: "Booking confirmed",
-      bookingId: result.id
+      bookingId: booking.id
     });
 
   } catch (err) {
 
-    if (err.message === "Slot already booked") {
+    if (err.message === "CART_EMPTY") {
+      return res.status(400).json({
+        message: "Cart is empty"
+      });
+    }
+
+    if (err.message === "SLOT_BOOKED") {
       return res.status(409).json({
         message: "Slot already booked by another user"
+      });
+    }
+
+    if (err.message === "SLOT_NOT_FOUND") {
+      return res.status(404).json({
+        message: "Slot not found"
       });
     }
 
@@ -825,6 +865,7 @@ export const confirmLabBooking = async (req, res) => {
     res.status(500).json({
       message: "Server error"
     });
+
   }
 };
 

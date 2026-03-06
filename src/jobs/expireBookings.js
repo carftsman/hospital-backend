@@ -3,31 +3,24 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 export const releaseExpiredSlots = async () => {
+  try {
 
-  const expired = await prisma.booking.findMany({
-    where: {
-      status: "HOLD",
-      expiresAt: { lt: new Date() }
-    }
-  });
-
-  for (const b of expired) {
-
-    await prisma.timeSlot.update({
-      where: { id: b.timeSlotId },
-      data: { isBooked: false }
+    const result = await prisma.booking.updateMany({
+      where: {
+        status: "HOLD",
+        expiresAt: { lt: new Date() }
+      },
+      data: {
+        status: "EXPIRED"
+      }
     });
 
+    console.log("Expired bookings cleaned");
+    console.log(`Released ${result.count} expired slots`);
+
+  } catch (error) {
+
+    console.error("releaseExpiredSlots error:", error);
+
   }
-
-  await prisma.booking.updateMany({
-    where: {
-      status: "HOLD",
-      expiresAt: { lt: new Date() }
-    },
-    data: {
-      status: "EXPIRED"
-    }
-  });
-
 };

@@ -84,46 +84,39 @@ export const getDoctorAvailability = async (req, res) => {
   }
 };
 export const getAvailableSlots = async (req, res) => {
-
   try {
 
     const doctorId = Number(req.query.doctorId);
     const date = req.query.date;
 
-    if (!doctorId || !date) {
-      return res.status(400).json({
-        message: "doctorId and date required"
-      });
-    }
-
     const start = new Date(`${date}T00:00:00.000Z`);
     const end = new Date(`${date}T23:59:59.999Z`);
 
     const slots = await prisma.timeSlot.findMany({
+  where: {
+    doctorId,
+    start: { gte: start, lte: end },
+    isActive: true
+  },
+  include: {
+    booking: {
       where: {
-        doctorId,
-        start: { gte: start, lte: end },
-        isActive: true
-      },
-      include: {
-        booking: true
-      },
-      orderBy: { start: "asc" }
-    });
+        OR: [
+          { status: "CONFIRMED" },
+          {
+            status: "HOLD",
+            expiresAt: { gt: new Date() }
+          }
+        ]
+      }
+    }
+  },
+  orderBy: { start: "asc" }
+});
 
-    const result = slots.map(slot => {
-
-      const booked =
-        slot.booking &&
-        (
-          slot.booking.status === "CONFIRMED" ||
-          (
-            slot.booking.status === "HOLD" &&
-            slot.booking.expiresAt > new Date()
-          )
-        );
-
-      return {
+    const availableSlots = slots
+      .filter(slot => slot.booking.length === 0)
+      .map(slot => ({
         slotId: slot.id,
         start: slot.start,
         end: slot.end,
@@ -131,28 +124,19 @@ export const getAvailableSlots = async (req, res) => {
           slot.start.toISOString().slice(11, 16) +
           " - " +
           slot.end.toISOString().slice(11, 16),
-        consultationMode: slot.consultationMode,
-        isBooked: booked
-      };
-
-    });
+        consultationMode: slot.consultationMode
+      }));
 
     res.json({
       date,
-      count: result.length,
-      slots: result
+      count: availableSlots.length,
+      slots: availableSlots
     });
 
   } catch (error) {
-
     console.error("getAvailableSlots error:", error);
-
-    res.status(500).json({
-      message: "Server error"
-    });
-
+    res.status(500).json({ message: "Server error" });
   }
-
 };
 export const holdAppointment = async (req, res) => {
 
@@ -161,17 +145,20 @@ export const holdAppointment = async (req, res) => {
     const { slotId, consultationMode } = req.body;
     const userId = req.user.id;
 
-    const lock = await prisma.timeSlot.updateMany({
+    const existingBooking = await prisma.booking.findFirst({
       where: {
-        id: slotId,
-        isBooked: false
-      },
-      data: {
-        isBooked: true
+        timeSlotId: slotId,
+        OR: [
+          { status: "CONFIRMED" },
+          {
+            status: "HOLD",
+            expiresAt: { gt: new Date() }
+          }
+        ]
       }
     });
 
-    if (lock.count === 0) {
+    if (existingBooking) {
       return res.status(409).json({
         message: "Slot already booked"
       });
@@ -329,8 +316,11 @@ export const getMyAppointments = async (req, res) => {
   try {
 
     const userId = Number(req.query.userId);
-    const consultationMode = req.query.consultationMode;
+let consultationMode = req.query.consultationMode;
 
+if (consultationMode === "Instant") {
+  consultationMode = "ONLINE";
+}
     if (!userId) {
       return res.status(400).json({
         message: "userId is required"
@@ -338,11 +328,14 @@ export const getMyAppointments = async (req, res) => {
     }
 
     const whereCondition = {
-      userId,
-      ...(consultationMode && consultationMode !== "ALL"
-        ? { consultationMode }
-        : {})
-    };
+  userId,
+  status: {
+    not: "EXPIRED"
+  },
+  ...(consultationMode && consultationMode !== "ALL"
+    ? { consultationMode }
+    : {})
+};
 
     const bookings = await prisma.booking.findMany({
       where: whereCondition,
@@ -609,14 +602,6 @@ export const cancelAppointment = async (req, res) => {
     // ===============================
 
     if (booking.timeSlotId) {
-
-      await prisma.timeSlot.update({
-        where: { id: booking.timeSlotId },
-        data: {
-          isBooked: false
-        }
-      });
-
     }
 
     res.json({

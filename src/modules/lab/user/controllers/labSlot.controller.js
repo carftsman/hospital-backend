@@ -40,18 +40,14 @@ export const getLabAvailability = async (req, res) => {
 
     const now = new Date();
 
-    /* 1️⃣ Get all slots */
     const slots = await prisma.labSlot.findMany({
       where: {
         labId,
         slotDate: { gte: today, lte: endDate }
       },
-      include: {
-        bookings: true
-      }
+      include: { bookings: true }
     });
 
-    /* 2️⃣ Count ONLY free slots */
     const slotMap = new Map();
 
     slots.forEach(slot => {
@@ -63,13 +59,11 @@ export const getLabAvailability = async (req, res) => {
 
       if (!activeBooking) {
         const key = slot.slotDate.toISOString().split("T")[0];
-
         slotMap.set(key, (slotMap.get(key) || 0) + 1);
       }
 
     });
 
-    /* 3️⃣ Build 14 days */
     const days = [];
 
     for (let i = 0; i < 14; i++) {
@@ -118,10 +112,6 @@ export const getLabSlots = async (req, res) => {
       });
     }
 
-    /* ==========================
-       1️⃣ CART VALIDATION
-    ========================== */
-
     const cart = await prisma.labCart.findFirst({
       where: { userId: Number(userId) },
       select: { labId: true }
@@ -139,76 +129,39 @@ export const getLabSlots = async (req, res) => {
       });
     }
 
-    /* ==========================
-       2️⃣ DATE RANGE
-    ========================== */
-
     const start = new Date(`${date}T00:00:00`);
     const end = new Date(`${date}T23:59:59`);
 
     const now = new Date();
 
-    /* ==========================
-       3️⃣ FETCH SLOTS
-    ========================== */
-
     const slots = await prisma.labSlot.findMany({
       where: {
         labId,
-        slotDate: {
-          gte: start,
-          lte: end
-        }
+        slotDate: { gte: start, lte: end }
       },
-      include: {
-        bookings: true
-      },
-      orderBy: {
-        startTime: "asc"
-      }
+      include: { bookings: true },
+      orderBy: { startTime: "asc" }
     });
 
-    /* ==========================
-       4️⃣ FORMAT SLOTS
-    ========================== */
+    /* 🔥 FILTER ONLY AVAILABLE SLOTS */
 
-    const formatted = slots.map(slot => {
+    const formatted = slots
+      .filter(slot => {
 
-      const activeBooking = slot.bookings.find(b =>
-        ["CONFIRMED","SAMPLE_COLLECTED","COMPLETED"].includes(b.status) ||
-        (b.status === "HOLD" && b.expiresAt > now)
-      );
-
-      let expiresIn = null;
-
-      if (activeBooking?.status === "HOLD") {
-        expiresIn = Math.max(
-          0,
-          Math.floor((activeBooking.expiresAt - now) / 1000)
+        const activeBooking = slot.bookings.find(b =>
+          ["CONFIRMED","SAMPLE_COLLECTED","COMPLETED"].includes(b.status) ||
+          (b.status === "HOLD" && b.expiresAt > now)
         );
-      }
 
-      const formatTime = (time) =>
-        new Date(time).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true
-        });
+        return !activeBooking;
 
-      return {
+      })
+      .map(slot => ({
         slotId: slot.id,
         startTime: formatTime(slot.startTime),
         endTime: formatTime(slot.endTime),
-        time: `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`,
-        isBooked: !!activeBooking,
-        expiresIn
-      };
-
-    });
-
-    /* ==========================
-       5️⃣ RESPONSE
-    ========================== */
+        time: `${formatTime(slot.startTime)} - ${formatTime(slot.endTime)}`
+      }));
 
     res.json({
       labId,
@@ -227,6 +180,7 @@ export const getLabSlots = async (req, res) => {
 
   }
 };
+
 export const holdLabSlot = async (req, res) => {
   try {
     const { userId, slotId } = req.body;
