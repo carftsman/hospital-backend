@@ -287,6 +287,62 @@ router.patch(
 
 /**
  * @swagger
+ * /api/appointments/{bookingId}/reschedule:
+ *   patch:
+ *     summary: Reschedule an existing appointment
+ *     description: >
+ *       Allows a user to reschedule an appointment to a new available slot.
+ *       The old slot will automatically become available once the booking
+ *       moves to the new slot.
+ *       Rescheduling is not allowed within 2 hours of the appointment time.
+ *     tags: [Appointments]
+ *     security:
+ *        - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 52
+ *         description: Booking ID to reschedule
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - slotId
+ *             properties:
+ *               slotId:
+ *                 type: integer
+ *                 example: 812
+ *     responses:
+ *       200:
+ *         description: Appointment rescheduled successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Appointment rescheduled successfully
+ *               bookingId: 52
+ *               newSlot:
+ *                 start: "2026-03-07T11:00:00Z"
+ *                 end: "2026-03-07T11:30:00Z"
+ *       400:
+ *         description: Invalid request or reschedule restriction
+ *       404:
+ *         description: Booking or slot not found
+ *       409:
+ *         description: Slot already booked
+ *       500:
+ *         description: Server error
+ */
+
+router.patch("/:bookingId/reschedule", auth, role("USER"), controller.rescheduleAppointment);
+
+/**
+ * @swagger
  * /api/appointments/{bookingId}:
  *   get:
  *     summary: Get booking summary

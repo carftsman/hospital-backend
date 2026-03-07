@@ -1,8 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
-
+ 
 const prisma = new PrismaClient();
-
+ 
 export const getDoctorAvailability = async (req, res) => {
   try {
 
@@ -27,11 +27,17 @@ export const getDoctorAvailability = async (req, res) => {
         },
         isActive: true,
         OR: [
-          { booking: null },
           {
             booking: {
-              status: "HOLD",
-              expiresAt: { lt: new Date() }
+              none: {} // no bookings
+            }
+          },
+          {
+            booking: {
+              some: {
+                status: "HOLD",
+                expiresAt: { lt: new Date() } // expired hold
+              }
             }
           }
         ]
@@ -85,13 +91,13 @@ export const getDoctorAvailability = async (req, res) => {
 };
 export const getAvailableSlots = async (req, res) => {
   try {
-
+ 
     const doctorId = Number(req.query.doctorId);
     const date = req.query.date;
-
+ 
     const start = new Date(`${date}T00:00:00.000Z`);
     const end = new Date(`${date}T23:59:59.999Z`);
-
+ 
     const slots = await prisma.timeSlot.findMany({
   where: {
     doctorId,
@@ -113,7 +119,7 @@ export const getAvailableSlots = async (req, res) => {
   },
   orderBy: { start: "asc" }
 });
-
+ 
     const availableSlots = slots
       .filter(slot => slot.booking.length === 0)
       .map(slot => ({
@@ -126,25 +132,25 @@ export const getAvailableSlots = async (req, res) => {
           slot.end.toISOString().slice(11, 16),
         consultationMode: slot.consultationMode
       }));
-
+ 
     res.json({
       date,
       count: availableSlots.length,
       slots: availableSlots
     });
-
+ 
   } catch (error) {
     console.error("getAvailableSlots error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 export const holdAppointment = async (req, res) => {
-
+ 
   try {
-
+ 
     const { slotId, consultationMode } = req.body;
     const userId = req.user.id;
-
+ 
     const existingBooking = await prisma.booking.findFirst({
       where: {
         timeSlotId: slotId,
@@ -157,13 +163,13 @@ export const holdAppointment = async (req, res) => {
         ]
       }
     });
-
+ 
     if (existingBooking) {
       return res.status(409).json({
         message: "Slot already booked"
       });
     }
-
+ 
     const slot = await prisma.timeSlot.findUnique({
       where: { id: slotId },
       include: {
@@ -172,9 +178,9 @@ export const holdAppointment = async (req, res) => {
         }
       }
     });
-
+ 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
+ 
     const booking = await prisma.booking.create({
       data: {
         userId,
@@ -190,30 +196,30 @@ export const holdAppointment = async (req, res) => {
         hospitalId: slot.doctor.hospital.id
       }
     });
-
+ 
     res.json({
       message: "Slot held successfully",
       bookingId: booking.id,
       expiresAt
     });
-
+ 
   } catch (error) {
-
+ 
     console.error("holdAppointment error:", error);
-
+ 
     res.status(500).json({
       message: "Server error"
     });
-
+ 
   }
-
+ 
 };
-
+ 
 export const getBookingSummary = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
-
+ 
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, userId },
       include: {
@@ -229,14 +235,14 @@ export const getBookingSummary = async (req, res) => {
         }
       }
     });
-
+ 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
-
+ 
     const doctor = booking.timeSlot.doctor;
     const slot = booking.timeSlot;
-
+ 
     /* ============================
        GET LOGGED-IN USER NAME
     ============================ */
@@ -244,13 +250,13 @@ export const getBookingSummary = async (req, res) => {
       where: { id: userId },
       select: { fullName: true }
     });
-
+ 
     const patientName =
       booking.patientProfile?.fullName ||
       user?.fullName ||
       user?.name ||
       "User";
-
+ 
     /* ============================
        PRICING
     ============================ */
@@ -258,7 +264,7 @@ export const getBookingSummary = async (req, res) => {
     const serviceFee = 0;
     const gst = Math.round(consultationFee * 0.18);
     const total = consultationFee + serviceFee + gst;
-
+ 
     /* ============================
        FORMAT TIME
     ============================ */
@@ -268,12 +274,12 @@ export const getBookingSummary = async (req, res) => {
         minute: "2-digit",
         hour12: true
       });
-
+ 
     return res.json({
       bookingId: booking.id,
-
+ 
       consultationMode: booking.consultationMode || slot.consultationMode || "BOTH", // ✅ added
-
+ 
       doctor: {
         name: doctor.name,
         image: doctor.imageUrl || null,
@@ -282,9 +288,9 @@ export const getBookingSummary = async (req, res) => {
         rating: doctor.rating ?? 4.5,
         reviews: doctor.reviews ?? 0
       },
-
+ 
       patient: patientName,
-
+ 
       appointment: {
         date: slot.start.toLocaleDateString("en-IN", {
           weekday: "short",
@@ -293,41 +299,41 @@ export const getBookingSummary = async (req, res) => {
         }),
         time: `${formatTime(slot.start)} - ${formatTime(slot.end)}`
       },
-
+ 
       reason: booking.reason ?? null,
-
+ 
       payment: {
         consultationFee,
         serviceFee,
         gst,
         total
       },
-
+ 
       status: booking.status
     });
-
+ 
   } catch (error) {
     console.error("getBookingSummary error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
+ 
 export const getMyAppointments = async (req, res) => {
   try {
-
+ 
     const userId = Number(req.query.userId);
     let consultationMode = req.query.consultationMode;
-
+ 
     if (consultationMode === "Instant") {
       consultationMode = "ONLINE";
     }
-
+ 
     if (!userId) {
       return res.status(400).json({
         message: "userId is required"
       });
     }
-
+ 
     const whereCondition = {
       userId,
       status: { not: "EXPIRED" },
@@ -335,11 +341,11 @@ export const getMyAppointments = async (req, res) => {
         ? { consultationMode }
         : {})
     };
-
+ 
     const bookings = await prisma.booking.findMany({
       where: whereCondition,
       orderBy: { createdAt: "desc" },
-
+ 
       select: {
         id: true,
         status: true,
@@ -349,7 +355,7 @@ export const getMyAppointments = async (req, res) => {
         reason: true,
         start: true,
         end: true,
-
+ 
         user: {
           select: {
             id: true,
@@ -361,7 +367,7 @@ export const getMyAppointments = async (req, res) => {
             DateOfBirth: true
           }
         },
-
+ 
         patientProfile: {
           select: {
             id: true,
@@ -372,14 +378,14 @@ export const getMyAppointments = async (req, res) => {
             email: true
           }
         },
-
+ 
         timeSlot: {
           select: {
             start: true,
             end: true
           }
         },
-
+ 
         doctor: {
           select: {
             id: true,
@@ -392,14 +398,14 @@ export const getMyAppointments = async (req, res) => {
             languages: true,
             rating: true,
             consultationMode: true,
-
+ 
             category: {
               select: {
                 id: true,
                 name: true
               }
             },
-
+ 
             hospital: {
               select: {
                 id: true,
@@ -421,64 +427,64 @@ export const getMyAppointments = async (req, res) => {
         }
       }
     });
-
+ 
     const upcoming = [];
     const past = [];
     const missed = [];
     const cancelled = [];
-
+ 
     let totalPaidAmount = 0;
-
+ 
     const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-
+ 
     const formatTime = (date) =>
       new Date(date).toISOString().slice(11, 16);
-
+ 
     bookings.forEach((b) => {
-
+ 
       const start = b.timeSlot?.start ?? b.start;
       const end = b.timeSlot?.end ?? b.end;
-
+ 
       if (!start || !end) return;
-
+ 
       // -------------------------
       // PATIENT
       // -------------------------
       const patient = b.patientProfile
         ? { type: "OTHER", ...b.patientProfile }
         : { type: "SELF", ...b.user };
-
+ 
       // -------------------------
       // PAYMENT
       // -------------------------
       const consultationFee = b.doctor.consultationFee ?? 0;
       const gst = Math.round(consultationFee * 0.18);
       const amountPaid = consultationFee + gst;
-
+ 
       if (["CONFIRMED", "COMPLETED", "CHECKED_IN"].includes(b.status)) {
         totalPaidAmount += amountPaid;
       }
-
+ 
       const item = {
-
+ 
         booking: {
           id: b.id,
           status: b.status,
           reason: b.reason,
           createdAt: b.createdAt
         },
-
+ 
         consultation: {
           mode: b.consultationMode
         },
-
+ 
         appointment: {
           date: start.toISOString().slice(0, 10),
           time: `${formatTime(start)} - ${formatTime(end)}`,
           start,
           end
         },
-
+ 
         doctor: {
           id: b.doctor.id,
           name: b.doctor.name,
@@ -491,59 +497,59 @@ export const getMyAppointments = async (req, res) => {
           rating: Number(b.doctor.rating),
           availableModes: b.doctor.consultationMode
         },
-
+ 
         hospital: b.doctor.hospital,
         category: b.doctor.category,
         patient,
-
+ 
         payment: {
           amountPaid
         }
-
+ 
       };
-
+ 
       // ============================
       // STATUS CLASSIFICATION
       // ============================
-
+ 
       if (b.status === "CANCELLED") {
-
+ 
         cancelled.push(item);
-
+ 
       }
-
+ 
       else if (b.status === "MISSED") {
-
+ 
         missed.push(item);
-
+ 
       }
-
+ 
       else if (b.status === "COMPLETED") {
-
+ 
         past.push(item);
-
+ 
       }
-
+ 
       else if (b.status === "CONFIRMED" && end < now) {
-
+ 
         missed.push(item);
-
+ 
       }
-
+ 
       else if (b.status === "CHECKED_IN") {
-
+ 
         past.push(item);
-
+ 
       }
-
+ 
       else {
-
+ 
         upcoming.push(item);
-
+ 
       }
-
+ 
     });
-
+ 
     res.json({
       total: bookings.length,
       upcoming,
@@ -551,75 +557,75 @@ export const getMyAppointments = async (req, res) => {
       missed,
       cancelled
     });
-
+ 
   } catch (error) {
-
+ 
     console.error("getMyAppointments error:", error);
-
+ 
     res.status(500).json({
       message: "Server error"
     });
-
+ 
   }
 };
-
+ 
 export const cancelAppointment = async (req, res) => {
   try {
-
+ 
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
     const { reason } = req.body;
-
+ 
     if (!bookingId) {
       return res.status(400).json({
         message: "bookingId is required"
       });
     }
-
+ 
     if (!reason) {
       return res.status(400).json({
         message: "Cancellation reason is required"
       });
     }
-
+ 
     const booking = await prisma.booking.findFirst({
       where: {
         id: bookingId,
         userId
       }
     });
-
+ 
     if (!booking) {
       return res.status(404).json({
         message: "Booking not found"
       });
     }
-
+ 
     const blockedStatuses = [
       "CANCELLED",
       "COMPLETED",
       "MISSED",
       "CHECKED_IN"
     ];
-
+ 
     if (blockedStatuses.includes(booking.status)) {
       return res.status(400).json({
         message: "Appointment cannot be cancelled"
       });
     }
-
+ 
     const now = new Date();
-
+ 
     if (booking.end < now) {
       return res.status(400).json({
         message: "Past appointments cannot be cancelled"
       });
     }
-
+ 
     // ===============================
     // CANCEL BOOKING
     // ===============================
-
+ 
     await prisma.booking.update({
       where: { id: bookingId },
       data: {
@@ -627,58 +633,158 @@ export const cancelAppointment = async (req, res) => {
         reason
       }
     });
-
+ 
     res.json({
       message: "Appointment cancelled successfully",
       bookingId,
       status: "CANCELLED",
       reason
     });
-
+ 
   } catch (error) {
-
+ 
     console.error("cancelAppointment error:", error);
-
+ 
     res.status(500).json({
       message: "Server error"
     });
-
+ 
   }
 };
+
+/// Reschedule Appointment
+export const rescheduleAppointment = async (req, res) => {
+  try {
+    const bookingId = Number(req.params.bookingId);
+    const { slotId } = req.body;
+    const userId = req.user.id;
+
+    if (!slotId) {
+      return res.status(400).json({ message: "slotId required" });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+
+      //GET BOOKING
+      const booking = await tx.booking.findFirst({
+        where: { id: bookingId, userId },
+        include: { timeSlot: true }
+      });
+
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      if (booking.status === "CANCELLED" || booking.status === "EXPIRED") {
+        throw new Error("This booking cannot be rescheduled");
+      }
+
+      // HOUR RESCHEDULE RESTRICTION
+      const twoHours = 2 * 60 * 60 * 1000;
+      const now = new Date();
+
+      if (booking.start - now < twoHours) {
+        throw new Error("Reschedule not allowed within 2 hours of appointment");
+      }
+
+      // GET NEW SLOT
+      const newSlot = await tx.timeSlot.findUnique({
+        where: { id: slotId },
+        include: { booking: true }
+      });
+
+      if (!newSlot) {
+        throw new Error("Slot not found");
+      }
+      // tp prevent booking for another doctor
+      if (newSlot.doctorId !== booking.doctorId) {
+        throw new Error("Invalid slot for this doctor");
+      }
+      //  PREVENT SAME SLOT
+      if (booking.timeSlotId === newSlot.id) {
+        throw new Error("You already have this slot");
+      }
+
+      // SLOT AVAILABILITY CHECK
+      const activeBooking = newSlot.booking.find(
+        b =>
+          b.status === "CONFIRMED" ||
+          (b.status === "HOLD" && b.expiresAt > new Date())
+      );
+
+      if (activeBooking) {
+        throw new Error("Selected slot already booked");
+      }
+
+      // UPDATE BOOKING TO NEW SLOT
+      const updatedBooking = await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          timeSlotId: newSlot.id,
+          start: newSlot.start,
+          end: newSlot.end
+        }
+      });
+
+      return {
+        updatedBooking,
+        oldSlot: booking.timeSlotId
+      };
+    });
+
+    res.json({
+      message: "Appointment rescheduled successfully",
+      bookingId: result.updatedBooking.id,
+      oldSlotReleased: result.oldSlot,
+      newSlot: {
+        start: result.updatedBooking.start,
+        end: result.updatedBooking.end
+      }
+    });
+
+  } catch (error) {
+    console.error("rescheduleAppointment error:", error);
+
+    res.status(400).json({
+      message: error.message
+    });
+  }
+};
+
 export const createPaymentOrder = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
-
+ 
     const booking = await prisma.booking.findFirst({
       where: { id: bookingId, userId, status: "HOLD" }
     });
-
+ 
     if (!booking) {
       return res.status(404).json({ message: "Invalid booking" });
     }
-
+ 
     if (booking.expiresAt < new Date()) {
       return res.status(409).json({ message: "Booking expired" });
     }
-
+ 
     await prisma.booking.update({
       where: { id: booking.id },
       data: { status: "CONFIRMED" }
     });
-
+ 
     res.json({
       message: "Appointment confirmed successfully",
       bookingId: booking.id,
       consultationMode: booking.consultationMode // ✅ added here
-
+ 
     });
   } catch (error) {
     console.error("createPaymentOrder error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
+ 
 /* ======================================================
    7️⃣ PAYMENT VERIFY
 ====================================================== */
@@ -690,7 +796,7 @@ export const verifyPaymentAndConfirm = async (req, res) => {
       razorpay_payment_id,
       razorpay_signature
     } = req.body;
-
+ 
     const booking = await prisma.booking.findFirst({
       where: {
         id: Number(bookingId),
@@ -698,20 +804,20 @@ export const verifyPaymentAndConfirm = async (req, res) => {
         orderId: razorpay_order_id
       }
     });
-
+ 
     if (!booking) {
       return res.status(404).json({ message: "Invalid booking" });
     }
-
+ 
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
-
+ 
     if (expectedSignature !== razorpay_signature) {
       return res.status(400).json({ message: "Payment verification failed" });
     }
-
+ 
     await prisma.booking.update({
       where: { id: booking.id },
       data: {
@@ -719,7 +825,7 @@ export const verifyPaymentAndConfirm = async (req, res) => {
         paymentId: razorpay_payment_id
       }
     });
-
+ 
     res.json({
       message: "Payment successful",
       bookingId: booking.id
@@ -736,17 +842,17 @@ export const getDoctorBookedSlots = async (req, res) => {
   try {
     const doctorId = req.user.id;
     const { date } = req.query;
-
+ 
     if (!date) {
       return res.status(400).json({ message: "date required" });
     }
-
+ 
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
-
+ 
     const end = new Date(date);
     end.setHours(23, 59, 59, 999);
-
+ 
     const bookings = await prisma.booking.findMany({
       where: {
         doctorId,
@@ -755,7 +861,7 @@ export const getDoctorBookedSlots = async (req, res) => {
       },
       orderBy: { start: "asc" }
     });
-
+ 
     res.json(
       bookings.map(b => ({
         time: `${b.start.toISOString().slice(11, 16)} - ${b.end
@@ -764,7 +870,7 @@ export const getDoctorBookedSlots = async (req, res) => {
         status: b.status
       }))
     );
-
+ 
   } catch (error) {
     console.error("getDoctorBookedSlots error:", error);
     res.status(500).json({ message: "Server error" });
@@ -772,10 +878,10 @@ export const getDoctorBookedSlots = async (req, res) => {
 };
 export const getPaymentSuccessDetails = async (req, res) => {
   try {
-
+ 
     const bookingId = Number(req.params.bookingId);
     const userId = req.user.id;
-
+ 
     const booking = await prisma.booking.findFirst({
       where: {
         id: bookingId,
@@ -798,20 +904,20 @@ export const getPaymentSuccessDetails = async (req, res) => {
         }
       }
     });
-
+ 
     if (!booking) {
       return res.status(404).json({
         message: "Booking not found"
       });
     }
-
+ 
     const doctor = booking.timeSlot.doctor;
     const hospital = doctor.hospital;
-
+ 
     // =========================
     // PATIENT DETAILS
     // =========================
-
+ 
     const patient = booking.patientProfile
       ? {
           type: "OTHER",
@@ -832,27 +938,27 @@ export const getPaymentSuccessDetails = async (req, res) => {
           gender: booking.user.gender,
           DateOfBirth: booking.user.DateOfBirth
         };
-
+ 
     const consultationFee = doctor.consultationFee ?? 0;
-
+ 
     res.json({
-
+ 
       bookingId: booking.id,
-
+ 
       // ✅ BOOKING CREATED TIME
       bookedAt: booking.createdAt,
-
+ 
       consultationMode:
         booking.consultationMode ||
         booking.timeSlot.consultationMode ||
         "BOTH",
-
+ 
       payment: {
         status: "SUCCESS",
         amountPaid: consultationFee,
         hospital: hospital.name
       },
-
+ 
       doctor: {
         name: doctor.name,
         image: doctor.imageUrl || null,
@@ -861,7 +967,7 @@ export const getPaymentSuccessDetails = async (req, res) => {
         rating: doctor.rating ?? 0,
         reviews: doctor.reviews ?? 0
       },
-
+ 
       appointment: {
         date: booking.timeSlot.start.toDateString(),
         time:
@@ -869,27 +975,27 @@ export const getPaymentSuccessDetails = async (req, res) => {
           " - " +
           booking.timeSlot.end.toISOString().slice(11,16)
       },
-
+ 
       hospital: {
         name: hospital.name,
         latitude: hospital.latitude,
         longitude: hospital.longitude
       },
-
+ 
       // ✅ PATIENT FULL DETAILS
       patient,
-
+ 
       shareLink: `${process.env.BASE_URL || "https://hospital-backend-1-9jq0.onrender.com"}/appointments/${booking.id}`
-
+ 
     });
-
+ 
   } catch (error) {
-
+ 
     console.error("getPaymentSuccessDetails error:", error);
-
+ 
     res.status(500).json({
       message: "Server error"
     });
-
+ 
   }
 };

@@ -30,7 +30,7 @@ model User {
   gender                String?           @default("MALE")
   DateOfBirth           DateTime?         @db.Date
   bookings              Booking[]
-  FamilyMember          FamilyMember[]
+  familyMembers         FamilyMember[]
   labAddresses          LabAddress[]
   labBookings           LabBooking[]
   labCart               LabCart[]
@@ -140,21 +140,6 @@ model Doctor {
   timeSlots        TimeSlot[]
 }
 
-model Review {
-  id        Int      @id @default(autoincrement())
-  doctorId  Int
-  userName  String
-  userImage String?
-  rating    Int
-  comment   String?
-  createdAt DateTime @default(now())
-  userId    Int?
-  doctor    Doctor   @relation(fields: [doctorId], references: [id])
-  User      User?    @relation(fields: [userId], references: [id])
-
-  @@index([doctorId])
-}
-
 model DoctorAvailability {
   id        Int      @id @default(autoincrement())
   doctorId  Int
@@ -192,17 +177,14 @@ model Booking {
   status           BookingStatus
   expiresAt        DateTime?
   reason           String?
-
   timeSlotId       Int?
-  timeSlot         TimeSlot?        @relation(fields: [timeSlotId], references: [id])
-
   doctorName       String?
   hospitalName     String?
   hospitalId       Int?
   consultationMode ConsultationMode
-
   doctor           Doctor           @relation(fields: [doctorId], references: [id])
   patientProfile   PatientProfile?  @relation(fields: [patientProfileId], references: [id])
+  timeSlot         TimeSlot?        @relation(fields: [timeSlotId], references: [id])
   user             User             @relation(fields: [userId], references: [id])
   notification     Notification?
 
@@ -351,11 +333,11 @@ model LabBooking {
   sampleDate       DateTime
   createdAt        DateTime         @default(now())
   expiresAt        DateTime?
-  reason       String?
   slotId           Int?
   patientProfileId Int?
   packageId        Int?
   labAddressId     Int?
+  reason           String?
   LabAddress       LabAddress?      @relation(fields: [labAddressId], references: [id])
   lab              Lab              @relation(fields: [labId], references: [id])
   package          LabPackage?      @relation(fields: [packageId], references: [id])
@@ -495,19 +477,19 @@ model LabCategories {
 }
 
 model FamilyMember {
-  id           Int            @id @default(autoincrement())
-  userId       Int
-  fullName     String
-  relation     Relation
-  age          Int?
-  gender       String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  phone        String?        @db.VarChar(10)
-  email        String?        @unique @db.VarChar(255)
-  photo        String?
-  User         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  FamilyReport FamilyReport[]
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  fullName  String
+  relation  Relation
+  age       Int?
+  gender    String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  phone     String?        @db.VarChar(10)
+  email     String?        @unique @db.VarChar(255)
+  photo     String?
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports   FamilyReport[]
 }
 
 model FamilyReport {
@@ -516,7 +498,22 @@ model FamilyReport {
   url            String
   type           String
   createdAt      DateTime     @default(now())
-  FamilyMember   FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  familyMember   FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  userName  String
+  userImage String?
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  userId    Int?
+  Doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  User      User?    @relation(fields: [userId], references: [id])
+
+  @@index([doctorId])
 }
 
 enum BookingFor {
@@ -544,8 +541,8 @@ enum LabPackageGender {
 enum ConsultationMode {
   ONLINE
   OFFLINE
-  INSTANT
   BOTH
+  INSTANT
 }
 
 enum HospitalStatus {

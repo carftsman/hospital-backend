@@ -5,7 +5,7 @@ import { randomUUID } from "crypto";
 export const uploadPrescription = async (req, res) => {
   try {
     const userId = req.user.id;
-    const files = req.files; // 👈 MULTIPLE FILES
+    const files = req.files; // MULTIPLE FILES
 
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "At least one file is required" });
@@ -97,7 +97,7 @@ export const getUserPrescriptions = async (req, res) => {
 
     const groupedArray = Object.values(groupedMap);
 
-    // 👇 Only latest group (already sorted by createdAt desc)
+    // Only latest group (already sorted by createdAt desc)
     const latestGroup = groupedArray[0];
 
     return res.json({
