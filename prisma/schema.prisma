@@ -210,21 +210,23 @@ model Notification {
 }
 
 model PatientProfile {
-  id          Int          @id @default(autoincrement())
-  userId      Int
-  fullName    String
-  phone       String?
-  age         Int?
-  gender      String?      @default("MALE")
-  isSelf      Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  email       String?
-  dob         DateTime?    @db.Timestamp(6)
-  booking     Booking[]
-  labBookings LabBooking[]
-  labCarts    LabCart[]
-  user        User         @relation(fields: [userId], references: [id])
+  id              Int                 @id @default(autoincrement())
+  userId          Int
+  fullName        String
+  phone           String?
+  age             Int?
+  gender          String?             @default("MALE")
+  isSelf          Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  email           String?
+  dob             DateTime?           @db.Timestamp(6)
+  booking         Booking[]
+  labBookings     LabBooking[]
+  labCarts        LabCart[]
+  bookingPackages LabBookingPackage[] // ⭐ ADD THIS
+
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
@@ -326,29 +328,43 @@ model LabSlot {
 }
 
 model LabBooking {
-  id               Int              @id @default(autoincrement())
+  id               Int                 @id @default(autoincrement())
   userId           Int
   labId            Int
-  status           LabBookingStatus @default(PENDING)
+  status           LabBookingStatus    @default(PENDING)
   sampleDate       DateTime
-  createdAt        DateTime         @default(now())
+  createdAt        DateTime            @default(now())
   expiresAt        DateTime?
   slotId           Int?
   patientProfileId Int?
   packageId        Int?
   labAddressId     Int?
   reason           String?
-  LabAddress       LabAddress?      @relation(fields: [labAddressId], references: [id])
-  lab              Lab              @relation(fields: [labId], references: [id])
-  package          LabPackage?      @relation(fields: [packageId], references: [id])
-  patient          PatientProfile?  @relation(fields: [patientProfileId], references: [id])
-  slot             LabSlot?         @relation(fields: [slotId], references: [id])
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  LabAddress       LabAddress?         @relation(fields: [labAddressId], references: [id])
+  lab              Lab                 @relation(fields: [labId], references: [id])
+  package          LabPackage?         @relation(fields: [packageId], references: [id])
+  patient          PatientProfile?     @relation(fields: [patientProfileId], references: [id])
+  slot             LabSlot?            @relation(fields: [slotId], references: [id])
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   LabFeedback      LabFeedback?
   LabReport        LabReport?
+  packages         LabBookingPackage[]
 
   @@unique([slotId, sampleDate])
   @@index([userId])
+}
+
+model LabBookingPackage {
+  id Int @id @default(autoincrement())
+
+  bookingId        Int
+  packageId        Int
+  patientProfileId Int?
+  price            Int
+
+  booking LabBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  package LabPackage      @relation(fields: [packageId], references: [id])
+  patient PatientProfile? @relation(fields: [patientProfileId], references: [id])
 }
 
 model LabReport {
@@ -435,22 +451,23 @@ model Reminder {
 }
 
 model LabPackage {
-  id            Int              @id @default(autoincrement())
-  labId         Int
-  name          String
-  description   String?
-  reportTime    String?
-  originalPrice Int              @default(0)
-  finalPrice    Int              @default(0)
-  createdAt     DateTime         @default(now())
-  minage        Int?
-  maxage        Int?
-  gender        LabPackageGender @default(MALE)
-  bookings      LabBooking[]
-  LabCart       LabCart[]
-  lab           Lab              @relation(fields: [labId], references: [id])
-  items         LabPackageItem[]
-  recentViews   LabRecentView[]
+  id              Int                 @id @default(autoincrement())
+  labId           Int
+  name            String
+  description     String?
+  reportTime      String?
+  originalPrice   Int                 @default(0)
+  finalPrice      Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  minage          Int?
+  maxage          Int?
+  gender          LabPackageGender    @default(MALE)
+  bookings        LabBooking[]
+  LabCart         LabCart[]
+  lab             Lab                 @relation(fields: [labId], references: [id])
+  items           LabPackageItem[]
+  recentViews     LabRecentView[]
+  bookingPackages LabBookingPackage[] // ⭐ ADD THIS
 
   @@index([labId])
   @@index([gender])

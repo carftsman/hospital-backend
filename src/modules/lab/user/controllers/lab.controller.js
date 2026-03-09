@@ -275,82 +275,162 @@ export const getPackagesByAge = async (req, res) => {
 };
 
 export const getUserPastLabBookings = async (req, res) => {
-  const userId = Number(req.query.userId);
+  try {
+    const userId = Number(req.query.userId);
 
-  const bookings = await prisma.labBooking.findMany({
-    where: {
-      userId,
-      status: { in: ["COMPLETED", "CANCELLED"] },
-    },
-    include: {
-      lab: true,
-      package: {
-        include: {
-          items: {
-            include: { test: true },
-          },
-        },
+    const bookings = await prisma.labBooking.findMany({
+      where: {
+        userId,
+        status: { in: ["COMPLETED", "CANCELLED"] }
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      include: {
+        lab: true,
 
-  const formatted = bookings.map(b => ({
-    bookingId: b.id,
-    labName: b.lab?.name,
-    status: b.status,
-    tests: b.package
-      ? b.package.items.map(i => i.test.name)
-      : [],
-    date: b.createdAt.toISOString().split("T")[0],
-  }));
+        // NEW MULTI PACKAGE STRUCTURE
+        packages: {
+          include: {
+            package: {
+              include: {
+                items: {
+                  include: { test: true }
+                }
+              }
+            }
+          }
+        },
 
-  res.json({ count: formatted.length, bookings: formatted });
+        // OLD STRUCTURE SUPPORT
+        package: {
+          include: {
+            items: {
+              include: { test: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    const formatted = bookings.map(b => {
+
+      let tests = [];
+
+      // NEW STRUCTURE
+      if (b.packages?.length) {
+        tests = b.packages.flatMap(p =>
+          p.package.items.map(i => i.test.name)
+        );
+      }
+
+      // OLD STRUCTURE
+      else if (b.package) {
+        tests = b.package.items.map(i => i.test.name);
+      }
+
+      // REMOVE DUPLICATES
+      tests = [...new Set(tests)];
+
+      return {
+        bookingId: b.id,
+        labName: b.lab?.name,
+        status: b.status,
+        tests,
+        date: b.createdAt.toISOString().split("T")[0]
+      };
+    });
+
+    res.json({
+      count: formatted.length,
+      bookings: formatted
+    });
+
+  } catch (error) {
+    console.error("getUserPastLabBookings error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const getUserUpcomingLabBookings = async (req, res) => {
-  const userId = Number(req.query.userId);
+  try {
+    const userId = Number(req.query.userId);
 
-  if (!userId) {
-    return res.status(400).json({ message: "userId required" });
-  }
+    if (!userId) {
+      return res.status(400).json({ message: "userId required" });
+    }
 
-  const bookings = await prisma.labBooking.findMany({
-    where: {
-      userId,
-      status: { in: ["HOLD", "CONFIRMED"] }
-    },
-    include: {
-      lab: true,
-      package: {
-        include: {
-          items: {
-            include: { test: true }
+    const bookings = await prisma.labBooking.findMany({
+      where: {
+        userId,
+        status: { in: ["HOLD", "CONFIRMED"] }
+      },
+
+      include: {
+        lab: true,
+
+        // ✅ NEW MULTI PACKAGE STRUCTURE
+        packages: {
+          include: {
+            package: {
+              include: {
+                items: {
+                  include: { test: true }
+                }
+              }
+            }
+          }
+        },
+
+        // optional support for old bookings
+        package: {
+          include: {
+            items: {
+              include: { test: true }
+            }
           }
         }
+      },
+
+      orderBy: { sampleDate: "asc" }
+    });
+
+    const formatted = bookings.map(b => {
+
+      let tests = [];
+
+      // NEW STRUCTURE
+      if (b.packages?.length) {
+        tests = b.packages.flatMap(p =>
+          p.package.items.map(i => i.test.name)
+        );
       }
-    },
-    orderBy: { sampleDate: "asc" }
-  });
 
-  const formatted = bookings.map(b => ({
-    bookingId: b.id,
-    labName: b.lab?.name,
+      // OLD STRUCTURE
+      else if (b.package) {
+        tests = b.package.items.map(i => i.test.name);
+      }
 
-    // ✅ FIXED DATE FORMAT
-    sampleDate: b.sampleDate
-      ? new Date(b.sampleDate).toISOString().split("T")[0]
-      : null,
+      // remove duplicates
+      tests = [...new Set(tests)];
 
-    tests: b.package
-      ? b.package.items.map(i => i.test.name)
-      : []
-  }));
+      return {
+        bookingId: b.id,
+        labName: b.lab?.name,
+        sampleDate: b.sampleDate
+          ? new Date(b.sampleDate).toISOString().split("T")[0]
+          : null,
+        tests
+      };
+    });
 
-  res.json({
-    count: formatted.length,
-    bookings: formatted
-  });
+    res.json({
+      count: formatted.length,
+      bookings: formatted
+    });
+
+  } catch (error) {
+    console.error("getUserUpcomingLabBookings error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 export const searchLabs = async (req, res) => {
   const { query } = req.query;
@@ -769,40 +849,16 @@ export const filterLabPackages = async (req, res) => {
 
 export const confirmLabBooking = async (req, res) => {
   try {
-
     const { userId, slotId } = req.body;
 
     const booking = await prisma.$transaction(async (tx) => {
 
-      const now = new Date();
-
-      /* 1️⃣ GET CART ITEM */
-      const cartItem = await tx.labCart.findFirst({
+      const cartItems = await tx.labCart.findMany({
         where: { userId: Number(userId) }
       });
 
-      if (!cartItem) {
+      if (!cartItems.length) {
         throw new Error("CART_EMPTY");
-      }
-
-      /* 2️⃣ SLOT CHECK */
-      const existing = await tx.labBooking.findFirst({
-        where: {
-          slotId: Number(slotId),
-          OR: [
-            { status: "CONFIRMED" },
-            { status: "SAMPLE_COLLECTED" },
-            { status: "COMPLETED" },
-            {
-              status: "HOLD",
-              expiresAt: { gt: now }
-            }
-          ]
-        }
-      });
-
-      if (existing) {
-        throw new Error("SLOT_BOOKED");
       }
 
       const slot = await tx.labSlot.findUnique({
@@ -813,26 +869,41 @@ export const confirmLabBooking = async (req, res) => {
         throw new Error("SLOT_NOT_FOUND");
       }
 
-      /* 3️⃣ CREATE BOOKING */
+      // 1️⃣ CREATE ONE BOOKING
       const booking = await tx.labBooking.create({
         data: {
           userId: Number(userId),
           labId: slot.labId,
-          packageId: cartItem.packageId,   // ⭐ FROM CART
-          patientProfileId: cartItem.patientProfileId,
           slotId: slot.id,
           sampleDate: slot.slotDate,
           status: "CONFIRMED"
         }
       });
 
-      /* 4️⃣ CLEAR CART */
+      // 2️⃣ ADD PACKAGES
+      for (const item of cartItems) {
+
+        const pkg = await tx.labPackage.findUnique({
+          where: { id: item.packageId }
+        });
+
+        await tx.labBookingPackage.create({
+          data: {
+            bookingId: booking.id,
+            packageId: item.packageId,
+            patientProfileId: item.patientProfileId,
+            price: pkg.finalPrice
+          }
+        });
+
+      }
+
+      // 3️⃣ CLEAR CART
       await tx.labCart.deleteMany({
         where: { userId: Number(userId) }
       });
 
       return booking;
-
     });
 
     res.json({
@@ -843,32 +914,18 @@ export const confirmLabBooking = async (req, res) => {
   } catch (err) {
 
     if (err.message === "CART_EMPTY") {
-      return res.status(400).json({
-        message: "Cart is empty"
-      });
-    }
-
-    if (err.message === "SLOT_BOOKED") {
-      return res.status(409).json({
-        message: "Slot already booked by another user"
-      });
+      return res.status(400).json({ message: "Cart is empty" });
     }
 
     if (err.message === "SLOT_NOT_FOUND") {
-      return res.status(404).json({
-        message: "Slot not found"
-      });
+      return res.status(404).json({ message: "Slot not found" });
     }
 
     console.error(err);
-
-    res.status(500).json({
-      message: "Server error"
-    });
+    res.status(500).json({ message: "Server error" });
 
   }
 };
-
 export const getLabBookingById = async (req, res) => {
   try {
     const bookingId = Number(req.params.bookingId);
@@ -879,7 +936,8 @@ export const getLabBookingById = async (req, res) => {
         lab: true,
         slot: true,
         patient: true,
-        user: true   // ⭐ needed for self name
+        user: true,
+        package: true
       }
     });
 
@@ -887,67 +945,40 @@ export const getLabBookingById = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    /* ---------- SAFE FORMATTERS ---------- */
-
     const safeDate = (d) =>
       d ? new Date(d).toLocaleDateString("en-IN") : null;
 
     const safeTime = (t) => {
-      if (!t) return null;
+  if (!t) return null;
 
-      let dateObj;
+  const dateObj =
+    t instanceof Date
+      ? t
+      : new Date(`1970-01-01T${t}`);
 
-      // Case 1: Already Date object
-      if (t instanceof Date) {
-        dateObj = t;
-      }
-      // Case 2: Full ISO string
-      else if (String(t).includes("T")) {
-        dateObj = new Date(t);
-      }
-      // Case 3: HH:mm:ss
-      else {
-        dateObj = new Date(`1970-01-01T${t}`);
-      }
+  if (isNaN(dateObj)) return null;
 
-      if (isNaN(dateObj)) return null;
-
-      return dateObj.toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true
-      });
-    };
+  return dateObj.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+};
 
     const start = booking.slot ? safeTime(booking.slot.startTime) : null;
     const end = booking.slot ? safeTime(booking.slot.endTime) : null;
 
-    /* ---------- PATIENT NAME LOGIC ---------- */
-
-    let patientName = null;
-
-    // 1️⃣ Family member
-    if (booking.patient && !booking.patient.isSelf) {
-      patientName = booking.patient.fullName;
-    }
-
-    // 2️⃣ Self booking → use USER NAME
-    if (!patientName && booking.user?.fullName) {
-      patientName = booking.user.fullName;
-    }
-
-    // 3️⃣ Final fallback
-    if (!patientName) {
-      patientName = "Guest";
-    }
-
-    /* ---------- RESPONSE ---------- */
+    const patientName =
+      booking.patient?.fullName ||
+      booking.user?.fullName ||
+      "Guest";
 
     return res.json({
       message: "Booking Details",
       booking: {
         bookingId: booking.id,
         labName: booking.lab?.name,
+        packageName: booking.package?.name,
 
         slot: {
           date: booking.slot ? safeDate(booking.slot.slotDate) : null,
@@ -976,10 +1007,10 @@ export const getUserLabBookings = async (req, res) => {
 
   const bookings = await prisma.labBooking.findMany({
     where: { userId },
-    include: {
-      lab: true,
-      labTest: true,
-    },
+   include: {
+  lab: true,
+  package: true
+},
     orderBy: { createdAt: "desc" },
   });
 
@@ -988,16 +1019,22 @@ export const getUserLabBookings = async (req, res) => {
 
 export const getLabInvoice = async (req, res) => {
   try {
+
     const bookingId = Number(req.params.bookingId);
 
     const booking = await prisma.labBooking.findUnique({
       where: { id: bookingId },
       include: {
         lab: true,
-        package: true,
-        patient: true,
         user: true,
-        slot: true
+        slot: true,
+
+        packages: {
+          include: {
+            package: true,
+            patient: true
+          }
+        }
       }
     });
 
@@ -1006,59 +1043,70 @@ export const getLabInvoice = async (req, res) => {
     }
 
     const formatDate = (d) =>
-      new Date(d).toLocaleDateString("en-IN");
+      new Date(d).toISOString().split("T")[0];
 
     const formatTime = (t) =>
-      new Date(t).toLocaleTimeString("en-IN", {
+      new Date(`1970-01-01T${t}`).toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: true
       });
 
-    const start = formatTime(booking.slot.startTime);
-    const end = formatTime(booking.slot.endTime);
+    const start = booking.slot ? formatTime(booking.slot.startTime) : null;
+    const end = booking.slot ? formatTime(booking.slot.endTime) : null;
 
-    const patientName =
-      booking.patient?.fullName ||
-      booking.user?.fullName ||
-      "Self";
+    // 🔹 Build tests with patient info
+    const tests = booking.packages.map(p => {
+
+      const patient = p.patient || {
+        fullName: booking.user.fullName,
+        phone: booking.user.phone,
+        age: null,
+        gender: null,
+        isSelf: true
+      };
+
+      return {
+        packageName: p.package.name,
+        price: p.price,
+
+        patient: {
+          name: patient.fullName,
+          age: patient.age,
+          gender: patient.gender,
+          phone: patient.phone,
+          isSelf: patient.isSelf || false
+        }
+      };
+    });
+
+    const subtotal = tests.reduce((sum, t) => sum + t.price, 0);
 
     res.json({
-      message: "Invoice generated",
       invoice: {
+
         invoiceId: `LAB-${booking.id}`,
         bookingId: booking.id,
         status: booking.status,
 
         lab: {
-          name: booking.lab.name,
-          address: booking.lab.address || booking.lab.city,
-          phone: booking.lab.phone
-        },
-
-        patient: {
-          name: patientName,
-          age: booking.patient?.age,
-          gender: booking.patient?.gender
-        },
-
-        test: {
-          packageName: booking.package?.name,
-          price: booking.package?.finalPrice
+          name: booking.lab?.name,
+          address: booking.lab?.address || booking.lab?.city,
+          phone: booking.lab?.phone
         },
 
         slot: {
           date: formatDate(booking.sampleDate),
-          time: `${start} - ${end}`
+          time: start && end ? `${start} - ${end}` : null
         },
 
+        tests,
+
         payment: {
-          subtotal: booking.package?.finalPrice || 0,
+          subtotal,
           discount: 0,
           tax: 0,
-          total: booking.package?.finalPrice || 0,
-          paid: true,
-          paymentMode: "CASH" // or ONLINE later
+          total: subtotal
         },
 
         generatedAt: new Date()
@@ -1066,8 +1114,12 @@ export const getLabInvoice = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+
+    console.error("getLabInvoice error:", err);
+
+    res.status(500).json({
+      message: "Server error"
+    });
   }
 };
 export const cancelLabBooking = async (req, res) => {
