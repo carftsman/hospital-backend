@@ -949,21 +949,21 @@ export const getLabBookingById = async (req, res) => {
       d ? new Date(d).toLocaleDateString("en-IN") : null;
 
     const safeTime = (t) => {
-  if (!t) return null;
+      if (!t) return null;
 
-  const dateObj =
-    t instanceof Date
-      ? t
-      : new Date(`1970-01-01T${t}`);
+      const dateObj =
+        t instanceof Date
+          ? t
+          : new Date(`1970-01-01T${t}`);
 
-  if (isNaN(dateObj)) return null;
+      if (isNaN(dateObj)) return null;
 
-  return dateObj.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true
-  });
-};
+      return dateObj.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+    };
 
     const start = booking.slot ? safeTime(booking.slot.startTime) : null;
     const end = booking.slot ? safeTime(booking.slot.endTime) : null;
@@ -1007,10 +1007,10 @@ export const getUserLabBookings = async (req, res) => {
 
   const bookings = await prisma.labBooking.findMany({
     where: { userId },
-   include: {
-  lab: true,
-  package: true
-},
+    include: {
+      lab: true,
+      package: true
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -1022,13 +1022,18 @@ export const getLabInvoice = async (req, res) => {
 
     const bookingId = Number(req.params.bookingId);
 
+    if (!bookingId) {
+      return res.status(400).json({
+        message: "Invalid bookingId"
+      });
+    }
+
     const booking = await prisma.labBooking.findUnique({
       where: { id: bookingId },
       include: {
         lab: true,
         user: true,
         slot: true,
-
         packages: {
           include: {
             package: true,
@@ -1039,48 +1044,73 @@ export const getLabInvoice = async (req, res) => {
     });
 
     if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
+      return res.status(404).json({
+        message: "Booking not found"
+      });
     }
 
+    // 📅 Safe Date Format
     const formatDate = (d) =>
-      new Date(d).toISOString().split("T")[0];
+      d ? new Date(d).toISOString().split("T")[0] : null;
 
-    const formatTime = (t) =>
-      new Date(`1970-01-01T${t}`).toLocaleTimeString("en-IN", {
+    // ⏰ Safe Time Format
+    const formatTime = (t) => {
+      if (!t) return null;
+
+      const dateObj =
+        t instanceof Date
+          ? t
+          : new Date(`1970-01-01T${t}`);
+
+      if (isNaN(dateObj)) return null;
+
+      return dateObj.toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: true
       });
+    };
 
-    const start = booking.slot ? formatTime(booking.slot.startTime) : null;
-    const end = booking.slot ? formatTime(booking.slot.endTime) : null;
+    const start = booking.slot
+      ? formatTime(booking.slot.startTime)
+      : null;
 
-    // 🔹 Build tests with patient info
-    const tests = booking.packages.map(p => {
+    const end = booking.slot
+      ? formatTime(booking.slot.endTime)
+      : null;
 
-      const patient = p.patient || {
-        fullName: booking.user.fullName,
-        phone: booking.user.phone,
-        age: null,
-        gender: null,
-        isSelf: true
-      };
+    // 🔹 Build test/package list
+    const tests = booking.packages.map((p) => {
+
+      // If family member exists use that
+      const patient = p.patient
+        ? {
+          name: p.patient.fullName,
+          age: p.patient.age,
+          gender: p.patient.gender,
+          phone: p.patient.phone,
+          isSelf: p.patient.isSelf || false
+        }
+        : {
+          name: booking.user.fullName,
+          age: null,
+          gender: booking.user.gender || "MALE",
+          phone: booking.user.phone,
+          isSelf: true
+        };
 
       return {
         packageName: p.package.name,
         price: p.price,
-
-        patient: {
-          name: patient.fullName,
-          age: patient.age,
-          gender: patient.gender,
-          phone: patient.phone,
-          isSelf: patient.isSelf || false
-        }
+        patient
       };
     });
 
-    const subtotal = tests.reduce((sum, t) => sum + t.price, 0);
+    // 💰 Calculate subtotal
+    const subtotal = tests.reduce(
+      (sum, t) => sum + (t.price || 0),
+      0
+    );
 
     res.json({
       invoice: {
@@ -1091,13 +1121,19 @@ export const getLabInvoice = async (req, res) => {
 
         lab: {
           name: booking.lab?.name,
-          address: booking.lab?.address || booking.lab?.city,
-          phone: booking.lab?.phone
+          address:
+            booking.lab?.address ||
+            booking.lab?.city ||
+            null,
+          phone: booking.lab?.phone || null
         },
 
         slot: {
           date: formatDate(booking.sampleDate),
-          time: start && end ? `${start} - ${end}` : null
+          time:
+            start && end
+              ? `${start} - ${end}`
+              : null
         },
 
         tests,
